@@ -2,6 +2,8 @@ import { useState, FormEvent } from 'react';
 import { Card } from '../components/Card';
 import { toPersianDigits } from '../lib/format';
 import { useToast } from '../lib/toast';
+import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
+import { FormError } from '../components/FormError';
 import {
   useAcademicYears,
   useCreateAcademicYear,
@@ -37,7 +39,7 @@ function AcademicYearsPanel() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isCurrent, setIsCurrent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ParsedApiError | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -51,7 +53,10 @@ function AcademicYearsPanel() {
           setEndDate('');
           setIsCurrent(false);
         },
-        onError: () => setError('ثبت سال تحصیلی با خطا مواجه شد'),
+        onError: (err) => {
+          setError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
       },
     );
   }
@@ -59,7 +64,7 @@ function AcademicYearsPanel() {
   function setAsCurrent(id: string) {
     updateAcademicYear.mutate(
       { id, dto: { isCurrent: true } },
-      { onError: () => showError('تغییر سال جاری با خطا مواجه شد') },
+      { onError: (err) => showError(getErrorMessage(err)) },
     );
   }
 
@@ -86,7 +91,7 @@ function AcademicYearsPanel() {
           <input type="checkbox" checked={isCurrent} onChange={(e) => setIsCurrent(e.target.checked)} />
           این سال، سال جاری باشد
         </label>
-        {error && <div className="rounded-lg bg-overdue/10 px-3 py-2 text-sm text-overdue">{error}</div>}
+        <FormError error={error} />
         <button
           type="submit"
           disabled={createAcademicYear.isPending}
@@ -123,7 +128,8 @@ function GradesPanel() {
   const grades = gradesQuery.data ?? [];
 
   const [title, setTitle] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ParsedApiError | null>(null);
+  const { showError } = useToast();
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -132,7 +138,10 @@ function GradesPanel() {
       { title },
       {
         onSuccess: () => setTitle(''),
-        onError: () => setError('ثبت پایه با خطا مواجه شد'),
+        onError: (err) => {
+          setError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
       },
     );
   }
@@ -156,7 +165,7 @@ function GradesPanel() {
         </button>
       </form>
 
-      {error && <div className="mb-3 rounded-lg bg-overdue/10 px-3 py-2 text-sm text-overdue">{error}</div>}
+      <FormError error={error} />
 
       <ul className="divide-y divide-line">
         {grades.map((g, i) => (

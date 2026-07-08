@@ -1,6 +1,8 @@
 import { useState, FormEvent } from 'react';
 import { Card } from '../components/Card';
 import { useToast } from '../lib/toast';
+import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
+import { FormError } from '../components/FormError';
 import type { ManagedUser } from '../types/user.types';
 import type { School } from '../types/school.types';
 import type { UserRole } from '../types/auth.types';
@@ -24,11 +26,12 @@ export function UsersPage() {
   const users = usersQuery.data ?? [];
   const schools = schoolsQuery.data ?? [];
   const [showForm, setShowForm] = useState(false);
+  const [createError, setCreateError] = useState<ParsedApiError | null>(null);
 
   function toggleActive(u: ManagedUser) {
     updateUser.mutate(
       { id: u.id, isActive: !u.isActive },
-      { onError: () => showError('تغییر وضعیت کاربر با خطا مواجه شد') },
+      { onError: (err) => showError(getErrorMessage(err)) },
     );
   }
 
@@ -48,15 +51,20 @@ export function UsersPage() {
         <CreateUserForm
           schools={schools}
           saving={createUser.isPending}
-          onSubmit={(dto) =>
+          error={createError}
+          onSubmit={(dto) => {
+            setCreateError(null);
             createUser.mutate(dto, {
               onSuccess: () => {
                 setShowForm(false);
                 showSuccess('کاربر ثبت شد');
               },
-              onError: () => showError('ثبت کاربر با خطا مواجه شد'),
-            })
-          }
+              onError: (err) => {
+                setCreateError(parseApiError(err));
+                showError(getErrorMessage(err));
+              },
+            });
+          }}
         />
       )}
 
@@ -106,10 +114,12 @@ export function UsersPage() {
 function CreateUserForm({
   schools,
   saving,
+  error,
   onSubmit,
 }: {
   schools: School[];
   saving: boolean;
+  error: ParsedApiError | null;
   onSubmit: (dto: { fullName: string; phone: string; password: string; role: UserRole; schoolId?: string }) => void;
 }) {
   const [fullName, setFullName] = useState('');
@@ -161,6 +171,7 @@ function CreateUserForm({
         )}
 
         <div className="col-span-full">
+          <FormError error={error} />
           <button
             type="submit"
             disabled={saving}

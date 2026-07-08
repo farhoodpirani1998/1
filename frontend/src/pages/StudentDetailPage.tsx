@@ -4,10 +4,12 @@ import { Card } from '../components/Card';
 import { StatusBadge } from '../components/StatusBadge';
 import { RecordPaymentModal, PayableInstallment } from '../components/RecordPaymentModal';
 import { VoidPaymentDialog } from '../components/VoidPaymentDialog';
+import { FormError } from '../components/FormError';
 import { formatToman, formatDate } from '../lib/format';
 import { useToast } from '../lib/toast';
 import { useAuth } from '../lib/auth';
 import { hasPermission, Permission } from '../lib/permissions';
+import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
 import type { StudentStatus, Student, Grade } from '../types/student.types';
 import { useStudent } from '../hooks/useStudent';
 import { useUpdateStudent, useGrades, useAcademicYears } from '../hooks/useStudents';
@@ -28,6 +30,7 @@ export function StudentDetailPage() {
 
   const [payingInstallment, setPayingInstallment] = useState<PayableInstallment | null>(null);
   const [voidingPaymentId, setVoidingPaymentId] = useState<string | null>(null);
+  const [voidError, setVoidError] = useState<ParsedApiError | null>(null);
   const [expandedInstallment, setExpandedInstallment] = useState<string | null>(null);
   const [editingProfile, setEditingProfile] = useState(false);
 
@@ -36,6 +39,7 @@ export function StudentDetailPage() {
 
   function handleVoidPayment(reason: string) {
     if (!voidingPaymentId || !id) return;
+    setVoidError(null);
     voidPayment.mutate(
       { paymentId: voidingPaymentId, reason, studentId: id },
       {
@@ -43,7 +47,10 @@ export function StudentDetailPage() {
           showSuccess('پرداخت لغو شد');
           setVoidingPaymentId(null);
         },
-        onError: () => showError('لغو پرداخت با خطا مواجه شد'),
+        onError: (err) => {
+          setVoidError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
       },
     );
   }
@@ -54,7 +61,7 @@ export function StudentDetailPage() {
       { id, dto: { status } },
       {
         onSuccess: () => showSuccess('وضعیت دانش‌آموز به‌روزرسانی شد'),
-        onError: () => showError('به‌روزرسانی وضعیت با خطا مواجه شد'),
+        onError: (err) => showError(getErrorMessage(err)),
       },
     );
   }
@@ -255,7 +262,14 @@ export function StudentDetailPage() {
       )}
 
       {voidingPaymentId && (
-        <VoidPaymentDialog onConfirm={handleVoidPayment} onCancel={() => setVoidingPaymentId(null)} />
+        <VoidPaymentDialog
+          error={voidError}
+          onConfirm={handleVoidPayment}
+          onCancel={() => {
+            setVoidingPaymentId(null);
+            setVoidError(null);
+          }}
+        />
       )}
     </div>
   );
@@ -289,6 +303,7 @@ function CreateTuitionPlanForm({ studentId }: { studentId: string }) {
   const [baseAmount, setBaseAmount] = useState<number>(0);
   const [discountAmount, setDiscountAmount] = useState<number | ''>('');
   const [discountReason, setDiscountReason] = useState('');
+  const [error, setError] = useState<ParsedApiError | null>(null);
 
   // academicYears loads async; default to the current year once it
   // arrives, same as the original useEffect-based version.
@@ -299,6 +314,7 @@ function CreateTuitionPlanForm({ studentId }: { studentId: string }) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setError(null);
     // Backend has no discount-type catalog — discount is a free amount
     // + a free-text reason directly on CreateTuitionPlanDto.
     createTuitionPlan.mutate(
@@ -311,7 +327,10 @@ function CreateTuitionPlanForm({ studentId }: { studentId: string }) {
       },
       {
         onSuccess: () => showSuccess('برنامه شهریه ثبت شد'),
-        onError: () => showError('ثبت برنامه شهریه با خطا مواجه شد.'),
+        onError: (err) => {
+          setError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
       },
     );
   }
@@ -357,6 +376,7 @@ function CreateTuitionPlanForm({ studentId }: { studentId: string }) {
         </div>
 
         <div className="col-span-full">
+          <FormError error={error} />
           <button
             type="submit"
             disabled={createTuitionPlan.isPending}
@@ -382,14 +402,19 @@ function GenerateInstallmentsForm({
   const [count, setCount] = useState(10);
   const [startDate, setStartDate] = useState('');
   const [intervalDays, setIntervalDays] = useState(30);
+  const [error, setError] = useState<ParsedApiError | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setError(null);
     generateInstallments.mutate(
       { planId, dto: { count, startDate, intervalDays } },
       {
         onSuccess: () => showSuccess('اقساط تولید شدند'),
-        onError: () => showError('تولید اقساط با خطا مواجه شد.'),
+        onError: (err) => {
+          setError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
       },
     );
   }
@@ -427,6 +452,7 @@ function GenerateInstallmentsForm({
         </div>
 
         <div className="col-span-full">
+          <FormError error={error} />
           <button
             type="submit"
             disabled={generateInstallments.isPending}
@@ -454,9 +480,11 @@ function EditProfileForm({
   const updateStudent = useUpdateStudent();
   const grades: Grade[] = gradesQuery.data ?? [];
   const [gradeId, setGradeId] = useState(student.gradeId ?? '');
+  const [error, setError] = useState<ParsedApiError | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setError(null);
     // UpdateStudentDto only accepts gradeId/status/fullName — there is
     // no birthDate/address column on Student in the backend.
     updateStudent.mutate(
@@ -466,7 +494,10 @@ function EditProfileForm({
           showSuccess('پروفایل به‌روزرسانی شد');
           onSaved(updated);
         },
-        onError: () => showError('به‌روزرسانی پروفایل با خطا مواجه شد'),
+        onError: (err) => {
+          setError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
       },
     );
   }
@@ -492,6 +523,9 @@ function EditProfileForm({
         <button type="button" onClick={onCancel} className="rounded-lg border border-line px-3 py-2 text-sm hover:bg-paper">
           انصراف
         </button>
+      </div>
+      <div className="sm:col-span-3">
+        <FormError error={error} />
       </div>
     </form>
   );

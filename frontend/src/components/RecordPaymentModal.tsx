@@ -2,6 +2,8 @@ import { useRef, useState } from 'react';
 import { formatToman } from '../lib/format';
 import { useToast } from '../lib/toast';
 import { useCreatePayment } from '../hooks/usePayments';
+import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
+import { FormError } from './FormError';
 
 export interface PayableInstallment {
   id: string;
@@ -32,7 +34,7 @@ export function RecordPaymentModal({
   const [amount, setAmount] = useState(remaining);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card_to_card' | 'cheque'>('card_to_card');
   const [referenceNumber, setReferenceNumber] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ParsedApiError | null>(null);
   // Generated once when the modal opens; sent on every retry of the same
   // submit action so a double-click or network retry can't create two
   // payments — backend's CreatePaymentDto.idempotencyKey exists for this.
@@ -60,10 +62,9 @@ export function RecordPaymentModal({
           showSuccess('پرداخت با موفقیت ثبت شد');
           onSaved();
         },
-        onError: () => {
-          const msg = 'ثبت پرداخت با خطا مواجه شد. مبلغ یا اطلاعات را بررسی کنید.';
-          setError(msg);
-          showError(msg);
+        onError: (err) => {
+          setError(parseApiError(err));
+          showError(getErrorMessage(err));
         },
       },
     );
@@ -105,7 +106,7 @@ export function RecordPaymentModal({
           className="input mb-4"
         />
 
-        {error && <div className="mb-4 rounded-lg bg-overdue/10 px-3 py-2 text-sm text-overdue">{error}</div>}
+        <FormError error={error} />
 
         <div className="flex gap-2">
           <button

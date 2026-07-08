@@ -1,6 +1,8 @@
 import { useState, FormEvent } from 'react';
 import { Card } from '../components/Card';
 import { useToast } from '../lib/toast';
+import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
+import { FormError } from '../components/FormError';
 import type { School } from '../types/school.types';
 import { useSchools, useCreateSchool, useUpdateSchool, useDeactivateSchool } from '../hooks/useSchools';
 
@@ -16,9 +18,11 @@ export function SchoolsPage() {
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
+  const [error, setError] = useState<ParsedApiError | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setError(null);
     createSchool.mutate(
       { name, address: address || undefined, phone: phone || undefined },
       {
@@ -29,7 +33,10 @@ export function SchoolsPage() {
           setPhone('');
           setShowForm(false);
         },
-        onError: () => showError('ثبت مدرسه با خطا مواجه شد'),
+        onError: (err) => {
+          setError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
       },
     );
   }
@@ -37,12 +44,12 @@ export function SchoolsPage() {
   function toggleActive(school: School) {
     if (school.isActive) {
       deactivateSchool.mutate(school.id, {
-        onError: () => showError('تغییر وضعیت مدرسه با خطا مواجه شد'),
+        onError: (err) => showError(getErrorMessage(err)),
       });
     } else {
       updateSchool.mutate(
         { id: school.id, dto: { isActive: true } },
-        { onError: () => showError('تغییر وضعیت مدرسه با خطا مواجه شد') },
+        { onError: (err) => showError(getErrorMessage(err)) },
       );
     }
   }
@@ -66,6 +73,7 @@ export function SchoolsPage() {
             <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="آدرس (اختیاری)" className="input" />
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="تلفن (اختیاری)" className="input" />
             <div className="col-span-full">
+              <FormError error={error} />
               <button
                 type="submit"
                 disabled={createSchool.isPending}

@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { getErrorMessage } from '../lib/error-handler';
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -17,8 +18,8 @@ export function LoginPage() {
     try {
       await login(phone, password);
       navigate('/');
-    } catch {
-      setError('شماره تلفن یا رمز عبور اشتباه است');
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }

@@ -4,6 +4,8 @@ import { Card } from '../components/Card';
 import { SkeletonRows } from '../components/Skeleton';
 import { Pagination, paginate } from '../components/Pagination';
 import { useToast } from '../lib/toast';
+import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
+import { FormError } from '../components/FormError';
 import { exportToExcel } from '../lib/exportExcel';
 import type { Student, Grade, AcademicYear } from '../types/student.types';
 import { useStudents, useCreateStudent, useGrades, useAcademicYears } from '../hooks/useStudents';
@@ -26,6 +28,7 @@ export function StudentsPage() {
   // live text.
   const [submittedSearch, setSubmittedSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [createError, setCreateError] = useState<ParsedApiError | null>(null);
 
   const studentsQuery = useStudents(submittedSearch ? { search: submittedSearch } : undefined);
   const gradesQuery = useGrades();
@@ -85,15 +88,20 @@ export function StudentsPage() {
           grades={grades}
           academicYears={academicYears}
           saving={createStudent.isPending}
-          onSubmit={(dto) =>
+          error={createError}
+          onSubmit={(dto) => {
+            setCreateError(null);
             createStudent.mutate(dto, {
               onSuccess: () => {
                 setShowForm(false);
                 showSuccess('دانش‌آموز ثبت شد');
               },
-              onError: () => showError('ثبت دانش‌آموز با خطا مواجه شد'),
-            })
-          }
+              onError: (err) => {
+                setCreateError(parseApiError(err));
+                showError(getErrorMessage(err));
+              },
+            });
+          }}
         />
       )}
 
@@ -154,11 +162,13 @@ function CreateStudentForm({
   grades,
   academicYears,
   saving,
+  error,
   onSubmit,
 }: {
   grades: Grade[];
   academicYears: AcademicYear[];
   saving: boolean;
+  error: ParsedApiError | null;
   onSubmit: (dto: {
     academicYearId: string;
     gradeId: string;
@@ -255,6 +265,7 @@ function CreateStudentForm({
         </Field>
 
         <div className="col-span-full">
+          <FormError error={error} />
           <button
             type="submit"
             disabled={saving}

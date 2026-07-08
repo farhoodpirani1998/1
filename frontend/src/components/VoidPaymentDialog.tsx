@@ -1,12 +1,16 @@
 import { useState } from 'react';
+import type { ParsedApiError } from '../lib/error-handler';
+import { FormError } from './FormError';
 
 // Backend's VoidPaymentDto requires `reason` (5-300 chars) in the DELETE
 // body — a plain window.confirm() (the old behavior) sent no body at all
 // and always failed with 400. This collects that reason first.
 export function VoidPaymentDialog({
+  error,
   onConfirm,
   onCancel,
 }: {
+  error?: ParsedApiError | null;
   onConfirm: (reason: string) => void;
   onCancel: () => void;
 }) {
@@ -27,6 +31,7 @@ export function VoidPaymentDialog({
           className="input mb-4"
           placeholder="مثلاً: پرداخت اشتباهی دوباره ثبت شده بود"
         />
+        <FormError error={error ?? null} />
         <div className="flex gap-2">
           <button
             onClick={() => onConfirm(reason.trim())}

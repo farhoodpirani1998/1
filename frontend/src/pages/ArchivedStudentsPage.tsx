@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { SkeletonRows } from '../components/Skeleton';
 import { useToast } from '../lib/toast';
+import { getErrorMessage } from '../lib/error-handler';
 import { useStudents, useRestoreStudent } from '../hooks/useStudents';
 
 // NOTE: the backend has no soft-delete "archive" listing endpoint and no
@@ -24,7 +25,7 @@ export function ArchivedStudentsPage() {
   function handleRestore(id: string) {
     restoreStudent.mutate(id, {
       onSuccess: () => showSuccess('دانش‌آموز به وضعیت فعال بازگردانده شد'),
-      onError: () => showError('بازگردانی با خطا مواجه شد'),
+      onError: (err) => showError(getErrorMessage(err)),
     });
   }
 
