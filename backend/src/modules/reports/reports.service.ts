@@ -5,6 +5,7 @@ import { Installment, InstallmentStatus } from '../tuition/entities/installment.
 import { TuitionPlan } from '../tuition/entities/tuition-plan.entity';
 import { Payment } from '../tuition/entities/payment.entity';
 import { Student } from '../students/entities/student.entity';
+import { LedgerEntry, LedgerEntryType } from '../ledger/entities/ledger-entry.entity';
 
 export interface OverdueSummary {
   overdueInstallmentCount: number;
@@ -42,10 +43,17 @@ export interface StudentStatement {
   };
 }
 
-export interface IncomePoint {
-  date: string; // YYYY-MM-DD
-  totalAmount: number;
+export interface MonthlyIncome {
+  year: number;
+  month: number;
+  totalIncome: number;
   paymentCount: number;
+}
+
+export interface DebtorStudent {
+  studentId: string;
+  studentFullName: string;
+  outstandingBalance: number;
 }
 
 @Injectable()
@@ -59,33 +67,65 @@ export class ReportsService {
     private readonly paymentRepo: Repository<Payment>,
     @InjectRepository(Student)
     private readonly studentRepo: Repository<Student>,
+    @InjectRepository(LedgerEntry)
+    private readonly ledgerRepo: Repository<LedgerEntry>,
   ) {}
 
   /**
-   * Income grouped by calendar day between `from` and `to` (inclusive).
-   * Covers both "daily income" (pass a single day as from=to) and
-   * "monthly income" (pass the month's first/last day) — the frontend
-   * just decides the range and, for monthly, sums the returned points.
+   * Total cash collected in a given month — reads only from
+   * `financial_ledger` (PAYMENT entries, which are stored as negative
+   * amounts by convention) instead of scanning/joining `payments`. Because
+   * the ledger is append-only and narrowly indexed on (school_id,
+   * created_at), this stays fast as history grows, and it's naturally
+   * cacheable per (schoolId, year, month) once that month is in the past
+   * — a closed month's income never changes.
    */
-  async income(schoolId: string, from: string, to: string): Promise<IncomePoint[]> {
-    const raw = await this.paymentRepo
-      .createQueryBuilder('payment')
-      .innerJoin('payment.installment', 'installment')
-      .innerJoin('installment.tuitionPlan', 'plan')
-      .innerJoin('plan.student', 'student')
-      .where('student.schoolId = :schoolId', { schoolId })
-      .andWhere('payment.paidAt BETWEEN :from AND :to', { from, to })
-      .select("to_char(payment.paidAt, 'YYYY-MM-DD')", 'date')
-      .addSelect('COALESCE(SUM(payment.amount), 0)', 'totalAmount')
-      .addSelect('COUNT(payment.id)', 'paymentCount')
-      .groupBy("to_char(payment.paidAt, 'YYYY-MM-DD')")
-      .orderBy('date', 'ASC')
-      .getRawMany<{ date: string; totalAmount: string; paymentCount: string }>();
+  async monthlyIncome(schoolId: string, year: number, month: number): Promise<MonthlyIncome> {
+    const start = new Date(Date.UTC(year, month - 1, 1));
+    const end = new Date(Date.UTC(year, month, 1));
 
-    return raw.map((row) => ({
-      date: row.date,
-      totalAmount: Number(row.totalAmount),
-      paymentCount: Number(row.paymentCount),
+    const raw = await this.ledgerRepo
+      .createQueryBuilder('l')
+      .where('l.schoolId = :schoolId', { schoolId })
+      .andWhere('l.entryType = :type', { type: LedgerEntryType.PAYMENT })
+      .andWhere('l.createdAt >= :start AND l.createdAt < :end', { start, end })
+      .select('COALESCE(SUM(-l.amount), 0)', 'totalIncome')
+      .addSelect('COUNT(*)', 'paymentCount')
+      .getRawOne<{ totalIncome: string; paymentCount: string }>();
+
+    return {
+      year,
+      month,
+      totalIncome: Number(raw?.totalIncome ?? 0),
+      paymentCount: Number(raw?.paymentCount ?? 0),
+    };
+  }
+
+  /**
+   * Every student with a positive running ledger balance (i.e. still owes
+   * money), sorted by amount owed. This is the "لیست دانش‌آموزان بدهکار"
+   * gap — previously the only way to see this was one student at a time
+   * via studentStatement().
+   */
+  async debtorStudents(schoolId: string, limit = 100): Promise<DebtorStudent[]> {
+    const raw = await this.ledgerRepo
+      .createQueryBuilder('l')
+      .innerJoin('l.student', 'student')
+      .where('l.schoolId = :schoolId', { schoolId })
+      .select('l.studentId', 'studentId')
+      .addSelect('student.fullName', 'studentFullName')
+      .addSelect('SUM(l.amount)', 'outstandingBalance')
+      .groupBy('l.studentId')
+      .addGroupBy('student.fullName')
+      .having('SUM(l.amount) > 0')
+      .orderBy('SUM(l.amount)', 'DESC')
+      .limit(limit)
+      .getRawMany<{ studentId: string; studentFullName: string; outstandingBalance: string }>();
+
+    return raw.map((r) => ({
+      studentId: r.studentId,
+      studentFullName: r.studentFullName,
+      outstandingBalance: Number(r.outstandingBalance),
     }));
   }
 

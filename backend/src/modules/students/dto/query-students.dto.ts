@@ -8,7 +8,11 @@ export class QueryStudentsDto {
 
   @IsOptional()
   @IsUUID()
-  classId?: string;
+  gradeId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  academicYearId?: string;
 
   @IsOptional()
   @IsString()

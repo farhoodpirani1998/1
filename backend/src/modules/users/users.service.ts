@@ -21,6 +21,11 @@ export class UsersService {
       throw new NotFoundException('کاربر یافت نشد');
     }
     user.isActive = isActive;
+    // Any existing JWT for this user (issued while active, or before this
+    // toggle) should stop working the moment status changes — bumping
+    // tokenVersion forces JwtStrategy to reject it on the next request,
+    // rather than waiting up to 7 days for natural expiry.
+    user.tokenVersion += 1;
     const saved = await this.userRepo.save(user);
     const { passwordHash: _drop, ...safe } = saved;
     return safe;

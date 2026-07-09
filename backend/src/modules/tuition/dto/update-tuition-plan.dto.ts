@@ -1,10 +1,6 @@
-import { IsOptional, IsInt, Min, IsString, MaxLength, IsUUID } from 'class-validator';
+import { IsOptional, IsInt, Min, IsString, MaxLength } from 'class-validator';
 
 export class UpdateTuitionPlanDto {
-  @IsOptional()
-  @IsUUID()
-  discountTypeId?: string;
-
   @IsOptional()
   @IsInt()
   @Min(0)

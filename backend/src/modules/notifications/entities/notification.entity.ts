@@ -15,12 +15,6 @@ export enum NotificationStatus {
   FAILED = 'failed',
 }
 
-export enum NotificationTemplate {
-  OVERDUE_REMINDER = 'overdue_reminder',
-  PAYMENT_CONFIRMATION = 'payment_confirmation',
-  WELCOME = 'welcome',
-}
-
 @Entity('notifications')
 export class Notification {
   @PrimaryGeneratedColumn('uuid')
@@ -33,21 +27,12 @@ export class Notification {
   @Column({ name: 'student_id' })
   studentId: string;
 
-  // Null for templates that aren't about a specific installment (e.g. welcome).
-  @ManyToOne(() => Installment, { nullable: true })
+  @ManyToOne(() => Installment, { nullable: false })
   @JoinColumn({ name: 'installment_id' })
-  installment: Installment | null;
+  installment: Installment;
 
-  @Column({ name: 'installment_id', nullable: true })
-  installmentId: string | null;
-
-  @Column({
-    name: 'template',
-    type: 'varchar',
-    length: 30,
-    default: NotificationTemplate.OVERDUE_REMINDER,
-  })
-  template: NotificationTemplate;
+  @Column({ name: 'installment_id' })
+  installmentId: string;
 
   @Column({ length: 20, default: 'sms' })
   channel: string;

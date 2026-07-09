@@ -15,6 +15,9 @@ export enum InstallmentStatus {
   PAID = 'paid',
   OVERDUE = 'overdue',
   PARTIAL = 'partial',
+  CANCELLED = 'cancelled',
+  DEFERRED = 'deferred',
+  DISPUTED = 'disputed',
 }
 
 @Entity('installments')

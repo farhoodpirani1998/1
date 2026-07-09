@@ -35,6 +35,13 @@ export class User {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
+  // Bumped whenever previously-issued JWTs for this user should stop
+  // working (password change, security reset, deactivation) — JwtStrategy
+  // rejects any token whose embedded tokenVersion doesn't match this
+  // column's current value. See auth/strategies/jwt.strategy.ts.
+  @Column({ name: 'token_version', type: 'int', default: 0 })
+  tokenVersion: number;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

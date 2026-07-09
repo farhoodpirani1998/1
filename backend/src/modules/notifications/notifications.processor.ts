@@ -5,11 +5,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { NOTIFICATIONS_QUEUE, NotificationsService } from './notifications.service';
 import { SmsProviderService } from './sms/sms-provider.service';
-import { Notification, NotificationTemplate } from './entities/notification.entity';
+import { Notification } from './entities/notification.entity';
 
 interface SendSmsJobData {
   notificationId: string;
-  context?: Record<string, string | number>;
 }
 
 @Processor(NOTIFICATIONS_QUEUE)
@@ -45,7 +44,10 @@ export class NotificationsProcessor extends WorkerHost {
       return; // no point retrying: there is no phone number to retry with
     }
 
-    const text = this.buildText(notification, job.data.context);
+    const text = `دانش‌آموز ${notification.student.fullName}: قسط به مبلغ ${Number(
+      notification.installment.amount,
+    ).toLocaleString('fa-IR')} تومان سررسید شده است.`;
+
     const result = await this.smsProvider.send({ to: guardianPhone, text });
 
     if (result.success) {
@@ -55,24 +57,6 @@ export class NotificationsProcessor extends WorkerHost {
       // only mark failed here if you want it reflected immediately in the UI.
       await this.notificationsService.markFailed(notification.id);
       throw new Error('SMS send failed'); // triggers BullMQ retry
-    }
-  }
-
-  private buildText(notification: Notification, context?: Record<string, string | number>): string {
-    switch (notification.template) {
-      case NotificationTemplate.WELCOME:
-        return `${notification.student.fullName} عزیز، ثبت‌نام شما در دفتر مدرسه با موفقیت انجام شد. خوش آمدید.`;
-
-      case NotificationTemplate.PAYMENT_CONFIRMATION: {
-        const amount = Number(context?.amount ?? notification.installment?.paidAmount ?? 0);
-        return `پرداخت به مبلغ ${amount.toLocaleString('fa-IR')} تومان برای ${notification.student.fullName} با موفقیت ثبت شد. سپاسگزاریم.`;
-      }
-
-      case NotificationTemplate.OVERDUE_REMINDER:
-      default:
-        return `دانش‌آموز ${notification.student.fullName}: قسط به مبلغ ${Number(
-          notification.installment?.amount ?? 0,
-        ).toLocaleString('fa-IR')} تومان سررسید شده است.`;
     }
   }
 }

@@ -1,10 +1,10 @@
-import { IsOptional, IsUUID, IsEnum, IsString, MaxLength, IsDateString } from 'class-validator';
+import { IsOptional, IsUUID, IsEnum, IsString, MaxLength } from 'class-validator';
 import { StudentStatus } from '../entities/student.entity';
 
 export class UpdateStudentDto {
   @IsOptional()
   @IsUUID()
-  classId?: string;
+  gradeId?: string;
 
   @IsOptional()
   @IsEnum(StudentStatus)
@@ -14,12 +14,4 @@ export class UpdateStudentDto {
   @IsString()
   @MaxLength(150)
   fullName?: string;
-
-  @IsOptional()
-  @IsDateString()
-  birthDate?: string;
-
-  @IsOptional()
-  @IsString()
-  address?: string;
 }

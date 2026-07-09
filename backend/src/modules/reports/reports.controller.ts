@@ -16,23 +16,33 @@ export class ReportsController {
     return this.reportsService.overdueSummary(schoolId);
   }
 
-  // Used for both "daily income" (from=to=same day) and "monthly income"
-  // (from/to spanning the month) — the frontend picks the range.
-  @Get('income')
-  @Roles('school_admin', 'accountant')
-  income(
-    @Query('from') from: string,
-    @Query('to') to: string,
-    @CurrentUser('schoolId') schoolId: string,
-  ) {
-    return this.reportsService.income(schoolId, from, to);
-  }
-
+  // Financial history (charges/discounts/payments) for a student — same
+  // sensitivity as the other report endpoints below, so it gets the same
+  // role restriction. Previously had no @Roles here, which meant staff
+  // (who can view/edit student records but shouldn't see financial
+  // history) could hit it too.
   @Get('student/:id/statement')
+  @Roles('school_admin', 'accountant')
   studentStatement(
     @Param('id') studentId: string,
     @CurrentUser('schoolId') schoolId: string,
   ) {
     return this.reportsService.studentStatement(studentId, schoolId);
+  }
+
+  @Get('monthly-income')
+  @Roles('school_admin', 'accountant')
+  monthlyIncome(
+    @Query('year') year: string,
+    @Query('month') month: string,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    return this.reportsService.monthlyIncome(schoolId, Number(year), Number(month));
+  }
+
+  @Get('debtor-students')
+  @Roles('school_admin', 'accountant')
+  debtorStudents(@CurrentUser('schoolId') schoolId: string) {
+    return this.reportsService.debtorStudents(schoolId);
   }
 }

@@ -9,7 +9,8 @@ import {
 } from 'typeorm';
 import { School } from '../../schools/entities/school.entity';
 import { Guardian } from './guardian.entity';
-import { Class } from '../../classes/entities/class.entity';
+import { AcademicYear } from '../../academic-years/entities/academic-year.entity';
+import { Grade } from '../../grades/entities/grade.entity';
 
 export enum StudentStatus {
   ACTIVE = 'active',
@@ -36,17 +37,19 @@ export class Student {
   @Column({ name: 'guardian_id', nullable: true })
   guardianId: string | null;
 
-  // A class encodes both the grade ("پایه هفتم") and the academic year
-  // ("۱۴۰۴-۱۴۰۵") it belongs to, so a student no longer needs separate
-  // grade_id/academic_year_id columns — both are reached via class.
-  // Nullable because a freshly transferred-in student has no class yet
-  // until the receiving school assigns one.
-  @ManyToOne(() => Class, { nullable: true })
-  @JoinColumn({ name: 'class_id' })
-  class: Class | null;
+  @ManyToOne(() => AcademicYear, { nullable: false })
+  @JoinColumn({ name: 'academic_year_id' })
+  academicYear: AcademicYear;
 
-  @Column({ name: 'class_id', nullable: true })
-  classId: string | null;
+  @Column({ name: 'academic_year_id' })
+  academicYearId: string;
+
+  @ManyToOne(() => Grade, { nullable: false })
+  @JoinColumn({ name: 'grade_id' })
+  grade: Grade;
+
+  @Column({ name: 'grade_id' })
+  gradeId: string;
 
   @Column({ name: 'full_name', length: 150 })
   fullName: string;
@@ -54,22 +57,11 @@ export class Student {
   @Column({ name: 'national_id', length: 20, nullable: true })
   nationalId: string | null;
 
-  @Column({ name: 'birth_date', type: 'date', nullable: true })
-  birthDate: string | null;
-
-  @Column({ type: 'text', nullable: true })
-  address: string | null;
-
   @Column({ type: 'varchar', length: 20, default: StudentStatus.ACTIVE })
   status: StudentStatus;
 
   @Column({ name: 'enrollment_date', type: 'date', nullable: true })
   enrollmentDate: string | null;
-
-  // Set when this student arrived via a cross-school transfer, for a
-  // simple audit trail ("where did this student come from").
-  @Column({ name: 'transferred_from_school_id', nullable: true })
-  transferredFromSchoolId: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

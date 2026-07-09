@@ -3,17 +3,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Repository } from 'typeorm';
-import { Notification, NotificationStatus, NotificationTemplate } from './entities/notification.entity';
+import { Notification, NotificationStatus } from './entities/notification.entity';
 
 export const NOTIFICATIONS_QUEUE = 'notifications';
-
-interface SendSmsJobData {
-  notificationId: string;
-  // Snapshot of anything the message text needs at send time, so a later
-  // change to the underlying row (e.g. paid_amount continuing to move)
-  // can't change what an already-queued confirmation says.
-  context?: Record<string, string | number>;
-}
 
 @Injectable()
 export class NotificationsService {
@@ -25,62 +17,52 @@ export class NotificationsService {
   ) {}
 
   /**
-   * Called by the overdue-installments cron. Creates a `pending`
-   * notification row, then enqueues a BullMQ job that the processor picks
-   * up asynchronously — so the cron tick that triggered this never blocks
-   * on the actual SMS gateway call.
+   * Called by the overdue-installments cron (and can also be called right
+   * after an installment is created, for "upcoming due date" reminders).
+   * Creates a `pending` notification row, then enqueues a BullMQ job that
+   * the processor picks up asynchronously — so the request/cron tick that
+   * triggered this never blocks on the actual SMS gateway call.
    */
   async queueOverdueReminder(installmentId: string, studentId: string): Promise<Notification> {
-    return this.enqueue({
-      studentId,
-      installmentId,
-      template: NotificationTemplate.OVERDUE_REMINDER,
-    });
-  }
-
-  /** Called right after PaymentsService.create() commits successfully. */
-  async queuePaymentConfirmation(
-    installmentId: string,
-    studentId: string,
-    amount: number,
-  ): Promise<Notification> {
-    return this.enqueue({
-      studentId,
-      installmentId,
-      template: NotificationTemplate.PAYMENT_CONFIRMATION,
-      context: { amount },
-    });
-  }
-
-  /** Called right after StudentsService.create() commits successfully. */
-  async queueWelcomeMessage(studentId: string): Promise<Notification> {
-    return this.enqueue({
-      studentId,
-      installmentId: null,
-      template: NotificationTemplate.WELCOME,
-    });
-  }
-
-  private async enqueue(params: {
-    studentId: string;
-    installmentId: string | null;
-    template: NotificationTemplate;
-    context?: Record<string, string | number>;
-  }): Promise<Notification> {
     const notification = this.notificationRepo.create({
-      studentId: params.studentId,
-      installmentId: params.installmentId,
-      template: params.template,
+      studentId,
+      installmentId,
       channel: 'sms',
       status: NotificationStatus.PENDING,
     });
     const saved = await this.notificationRepo.save(notification);
 
-    const jobData: SendSmsJobData = { notificationId: saved.id, context: params.context };
-    await this.notificationsQueue.add('send-sms', jobData, {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 5000 },
+    await this.notificationsQueue.add(
+      'send-sms',
+      { notificationId: saved.id },
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      },
+    );
+
+    return saved;
+  }
+
+  /**
+   * Queues a "payment received" SMS. Called from PaymentEventsListener in
+   * reaction to PaymentRecordedEvent — NotificationsService has no idea
+   * PaymentsService exists; the event is the only connection between them.
+   */
+  async queuePaymentReceipt(installmentId: string, studentId: string): Promise<Notification> {
+    const notification = this.notificationRepo.create({
+      studentId,
+      installmentId,
+      channel: 'sms',
+      status: NotificationStatus.PENDING,
     });
+    const saved = await this.notificationRepo.save(notification);
+
+    await this.notificationsQueue.add(
+      'send-sms',
+      { notificationId: saved.id, template: 'payment-receipt' },
+      { attempts: 3, backoff: { type: 'exponential', delay: 5000 } },
+    );
 
     return saved;
   }

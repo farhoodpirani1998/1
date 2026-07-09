@@ -9,7 +9,6 @@ import {
 } from 'typeorm';
 import { Student } from '../../students/entities/student.entity';
 import { AcademicYear } from '../../academic-years/entities/academic-year.entity';
-import { DiscountType } from '../../discount-types/entities/discount-type.entity';
 import { Installment } from './installment.entity';
 
 @Entity('tuition_plans')
@@ -45,13 +44,6 @@ export class TuitionPlan {
 
   @Column({ name: 'discount_reason', length: 200, nullable: true })
   discountReason: string | null;
-
-  @ManyToOne(() => DiscountType, { nullable: true })
-  @JoinColumn({ name: 'discount_type_id' })
-  discountType: DiscountType | null;
-
-  @Column({ name: 'discount_type_id', nullable: true })
-  discountTypeId: string | null;
 
   @Column({ name: 'final_amount', type: 'numeric', precision: 14, scale: 0 })
   finalAmount: number;

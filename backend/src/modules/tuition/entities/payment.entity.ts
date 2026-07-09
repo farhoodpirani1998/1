@@ -57,6 +57,25 @@ export class Payment {
   @Column({ type: 'text', nullable: true })
   note: string | null;
 
+  @Column({ name: 'idempotency_key', length: 100, nullable: true })
+  idempotencyKey: string | null;
+
+  // Format "<jalali-year>-<6-digit-sequence>", e.g. "1405-000001".
+  // Assigned once, inside the same transaction that creates the payment —
+  // see PaymentsService.create() and receipt_counters in the migration.
+  @Column({ name: 'receipt_number', length: 30, nullable: true })
+  receiptNumber: string | null;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'voided_by' })
+  voidedBy: User | null;
+
+  @Column({ name: 'voided_by', nullable: true })
+  voidedById: string | null;
+
+  @Column({ name: 'void_reason', type: 'text', nullable: true })
+  voidReason: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

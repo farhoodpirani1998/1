@@ -1,6 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
+import { Role } from '../authorization/roles.enum';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -19,6 +20,6 @@ export class RolesGuard implements CanActivate {
 
     const { user } = context.switchToHttp().getRequest();
     // super_admin always passes, regardless of the route's role list.
-    return user?.role === 'super_admin' || requiredRoles.includes(user?.role);
+    return user?.role === Role.SUPER_ADMIN || requiredRoles.includes(user?.role);
   }
 }

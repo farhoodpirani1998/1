@@ -25,19 +25,22 @@ export class TuitionPlansController {
   @Roles('school_admin', 'accountant')
   create(
     @Body() dto: CreateTuitionPlanDto,
-    @CurrentUser() user: { schoolId: string },
+    @CurrentUser() user: { id: string; schoolId: string; role: string },
   ) {
-    return this.tuitionPlansService.create(dto, user.schoolId);
+    return this.tuitionPlansService.create(dto, user.schoolId, { id: user.id, role: user.role });
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.tuitionPlansService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
+    return this.tuitionPlansService.findOne(id, schoolId);
   }
 
   @Get()
-  findByStudent(@Query('studentId') studentId: string) {
-    return this.tuitionPlansService.findByStudent(studentId);
+  findByStudent(
+    @Query('studentId') studentId: string,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    return this.tuitionPlansService.findByStudent(studentId, schoolId);
   }
 
   @Patch(':id')
@@ -45,8 +48,8 @@ export class TuitionPlansController {
   update(
     @Param('id') id: string,
     @Body() dto: UpdateTuitionPlanDto,
-    @CurrentUser('schoolId') schoolId: string,
+    @CurrentUser() user: { id: string; schoolId: string },
   ) {
-    return this.tuitionPlansService.update(id, dto, schoolId);
+    return this.tuitionPlansService.update(id, dto, user, user.schoolId);
   }
 }

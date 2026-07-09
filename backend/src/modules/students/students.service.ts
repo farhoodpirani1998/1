@@ -2,16 +2,18 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
-import { Repository, DataSource, IsNull, Not } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Student } from './entities/student.entity';
 import { Guardian } from './entities/guardian.entity';
+import { Grade } from '../grades/entities/grade.entity';
+import { AcademicYear } from '../academic-years/entities/academic-year.entity';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
 import { GuardiansService } from './guardians.service';
-import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class StudentsService {
@@ -21,7 +23,6 @@ export class StudentsService {
     private readonly guardiansService: GuardiansService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
-    private readonly notificationsService: NotificationsService,
   ) {}
 
   async create(dto: CreateStudentDto, schoolId: string): Promise<Student> {
@@ -38,7 +39,7 @@ export class StudentsService {
 
     // Wrapped in a transaction: guardian creation and student creation
     // succeed or fail together.
-    const student = await this.dataSource.transaction(async (manager) => {
+    return this.dataSource.transaction(async (manager) => {
       let guardianId = dto.guardianId;
 
       if (dto.newGuardian) {
@@ -48,45 +49,83 @@ export class StudentsService {
           manager,
         );
         guardianId = guardian.id;
+      } else if (dto.guardianId) {
+        // Tenant enforcement: an explicit guardianId must belong to the
+        // same school — otherwise a school_admin could attach a student
+        // to another school's guardian just by guessing/enumerating a
+        // UUID. The findOrCreate() path above is already safe since it
+        // always scopes to `schoolId`.
+        const guardian = await manager.findOne(Guardian, {
+          where: { id: dto.guardianId },
+        });
+        if (!guardian) {
+          throw new NotFoundException('والد یافت نشد');
+        }
+        if (guardian.schoolId !== schoolId) {
+          throw new ForbiddenException('این والد متعلق به مدرسه دیگری است');
+        }
       }
 
-      const entity = manager.getRepository(Student).create({
+      // Tenant enforcement: academicYearId and gradeId must both belong to
+      // the same school as the authenticated user, same class of check as
+      // guardianId above.
+      const academicYear = await manager.findOne(AcademicYear, {
+        where: { id: dto.academicYearId },
+      });
+      if (!academicYear) {
+        throw new NotFoundException('سال تحصیلی یافت نشد');
+      }
+      if (academicYear.schoolId !== schoolId) {
+        throw new ForbiddenException('این سال تحصیلی متعلق به مدرسه دیگری است');
+      }
+
+      const grade = await manager.findOne(Grade, { where: { id: dto.gradeId } });
+      if (!grade) {
+        throw new NotFoundException('پایه یافت نشد');
+      }
+      if (grade.schoolId !== schoolId) {
+        throw new ForbiddenException('این پایه متعلق به مدرسه دیگری است');
+      }
+
+      const student = manager.getRepository(Student).create({
         schoolId,
         guardianId,
-        classId: dto.classId,
+        academicYearId: dto.academicYearId,
+        gradeId: dto.gradeId,
         fullName: dto.fullName,
         nationalId: dto.nationalId ?? null,
-        birthDate: dto.birthDate ?? null,
-        address: dto.address ?? null,
         enrollmentDate: dto.enrollmentDate ?? null,
       });
 
-      return manager.getRepository(Student).save(entity);
+      return manager.getRepository(Student).save(student);
     });
-
-    // Best-effort: a welcome SMS failing to queue shouldn't roll back the
-    // enrollment itself, so this happens after the transaction commits.
-    await this.notificationsService.queueWelcomeMessage(student.id);
-
-    return student;
   }
 
-  async findWithFilters(query: QueryStudentsDto, schoolId: string): Promise<Student[]> {
+  async findWithFilters(
+    query: QueryStudentsDto,
+    schoolId: string,
+  ): Promise<Student[]> {
     const qb = this.studentRepo
       .createQueryBuilder('student')
       .leftJoinAndSelect('student.guardian', 'guardian')
-      .leftJoinAndSelect('student.class', 'class')
-      .leftJoinAndSelect('class.grade', 'grade')
+      .leftJoinAndSelect('student.grade', 'grade')
       .where('student.schoolId = :schoolId', { schoolId });
 
     if (query.status) {
       qb.andWhere('student.status = :status', { status: query.status });
     }
-    if (query.classId) {
-      qb.andWhere('student.classId = :classId', { classId: query.classId });
+    if (query.gradeId) {
+      qb.andWhere('student.gradeId = :gradeId', { gradeId: query.gradeId });
+    }
+    if (query.academicYearId) {
+      qb.andWhere('student.academicYearId = :academicYearId', {
+        academicYearId: query.academicYearId,
+      });
     }
     if (query.search) {
-      qb.andWhere('student.fullName ILIKE :search', { search: `%${query.search}%` });
+      qb.andWhere('student.fullName ILIKE :search', {
+        search: `%${query.search}%`,
+      });
     }
 
     return qb.orderBy('student.fullName', 'ASC').getMany();
@@ -95,7 +134,7 @@ export class StudentsService {
   async findOne(id: string, schoolId: string): Promise<Student> {
     const student = await this.studentRepo.findOne({
       where: { id, schoolId },
-      relations: ['guardian', 'class', 'class.grade', 'class.academicYear'],
+      relations: ['guardian', 'grade', 'academicYear'],
     });
     if (!student) {
       throw new NotFoundException('دانش‌آموز یافت نشد');
@@ -103,116 +142,33 @@ export class StudentsService {
     return student;
   }
 
-  async update(id: string, dto: UpdateStudentDto, schoolId: string): Promise<Student> {
+  async update(
+    id: string,
+    dto: UpdateStudentDto,
+    schoolId: string,
+  ): Promise<Student> {
     const student = await this.findOne(id, schoolId);
+
+    // Tenant enforcement: a gradeId change must stay within the same
+    // school, same class of check as create().
+    if (dto.gradeId !== undefined) {
+      const grade = await this.dataSource
+        .getRepository(Grade)
+        .findOne({ where: { id: dto.gradeId } });
+      if (!grade) {
+        throw new NotFoundException('پایه یافت نشد');
+      }
+      if (grade.schoolId !== schoolId) {
+        throw new ForbiddenException('این پایه متعلق به مدرسه دیگری است');
+      }
+    }
+
     Object.assign(student, dto);
-    await this.studentRepo.save(student);
-    // Re-fetch: a changed classId means the previously-loaded `class`
-    // relation object is now stale, so return a clean read instead of
-    // reusing the in-memory entity from before the save.
-    return this.findOne(id, schoolId);
+    return this.studentRepo.save(student);
   }
 
   async softDelete(id: string, schoolId: string): Promise<void> {
     await this.findOne(id, schoolId); // ensures it exists and belongs to this school
     await this.studentRepo.softDelete(id);
-  }
-
-  async findArchived(schoolId: string): Promise<Student[]> {
-    return this.studentRepo.find({
-      where: { schoolId, deletedAt: Not(IsNull()) },
-      withDeleted: true,
-      relations: ['class', 'class.grade'],
-      order: { deletedAt: 'DESC' },
-    });
-  }
-
-  /**
-   * Cross-school search, used only by the super_admin transfer flow.
-   * Every other read path in this service is scoped to one school —
-   * this is the deliberate, narrow exception, gated by @Roles('super_admin')
-   * at the controller.
-   */
-  async searchAll(search: string): Promise<Student[]> {
-    return this.studentRepo
-      .createQueryBuilder('student')
-      .leftJoinAndSelect('student.school', 'school')
-      .leftJoinAndSelect('student.guardian', 'guardian')
-      .where('student.fullName ILIKE :search', { search: `%${search}%` })
-      .orderBy('student.fullName', 'ASC')
-      .limit(20)
-      .getMany();
-  }
-
-  async restore(id: string, schoolId: string): Promise<Student> {
-    const student = await this.studentRepo.findOne({
-      where: { id, schoolId },
-      withDeleted: true,
-    });
-    if (!student) {
-      throw new NotFoundException('دانش‌آموز یافت نشد');
-    }
-    await this.studentRepo.restore(id);
-    return this.findOne(id, schoolId);
-  }
-
-  /**
-   * Moves a student to a different school. Only meaningful for super_admin,
-   * since it crosses the tenant boundary that every other operation enforces.
-   * The student's class is cleared (classes are school-specific) — the
-   * receiving school must assign a new class. Tuition/installment/payment
-   * history stays attached to the student and simply moves with them.
-   *
-   * Guardian handling: if this is the guardian's only child at the old
-   * school, the guardian record moves with them. Otherwise a new guardian
-   * record is created at the target school (since guardians are scoped to
-   * one school and may still have other children at the old one).
-   */
-  async transfer(id: string, targetSchoolId: string): Promise<Student> {
-    return this.dataSource.transaction(async (manager) => {
-      const studentRepo = manager.getRepository(Student);
-      const guardianRepo = manager.getRepository(Guardian);
-
-      const student = await studentRepo.findOne({ where: { id } });
-      if (!student) {
-        throw new NotFoundException('دانش‌آموز یافت نشد');
-      }
-      if (student.schoolId === targetSchoolId) {
-        throw new BadRequestException('مدرسه‌ی مقصد نمی‌تواند همان مدرسه‌ی فعلی باشد');
-      }
-      const currentSchoolId = student.schoolId;
-
-      let newGuardianId: string | null = student.guardianId;
-
-      if (student.guardianId) {
-        const siblingsRemaining = await studentRepo.count({
-          where: { guardianId: student.guardianId, schoolId: currentSchoolId, id: Not(id) },
-        });
-
-        if (siblingsRemaining === 0) {
-          // Only child at the old school — move the guardian record itself.
-          await guardianRepo.update(student.guardianId, { schoolId: targetSchoolId });
-        } else {
-          // Other children remain — duplicate the guardian into the new school.
-          const oldGuardian = await guardianRepo.findOne({ where: { id: student.guardianId } });
-          if (oldGuardian) {
-            const duplicated = guardianRepo.create({
-              schoolId: targetSchoolId,
-              fullName: oldGuardian.fullName,
-              phone: oldGuardian.phone,
-              nationalId: oldGuardian.nationalId,
-            });
-            const saved = await guardianRepo.save(duplicated);
-            newGuardianId = saved.id;
-          }
-        }
-      }
-
-      student.schoolId = targetSchoolId;
-      student.guardianId = newGuardianId;
-      student.classId = null; // must be reassigned in the new school
-      student.transferredFromSchoolId = currentSchoolId;
-      return studentRepo.save(student);
-    });
   }
 }

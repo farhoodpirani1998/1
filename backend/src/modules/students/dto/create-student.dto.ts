@@ -11,7 +11,10 @@ import { CreateGuardianDto } from './create-guardian.dto';
 
 export class CreateStudentDto {
   @IsUUID()
-  classId: string;
+  academicYearId: string;
+
+  @IsUUID()
+  gradeId: string;
 
   @IsString()
   @MaxLength(150)
@@ -21,14 +24,6 @@ export class CreateStudentDto {
   @IsString()
   @MaxLength(20)
   nationalId?: string;
-
-  @IsOptional()
-  @IsDateString()
-  birthDate?: string;
-
-  @IsOptional()
-  @IsString()
-  address?: string;
 
   @IsOptional()
   @IsDateString()
