@@ -39,13 +39,22 @@ export class PaymentsController {
   // Payment history is financial data — staff shouldn't see it by
   // default (previously had no @Roles here, so any authenticated role
   // including staff could list every payment for the school).
+  //
+  // page/limit are optional (Phase 4A pagination); omitting them still
+  // returns an array, just bounded by DEFAULT_PAGE_LIMIT instead of the
+  // school's entire payment history.
   @Get('payments')
   @Roles('school_admin', 'accountant')
   findAll(
     @Query('studentId') studentId: string | undefined,
+    @Query('page') page: string | undefined,
+    @Query('limit') limit: string | undefined,
     @CurrentUser('schoolId') schoolId: string,
   ) {
-    return this.paymentsService.findAll(schoolId, studentId);
+    return this.paymentsService.findAll(schoolId, studentId, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   // Clean data endpoint for a printable receipt — no PDF generation yet,

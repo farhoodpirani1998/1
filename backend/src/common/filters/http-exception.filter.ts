@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { getRequestContext } from '../logging/request-context';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -40,11 +41,18 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
 
+    // Set by RequestIdMiddleware on every request; falls back to the
+    // AsyncLocalStorage context in case this filter ever runs outside the
+    // normal Express request path.
+    const requestId =
+      (request as Request & { requestId?: string }).requestId ?? getRequestContext()?.requestId;
+
     response.status(status).json({
       statusCode: status,
       message,
       path: request.url,
       timestamp: new Date().toISOString(),
+      requestId,
     });
   }
 }

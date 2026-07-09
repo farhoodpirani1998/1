@@ -3,13 +3,36 @@ import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
+import { AppLogger } from './common/logging/app-logger.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    // Structured (JSON in production, pretty in dev) logger — see
+    // app-logger.service.ts. bufferLogs holds Nest's own bootstrap log
+    // lines until this logger is ready, so nothing gets lost/printed via
+    // the old console format before the switch takes effect.
+    logger: new AppLogger(),
+    bufferLogs: true,
+  });
+
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  // The app sits behind a reverse proxy / load balancer in production
+  // (see docker-compose.yml, docs/DEPLOYMENT.md). Without this, Express
+  // (and therefore ThrottlerGuard's per-IP limiting, and req.ip in logs)
+  // sees the proxy's IP for every request instead of the real client's.
+  if (isProduction) {
+    app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  }
+
+  // Let Nest catch SIGTERM/SIGINT (sent by Docker/Kubernetes on
+  // stop/rolling-deploy) and run each module's OnModuleDestroy hook —
+  // closes the Postgres pool, Redis connections, and in-flight BullMQ
+  // jobs cleanly instead of the process being killed mid-request.
+  app.enableShutdownHooks();
 
   app.use(helmet());
 
-  const isProduction = process.env.NODE_ENV === 'production';
   const configuredOrigins = process.env.CORS_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean);
 
   if (isProduction && (!configuredOrigins || configuredOrigins.length === 0)) {

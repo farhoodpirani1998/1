@@ -18,10 +18,13 @@ import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { UsersModule } from './modules/users/users.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { AuditModule } from './common/audit/audit.module';
+import { HealthModule } from './modules/health/health.module';
+import { ObservabilityModule } from './common/logging/observability.module';
+import { validateEnv } from './config/env.validation';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
 
     // Domain Events backbone. `global: true` so any module's EventEmitter2
     // injection and any module's @OnEvent listener talk to the same bus
@@ -41,6 +44,10 @@ import { AuditModule } from './common/audit/audit.module';
       connection: {
         host: process.env.REDIS_HOST ?? 'localhost',
         port: Number(process.env.REDIS_PORT ?? 6379),
+        // Undefined (not empty string) when unset, so ioredis skips AUTH
+        // in dev; env.validation.ts already refuses to boot in production
+        // without REDIS_PASSWORD set.
+        password: process.env.REDIS_PASSWORD || undefined,
       },
     }),
 
@@ -50,6 +57,15 @@ import { AuditModule } from './common/audit/audit.module';
         limit: 20, // generous default; login itself uses a stricter @Throttle()
       },
     ]),
+
+    // Phase 4B: request-id tracking, structured HTTP logging, and
+    // userId/schoolId log enrichment. Self-contained (see
+    // common/logging/observability.module.ts) — no other module changes.
+    ObservabilityModule,
+    // Phase 4B: /api/v1/health, /api/v1/health/live, /api/v1/health/ready
+    // (HealthController's 'health' path + the global 'api/v1' prefix set
+    // in main.ts -- see docs/DEPLOYMENT.md for the full table).
+    HealthModule,
 
     AuthModule,
     UsersModule,

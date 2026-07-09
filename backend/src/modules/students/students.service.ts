@@ -14,6 +14,7 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
 import { GuardiansService } from './guardians.service';
+import { normalizePagination } from '../../common/utils/pagination';
 
 @Injectable()
 export class StudentsService {
@@ -128,7 +129,17 @@ export class StudentsService {
       });
     }
 
-    return qb.orderBy('student.fullName', 'ASC').getMany();
+    // Phase 4A: bounded result set by default (DEFAULT_PAGE_LIMIT), and
+    // page/limit are honored when the caller passes them — previously this
+    // ran unbounded, so a school with a large student roster loaded every
+    // row (plus its guardian/grade joins) on every list request.
+    const { limit, skip } = normalizePagination(query);
+
+    return qb
+      .orderBy('student.fullName', 'ASC')
+      .skip(skip)
+      .take(limit)
+      .getMany();
   }
 
   async findOne(id: string, schoolId: string): Promise<Student> {

@@ -1,0 +1,67 @@
+# Reference deployment for self-hosted / single-VM setups. If deploying to
+# Kubernetes or a managed platform, use this as a guide for required env
+# vars and healthcheck wiring rather than running it as-is.
+#
+# Usage:
+#   cp .env.example .env   # then fill in real values
+#   docker compose up -d --build
+#   docker compose exec app npm run migration:run   # once, before first boot's traffic
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+    ports:
+      - '${PORT:-3000}:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:3000/api/v1/health/live']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-school_tuition}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # Redis has no auth by default -- anyone who can reach the port can
+    # read/write job queues and cache data. requirepass is mandatory here;
+    # REDIS_PASSWORD has no fallback default, so docker compose up fails
+    # loudly instead of starting an unauthenticated Redis.
+    command: ['redis-server', '--appendonly', 'yes', '--requirepass', '${REDIS_PASSWORD:?REDIS_PASSWORD is required}']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:?REDIS_PASSWORD is required}', '--no-auth-warning', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres-data:
+  redis-data:

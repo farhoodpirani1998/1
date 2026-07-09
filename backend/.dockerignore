@@ -1,0 +1,20 @@
+node_modules
+dist
+coverage
+.git
+.gitignore
+.github
+
+# Env files: never bake secrets into an image layer. Pass real values at
+# `docker run` / `docker compose up` time via --env-file or environment:.
+.env
+.env.*
+!.env.example
+
+# Not needed at build or runtime.
+test
+docs
+*.md
+docker-compose*.yml
+Dockerfile
+.dockerignore

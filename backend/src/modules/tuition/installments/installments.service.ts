@@ -20,6 +20,7 @@ import {
   InstallmentUpdatedEvent,
   InstallmentStatusChangedEvent,
 } from '../../../common/events/domain-events';
+import { normalizePagination } from '../../../common/utils/pagination';
 
 @Injectable()
 export class InstallmentsService {
@@ -124,7 +125,17 @@ export class InstallmentsService {
       });
     }
 
-    return qb.orderBy('installment.dueDate', 'ASC').getMany();
+    // Phase 4A: bounded result set by default — this previously ran
+    // unbounded (leftJoinAndSelect on tuitionPlan + student for every
+    // matching installment), so a school with a large installment history
+    // loaded its entire table on every list request.
+    const { limit, skip } = normalizePagination(query);
+
+    return qb
+      .orderBy('installment.dueDate', 'ASC')
+      .skip(skip)
+      .take(limit)
+      .getMany();
   }
 
   async findOne(id: string, schoolId: string): Promise<Installment> {

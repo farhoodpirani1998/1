@@ -1,4 +1,5 @@
-import { IsOptional, IsEnum, IsUUID } from 'class-validator';
+import { IsOptional, IsEnum, IsUUID, IsInt, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { InstallmentStatus } from '../entities/installment.entity';
 
 export class QueryInstallmentsDto {
@@ -16,4 +17,19 @@ export class QueryInstallmentsDto {
   @IsOptional()
   @IsUUID()
   schoolId?: string;
+
+  // Phase 4A: pagination — see QueryStudentsDto for the same pattern;
+  // defaults/ceiling applied in InstallmentsService via
+  // normalizePagination().
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  limit?: number;
 }
