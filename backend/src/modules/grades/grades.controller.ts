@@ -17,12 +17,18 @@ export class GradesController {
     return this.gradesService.create(dto, schoolId);
   }
 
+  // Previously had no @Roles, so any authenticated role was let through.
+  // Phase 5A's new 'parent' role must be excluded here same as everywhere
+  // else outside /parent/*; existing school_admin/accountant/staff access
+  // is unchanged.
   @Get()
+  @Roles('school_admin', 'accountant', 'staff')
   findAll(@CurrentUser('schoolId') schoolId: string) {
     return this.gradesService.findAll(schoolId);
   }
 
   @Get(':id')
+  @Roles('school_admin', 'accountant', 'staff')
   findOne(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
     return this.gradesService.findOne(id, schoolId);
   }

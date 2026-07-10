@@ -29,12 +29,18 @@ export class AcademicYearsController {
     return this.academicYearsService.create(dto, schoolId);
   }
 
+  // Previously had no @Roles, so any authenticated role was let through.
+  // Phase 5A's new 'parent' role must be excluded here same as everywhere
+  // else outside /parent/*; existing school_admin/accountant/staff access
+  // is unchanged.
   @Get()
+  @Roles('school_admin', 'accountant', 'staff')
   findAll(@CurrentUser('schoolId') schoolId: string) {
     return this.academicYearsService.findAll(schoolId);
   }
 
   @Get(':id')
+  @Roles('school_admin', 'accountant', 'staff')
   findOne(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
     return this.academicYearsService.findOne(id, schoolId);
   }

@@ -13,7 +13,7 @@ export function AppLayout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-paper dark:bg-[#0a1120]">
+    <div className="flex min-h-screen bg-paper dark:bg-navy-dark">
       {/* mobile backdrop */}
       {mobileNavOpen && (
         <div

@@ -1,6 +1,11 @@
 import { useState, FormEvent } from 'react';
 import { Card } from '../components/Card';
-import { toPersianDigits } from '../lib/format';
+import { PageHeader } from '../components/PageHeader';
+import { SectionHeader } from '../components/SectionHeader';
+import { Button } from '../components/Button';
+import { Input } from '../components/Input';
+import { Table, type TableColumn } from '../components/Table';
+import { toPersianDigits, formatDate } from '../lib/format';
 import { useToast } from '../lib/toast';
 import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
 import { FormError } from '../components/FormError';
@@ -11,6 +16,7 @@ import {
   useGrades,
   useCreateGrade,
 } from '../hooks/useStudents';
+import type { AcademicYear, Grade } from '../types/student.types';
 
 // NOTE: "کلاس‌ها" و "انواع تخفیف" از این صفحه حذف شدند — بک‌اند فعلی هیچ
 // ماژول Class یا DiscountType ندارد (فقط Grade + AcademicYear، و تخفیف
@@ -19,7 +25,7 @@ import {
 export function SettingsPage() {
   return (
     <div className="fade-in">
-      <h1 className="mb-6 text-xl font-bold text-ink">تنظیمات مدرسه</h1>
+      <PageHeader title="تنظیمات مدرسه" description="مدیریت سال‌های تحصیلی و پایه‌های تحصیلی مدرسه" />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <AcademicYearsPanel />
         <GradesPanel />
@@ -68,56 +74,88 @@ function AcademicYearsPanel() {
     );
   }
 
+  const columns: TableColumn<AcademicYear>[] = [
+    {
+      key: 'title',
+      header: 'عنوان',
+      render: (y) => <span className="font-medium text-ink dark:text-paper">{y.title}</span>,
+    },
+    {
+      key: 'range',
+      header: 'بازه',
+      render: (y) =>
+        y.startDate || y.endDate ? (
+          <span className="text-ink/60 dark:text-paper/60">
+            {y.startDate ? formatDate(y.startDate) : '—'} تا {y.endDate ? formatDate(y.endDate) : '—'}
+          </span>
+        ) : (
+          <span className="text-ink/35 dark:text-paper/35">—</span>
+        ),
+    },
+    {
+      key: 'status',
+      header: 'وضعیت',
+      align: 'left',
+      render: (y) =>
+        y.isCurrent ? (
+          <span className="rounded-full bg-action/10 px-2.5 py-0.5 text-xs font-medium text-action">
+            سال جاری
+          </span>
+        ) : (
+          <button
+            onClick={() => setAsCurrent(y.id)}
+            disabled={updateAcademicYear.isPending}
+            className="text-xs text-action hover:underline disabled:opacity-50"
+          >
+            تعیین به‌عنوان سال جاری
+          </button>
+        ),
+    },
+  ];
+
   return (
     <Card title="سال‌های تحصیلی">
-      <form onSubmit={handleSubmit} className="mb-5 space-y-3">
-        <input
+      <SectionHeader title="افزودن سال تحصیلی جدید" className="mb-4" />
+      <form onSubmit={handleSubmit} className="mb-6 space-y-3 rounded-lg bg-paper/60 p-4 dark:bg-white/[0.03]">
+        <Input
           required
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="عنوان — مثلاً ۱۴۰۴-۱۴۰۵"
-          className="input"
+          label="عنوان سال تحصیلی"
         />
-        <div className="flex gap-2">
-          <input
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Input
             type="date"
             value={startDate}
             onChange={(e) => setStartDate(e.target.value)}
-            className="input"
+            label="تاریخ شروع"
           />
-          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="input" />
+          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} label="تاریخ پایان" />
         </div>
-        <label className="flex items-center gap-2 text-sm text-ink/70">
-          <input type="checkbox" checked={isCurrent} onChange={(e) => setIsCurrent(e.target.checked)} />
+        <label className="flex items-center gap-2 text-sm text-ink/70 dark:text-paper/70">
+          <input
+            type="checkbox"
+            checked={isCurrent}
+            onChange={(e) => setIsCurrent(e.target.checked)}
+            className="h-4 w-4 rounded border-line text-action focus:ring-action/40"
+          />
           این سال، سال جاری باشد
         </label>
         <FormError error={error} />
-        <button
-          type="submit"
-          disabled={createAcademicYear.isPending}
-          className="rounded-lg bg-action px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-        >
+        <Button type="submit" loading={createAcademicYear.isPending}>
           {createAcademicYear.isPending ? 'در حال ذخیره...' : 'افزودن سال تحصیلی'}
-        </button>
+        </Button>
       </form>
 
-      <ul className="divide-y divide-line">
-        {years.map((y) => (
-          <li key={y.id} className="flex items-center justify-between py-2.5 text-sm">
-            <span className="text-ink">{y.title}</span>
-            {y.isCurrent ? (
-              <span className="rounded-full bg-action/10 px-2.5 py-0.5 text-xs font-medium text-action">
-                سال جاری
-              </span>
-            ) : (
-              <button onClick={() => setAsCurrent(y.id)} className="text-xs text-action hover:underline">
-                تعیین به‌عنوان سال جاری
-              </button>
-            )}
-          </li>
-        ))}
-        {years.length === 0 && <li className="py-4 text-center text-sm text-ink/50">هنوز سالی ثبت نشده است.</li>}
-      </ul>
+      <SectionHeader title="فهرست سال‌های تحصیلی" className="mb-3" />
+      <Table
+        columns={columns}
+        data={years}
+        rowKey={(y) => y.id}
+        loading={yearsQuery.isLoading}
+        emptyMessage="هنوز سالی ثبت نشده است."
+      />
     </Card>
   );
 }
@@ -146,35 +184,50 @@ function GradesPanel() {
     );
   }
 
+  const columns: TableColumn<Grade>[] = [
+    {
+      key: 'index',
+      header: '#',
+      cellClassName: 'text-ink/45 dark:text-paper/45',
+      render: (g) => toPersianDigits(grades.findIndex((x) => x.id === g.id) + 1),
+    },
+    {
+      key: 'title',
+      header: 'عنوان پایه',
+      render: (g) => <span className="font-medium text-ink dark:text-paper">{g.title}</span>,
+    },
+  ];
+
   return (
     <Card title="پایه‌های تحصیلی">
-      <form onSubmit={handleSubmit} className="mb-5 flex gap-2">
-        <input
+      <SectionHeader title="افزودن پایه جدید" className="mb-4" />
+      <form
+        onSubmit={handleSubmit}
+        className="mb-6 flex flex-col gap-3 rounded-lg bg-paper/60 p-4 dark:bg-white/[0.03] sm:flex-row sm:items-end"
+      >
+        <Input
           required
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="عنوان پایه — مثلاً پایه هفتم"
-          className="input"
+          label="عنوان پایه"
+          containerClassName="flex-1"
         />
-        <button
-          type="submit"
-          disabled={createGrade.isPending}
-          className="shrink-0 rounded-lg bg-action px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
-        >
+        <Button type="submit" loading={createGrade.isPending} className="shrink-0">
           افزودن
-        </button>
+        </Button>
       </form>
 
       <FormError error={error} />
 
-      <ul className="divide-y divide-line">
-        {grades.map((g, i) => (
-          <li key={g.id} className="py-2.5 text-sm text-ink">
-            {toPersianDigits(i + 1)}. {g.title}
-          </li>
-        ))}
-        {grades.length === 0 && <li className="py-4 text-center text-sm text-ink/50">هنوز پایه‌ای ثبت نشده است.</li>}
-      </ul>
+      <SectionHeader title="فهرست پایه‌های تحصیلی" className="mb-3" />
+      <Table
+        columns={columns}
+        data={grades}
+        rowKey={(g) => g.id}
+        loading={gradesQuery.isLoading}
+        emptyMessage="هنوز پایه‌ای ثبت نشده است."
+      />
     </Card>
   );
 }

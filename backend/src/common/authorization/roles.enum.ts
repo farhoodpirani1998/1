@@ -21,4 +21,17 @@ export enum Role {
   SCHOOL_ADMIN = 'school_admin',
   ACCOUNTANT = 'accountant',
   STAFF = 'staff',
+  // Phase 5A: read-only portal access for a student's parent/guardian
+  // login. Never gets a @Roles() grant on any staff-facing endpoint —
+  // only on the dedicated /parent/* routes in modules/parent. See
+  // ParentStudent (modules/parent/entities/parent-student.entity.ts) for
+  // how a parent user is scoped to specific students.
+  PARENT = 'parent',
+  // Phase 5G: a teaching-staff login, scoped to only the grade+subject
+  // combinations they've been explicitly assigned (see TeacherAssignment,
+  // modules/teacher/entities/teacher-assignment.entity.ts). Never gets a
+  // @Roles() grant on any other staff-facing endpoint — only on the
+  // dedicated /teacher/* routes in modules/teacher, same isolation shape
+  // as PARENT and /parent/*.
+  TEACHER = 'teacher',
 }

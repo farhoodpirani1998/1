@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Card } from '../components/Card';
+import { PageHeader } from '../components/PageHeader';
+import { StatCard } from '../components/StatCard';
+import { FilterBar } from '../components/FilterBar';
+import { SearchInput } from '../components/SearchInput';
+import { Select } from '../components/Select';
+import { Button } from '../components/Button';
+import { Table, type TableColumn } from '../components/Table';
 import { StatusBadge } from '../components/StatusBadge';
-import { SkeletonRows } from '../components/Skeleton';
 import { Pagination, paginate } from '../components/Pagination';
 import { RecordPaymentModal, PayableInstallment } from '../components/RecordPaymentModal';
-import { formatToman, formatDate } from '../lib/format';
+import { formatToman, formatDate, toPersianDigits } from '../lib/format';
 import { exportToExcel } from '../lib/exportExcel';
-import type { InstallmentStatus } from '../types/tuition.types';
+import type { InstallmentWithStudent, InstallmentStatus } from '../types/tuition.types';
 import { useInstallments } from '../hooks/useInstallments';
 
 const PAGE_SIZE = 15;
@@ -67,80 +73,110 @@ export function InstallmentsPage() {
     );
   }
 
+  const overdueCount = useMemo(() => installments.filter((i) => i.status === 'overdue').length, [installments]);
+  const pendingCount = useMemo(
+    () => installments.filter((i) => i.status === 'pending' || i.status === 'partial').length,
+    [installments],
+  );
+
+  const columns: TableColumn<InstallmentWithStudent>[] = [
+    {
+      key: 'student',
+      header: 'دانش‌آموز',
+      render: (inst) => (
+        <Link to={`/students/${inst.tuitionPlan.student.id}`} className="font-medium text-action hover:underline">
+          {inst.tuitionPlan.student.fullName}
+        </Link>
+      ),
+    },
+    {
+      key: 'number',
+      header: 'قسط',
+      cellClassName: 'tabular',
+      render: (inst) => toPersianDigits(inst.installmentNumber),
+    },
+    {
+      key: 'dueDate',
+      header: 'سررسید',
+      cellClassName: 'tabular text-ink/70 dark:text-paper/70',
+      render: (inst) => formatDate(inst.dueDate),
+    },
+    {
+      key: 'amount',
+      header: 'مبلغ',
+      cellClassName: 'tabular font-medium',
+      render: (inst) => formatToman(inst.amount),
+    },
+    {
+      key: 'status',
+      header: 'وضعیت',
+      render: (inst) => <StatusBadge status={inst.status} />,
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'left',
+      render: (inst) =>
+        inst.status !== 'paid' && inst.status !== 'cancelled' ? (
+          <button
+            onClick={() => setPayingInstallment(inst)}
+            className="text-xs font-medium text-action hover:underline"
+          >
+            ثبت پرداخت
+          </button>
+        ) : null,
+    },
+  ];
+
   return (
     <div className="fade-in">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-ink">اقساط و پرداخت‌ها</h1>
-        <button onClick={handleExport} className="rounded-lg border border-line px-4 py-2 text-sm hover:bg-paper">
-          خروجی Excel
-        </button>
+      <PageHeader
+        title="اقساط و پرداخت‌ها"
+        description="پیگیری سررسیدها، ثبت پرداخت و خروجی گرفتن از فهرست اقساط"
+        actions={
+          <Button variant="secondary" size="sm" onClick={handleExport}>
+            خروجی Excel
+          </Button>
+        }
+      />
+
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard label="کل اقساط" value={loading ? '—' : toPersianDigits(installments.length)} />
+        <StatCard
+          label="در انتظار پرداخت"
+          value={loading ? '—' : toPersianDigits(pendingCount)}
+          accent="warning"
+        />
+        <StatCard label="معوق" value={loading ? '—' : toPersianDigits(overdueCount)} accent="overdue" />
       </div>
 
       <Card>
-        <div className="mb-4 flex flex-wrap gap-3">
-          <select value={status} onChange={(e) => setStatus(e.target.value as InstallmentStatus | '')} className="input w-auto">
-            {statusOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-          <input
-            value={nameFilter}
-            onChange={(e) => setNameFilter(e.target.value)}
-            placeholder="فیلتر بر اساس نام دانش‌آموز..."
-            className="input flex-1 sm:max-w-xs"
+        <FilterBar>
+          <Select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as InstallmentStatus | '')}
+            options={statusOptions}
+            containerClassName="w-auto"
           />
-        </div>
+          <SearchInput
+            value={nameFilter}
+            onChange={setNameFilter}
+            placeholder="فیلتر بر اساس نام دانش‌آموز..."
+            containerClassName="w-full sm:w-64"
+          />
+        </FilterBar>
 
-        {loading ? (
-          <SkeletonRows rows={8} cols={6} />
-        ) : filtered.length === 0 ? (
-          <div className="py-8 text-center text-sm text-ink/50">موردی یافت نشد.</div>
-        ) : (
-          <>
-            <table className="ledger-lines w-full text-sm">
-              <thead>
-                <tr className="text-right text-ink/50">
-                  <th className="py-2 font-medium">دانش‌آموز</th>
-                  <th className="py-2 font-medium">قسط</th>
-                  <th className="py-2 font-medium">سررسید</th>
-                  <th className="py-2 font-medium">مبلغ</th>
-                  <th className="py-2 font-medium">وضعیت</th>
-                  <th className="py-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageItems.map((inst) => (
-                  <tr key={inst.id}>
-                    <td className="py-2">
-                      <Link to={`/students/${inst.tuitionPlan.student.id}`} className="text-action hover:underline">
-                        {inst.tuitionPlan.student.fullName}
-                      </Link>
-                    </td>
-                    <td className="tabular py-2">{inst.installmentNumber}</td>
-                    <td className="tabular py-2 text-ink/70">{formatDate(inst.dueDate)}</td>
-                    <td className="tabular py-2">{formatToman(inst.amount)}</td>
-                    <td className="py-2">
-                      <StatusBadge status={inst.status} />
-                    </td>
-                    <td className="py-2 text-left">
-                      {inst.status !== 'paid' && inst.status !== 'cancelled' && (
-                        <button
-                          onClick={() => setPayingInstallment(inst)}
-                          className="text-xs font-medium text-action hover:underline"
-                        >
-                          ثبت پرداخت
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <Pagination page={page} pageCount={pageCount} onChange={setPage} />
-          </>
-        )}
+        <Table
+          columns={columns}
+          data={pageItems}
+          rowKey={(inst) => inst.id}
+          loading={loading}
+          skeletonRows={8}
+          emptyMessage="موردی یافت نشد."
+          emptyDescription="فیلترها را تغییر دهید یا عبارت جستجو را پاک کنید."
+        />
+
+        {!loading && filtered.length > 0 && <Pagination page={page} pageCount={pageCount} onChange={setPage} />}
       </Card>
 
       {payingInstallment && (

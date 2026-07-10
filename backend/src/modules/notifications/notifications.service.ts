@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Repository } from 'typeorm';
-import { Notification, NotificationStatus } from './entities/notification.entity';
+import { Notification, NotificationStatus, NotificationType } from './entities/notification.entity';
 
 export const NOTIFICATIONS_QUEUE = 'notifications';
 
@@ -29,6 +29,37 @@ export class NotificationsService {
       installmentId,
       channel: 'sms',
       status: NotificationStatus.PENDING,
+      type: NotificationType.OVERDUE_INSTALLMENT,
+    });
+    const saved = await this.notificationRepo.save(notification);
+
+    await this.notificationsQueue.add(
+      'send-sms',
+      { notificationId: saved.id },
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+      },
+    );
+
+    return saved;
+  }
+
+  /**
+   * Phase 5C: queues an "installment due soon" reminder. Called by
+   * UpcomingDueInstallmentsCron (modules/scheduler) — there's no status
+   * transition to hook an event off of here (the installment stays
+   * PENDING), so the cron calls this directly rather than going through
+   * PaymentEventsListener, same as this method's sibling
+   * queueOverdueReminder did before Domain Events existed.
+   */
+  async queueUpcomingDueReminder(installmentId: string, studentId: string): Promise<Notification> {
+    const notification = this.notificationRepo.create({
+      studentId,
+      installmentId,
+      channel: 'sms',
+      status: NotificationStatus.PENDING,
+      type: NotificationType.UPCOMING_DUE,
     });
     const saved = await this.notificationRepo.save(notification);
 
@@ -55,6 +86,7 @@ export class NotificationsService {
       installmentId,
       channel: 'sms',
       status: NotificationStatus.PENDING,
+      type: NotificationType.PAYMENT_RECEIVED,
     });
     const saved = await this.notificationRepo.save(notification);
 

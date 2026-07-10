@@ -39,6 +39,15 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     // money that already moved, or overriding a schedule, needs an admin.
   ],
   [Role.STAFF]: [],
+  // Parents only ever hit the read-only /parent/* routes (see
+  // modules/parent), which aren't gated by @RequirePermission at all —
+  // listed explicitly so it's obvious this was considered, not missed.
+  [Role.PARENT]: [],
+  // Teachers only ever hit the /teacher/* routes (see modules/teacher),
+  // scoped further still by their TeacherAssignment rows. No sensitive
+  // permission from this list applies to any of those routes — listed
+  // explicitly for the same "considered, not missed" reason as PARENT.
+  [Role.TEACHER]: [],
 };
 
 export function roleHasPermission(role: string, permission: Permission): boolean {

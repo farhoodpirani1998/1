@@ -315,4 +315,31 @@ export class InstallmentsService {
 
     return candidates;
   }
+
+  /**
+   * Phase 5C: candidates for the "installment due soon" reminder — pending
+   * installments whose due_date is exactly `daysAhead` days from today.
+   * Read-only (unlike markOverdueInstallments, no status change happens
+   * when something is merely *approaching* its due date), so this only
+   * ever matches a given installment on the one calendar day where
+   * due_date - daysAhead = today — no separate "already notified"
+   * bookkeeping needed, same as how markOverdueInstallments naturally
+   * stops matching once status leaves PENDING.
+   */
+  async findUpcomingDueInstallments(
+    daysAhead: number,
+  ): Promise<{ id: string; studentId: string }[]> {
+    return this.installmentRepo
+      .createQueryBuilder('installment')
+      .innerJoin('installment.tuitionPlan', 'plan')
+      .where(
+        `installment.dueDate = (CURRENT_DATE + make_interval(days => :daysAhead))::date`,
+        { daysAhead },
+      )
+      .andWhere('installment.status = :pending', {
+        pending: InstallmentStatus.PENDING,
+      })
+      .select(['installment.id AS id', 'plan.studentId AS "studentId"'])
+      .getRawMany<{ id: string; studentId: string }>();
+  }
 }

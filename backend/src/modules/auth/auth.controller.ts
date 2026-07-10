@@ -23,7 +23,9 @@ export class AuthController {
   }
 
   // Only an already-authenticated super_admin can create new users
-  // (school_admin, accountant, staff, or another super_admin).
+  // (school_admin, accountant, staff, parent, or another super_admin).
+  // Phase 5A: a parent login is created here like any other user, then a
+  // school_admin links it to specific students via POST /parent/link.
   @Post('register')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('super_admin')

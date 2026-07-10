@@ -19,37 +19,53 @@ const navItems: NavItem[] = [
   { to: '/users', label: 'کاربران', icon: UsersIcon, roles: ['super_admin'] },
 ];
 
+const roleLabels: Record<string, string> = {
+  super_admin: 'مدیر کل',
+  school_admin: 'مدیر مدرسه',
+  accountant: 'حسابدار',
+  staff: 'کارمند',
+};
+
 export function Sidebar() {
   const { user } = useAuth();
   const visibleItems = navItems.filter((item) => user && item.roles.includes(user.role));
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-l border-line bg-navy text-white">
-      <div className="px-6 py-6">
-        <div className="text-lg font-bold">دفتر مدرسه</div>
-        <div className="mt-0.5 text-xs text-white/60">پنل مدیریت</div>
+    <aside className="flex h-screen w-64 flex-col border-l border-white/[0.06] bg-navy text-white">
+      <div className="flex items-center gap-3 px-6 py-6">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-action shadow-[0_2px_8px_rgba(37,99,235,0.45)]">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+            <path d="M3 21h18M4 21V9l8-5 8 5v12M9 21v-6h6v6" />
+          </svg>
+        </div>
+        <div>
+          <div className="text-[15px] font-bold leading-tight">دفتر مدرسه</div>
+          <div className="mt-0.5 text-[11px] text-white/45">پنل مدیریت مالی</div>
+        </div>
       </div>
 
-      <nav className="flex-1 px-3">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
         {visibleItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
+            end={to === '/'}
             className={({ isActive }) =>
-              `relative mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${
+              `group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${
                 isActive
-                  ? 'bg-white/10 font-medium text-white'
-                  : 'text-white/70 hover:bg-white/5 hover:text-white'
+                  ? 'bg-action/15 font-medium text-white'
+                  : 'text-white/55 hover:bg-white/5 hover:text-white'
               }`
             }
           >
             {({ isActive }) => (
               <>
-                {/* active-tab: a small bookmark-like tab marking the active page */}
                 {isActive && (
-                  <span className="absolute -right-3 top-1/2 h-5 w-1.5 -translate-y-1/2 rounded-full bg-accent" />
+                  <span className="absolute right-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-full bg-action-light" />
                 )}
-                <Icon />
+                <span className={isActive ? 'text-action-light' : 'text-white/40 group-hover:text-white/70'}>
+                  <Icon />
+                </span>
                 {label}
               </>
             )}
@@ -57,9 +73,17 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="border-t border-white/10 px-6 py-4 text-xs text-white/50">
-        نسخه ۰.۲ — در حال توسعه
-      </div>
+      {user && (
+        <div className="flex items-center gap-3 border-t border-white/[0.06] px-4 py-4">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">
+            {user.fullName?.charAt(0) ?? '?'}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-xs font-medium text-white/85">{user.fullName}</div>
+            <div className="truncate text-[11px] text-white/40">{roleLabels[user.role] ?? user.role}</div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
@@ -128,5 +152,3 @@ function UsersIcon() {
     </svg>
   );
 }
-
-

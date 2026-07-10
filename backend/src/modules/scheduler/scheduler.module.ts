@@ -1,17 +1,20 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TuitionModule } from '../tuition/tuition.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { OverdueInstallmentsCron } from './overdue-installments.cron';
+import { UpcomingDueInstallmentsCron } from './upcoming-due-installments.cron';
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
     TuitionModule, // exports InstallmentsService
-    // NotificationsModule is not imported here anymore — the cron no
-    // longer calls it directly. NotificationsModule is registered once in
-    // AppModule, which is enough for its PaymentEventsListener to receive
-    // events emitted from anywhere (EventEmitter2 is process-wide).
+    // Phase 5C: UpcomingDueInstallmentsCron calls NotificationsService
+    // directly (see that file for why — no status-change event exists to
+    // hook for "approaching due date"), so, unlike OverdueInstallmentsCron,
+    // this module needs NotificationsModule imported for real.
+    NotificationsModule,
   ],
-  providers: [OverdueInstallmentsCron],
+  providers: [OverdueInstallmentsCron, UpcomingDueInstallmentsCron],
 })
 export class SchedulerModule {}

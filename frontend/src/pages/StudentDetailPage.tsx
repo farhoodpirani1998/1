@@ -1,7 +1,13 @@
-import { useState, FormEvent, Fragment } from 'react';
+import { useState, FormEvent, Fragment, ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '../components/Card';
+import { PageHeader } from '../components/PageHeader';
+import { SectionHeader } from '../components/SectionHeader';
+import { StatCard } from '../components/StatCard';
+import { Button } from '../components/Button';
+import { EmptyState } from '../components/EmptyState';
 import { StatusBadge } from '../components/StatusBadge';
+import { SkeletonRows, SkeletonCards } from '../components/Skeleton';
 import { RecordPaymentModal, PayableInstallment } from '../components/RecordPaymentModal';
 import { VoidPaymentDialog } from '../components/VoidPaymentDialog';
 import { FormError } from '../components/FormError';
@@ -16,6 +22,79 @@ import { useUpdateStudent, useGrades, useAcademicYears } from '../hooks/useStude
 import { useStudentStatement } from '../hooks/useReports';
 import { useCreateTuitionPlan, useGenerateInstallments } from '../hooks/useTuition';
 import { useVoidPayment } from '../hooks/usePayments';
+
+const statusLabels: Record<StudentStatus, string> = {
+  active: 'فعال',
+  withdrawn: 'انصرافی',
+  graduated: 'فارغ‌التحصیل',
+};
+
+// Presentation-only status badge for a student profile — kept local to
+// this page for the same reason as on StudentsPage: the shared
+// <StatusBadge/> is typed for InstallmentStatus, not StudentStatus.
+const statusBadgeClass: Record<StudentStatus, string> = {
+  active: 'bg-paid/10 text-paid border-paid/25',
+  withdrawn: 'bg-overdue/10 text-overdue border-overdue/25',
+  graduated: 'bg-action-soft text-action border-action/25',
+};
+
+function StudentStatusBadge({ status }: { status: StudentStatus }) {
+  return (
+    <span className={`badge ${statusBadgeClass[status]}`}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {statusLabels[status]}
+    </span>
+  );
+}
+
+// Initial-letter avatar placeholder, derived from the student's existing
+// fullName — no new/fake data, purely presentational.
+function StudentAvatar({ name }: { name: string }) {
+  const initial = name.trim().charAt(0) || '?';
+  return (
+    <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-action-soft text-xl font-semibold text-action dark:bg-action/15 dark:text-action-light">
+      {initial}
+    </span>
+  );
+}
+
+// Small label/value row used inside the Personal Information / Guardian
+// cards — presentational only, replaces the inline "label: value" spans
+// the page already rendered, just laid out more clearly per field.
+function InfoRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-2 text-sm">
+      <span className="text-ink/50 dark:text-paper/50">{label}</span>
+      <span className="tabular text-ink dark:text-paper">{value}</span>
+    </div>
+  );
+}
+
+// Full-page loading skeleton, shown while the statement (and/or student)
+// query is still in flight. Built entirely from the existing Skeleton
+// primitives — no new loading UI concepts introduced.
+function StudentProfileSkeleton() {
+  return (
+    <div className="fade-in">
+      <div className="mb-6 flex items-center gap-4">
+        <div className="skeleton h-14 w-14 rounded-full" />
+        <div className="flex-1">
+          <div className="skeleton mb-2 h-5 w-40" />
+          <div className="skeleton h-3 w-24" />
+        </div>
+      </div>
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <SkeletonRows rows={4} cols={2} />
+        </Card>
+        <Card>
+          <SkeletonRows rows={3} cols={2} />
+        </Card>
+      </div>
+      <SkeletonCards count={3} />
+    </div>
+  );
+}
 
 export function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -66,8 +145,19 @@ export function StudentDetailPage() {
     );
   }
 
-  if (statementQuery.isError) return <div className="rounded-lg bg-overdue/10 px-4 py-3 text-sm text-overdue">صورت‌حساب یافت نشد</div>;
-  if (!statement) return <div className="text-sm text-ink/50">در حال بارگذاری...</div>;
+  if (statementQuery.isError) {
+    return (
+      <div className="fade-in">
+        <Card>
+          <EmptyState
+            message="صورت‌حساب یافت نشد"
+            description="ممکن است این دانش‌آموز حذف شده باشد یا شناسه نامعتبر باشد."
+          />
+        </Card>
+      </div>
+    );
+  }
+  if (!statement) return <StudentProfileSkeleton />;
 
   // Role-gate mirrors backend's @Roles(); permission-gate mirrors backend's
   // @RequirePermission(PAYMENT_VOID) for the extra layer on top of role.
@@ -76,70 +166,124 @@ export function StudentDetailPage() {
 
   return (
     <div className="fade-in">
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="mb-1 text-xl font-bold text-ink">{statement.student.fullName}</h1>
-          <p className="text-sm text-ink/50">صورت‌حساب شهریه</p>
-        </div>
-        {canEditStatus && (
-          <select
-            defaultValue=""
-            onChange={(e) => {
-              if (e.target.value) handleStatusChange(e.target.value as StudentStatus);
-              e.target.value = '';
-            }}
-            className="input w-auto text-sm"
-          >
-            <option value="">تغییر وضعیت...</option>
-            <option value="active">فعال</option>
-            <option value="withdrawn">انصرافی</option>
-            <option value="graduated">فارغ‌التحصیل</option>
-          </select>
-        )}
-      </div>
+      <PageHeader
+        title={statement.student.fullName}
+        description="پروفایل و صورت‌حساب شهریه دانش‌آموز"
+        actions={
+          canEditStatus && (
+            <select
+              defaultValue=""
+              onChange={(e) => {
+                if (e.target.value) handleStatusChange(e.target.value as StudentStatus);
+                e.target.value = '';
+              }}
+              className="input w-auto text-sm"
+            >
+              <option value="">تغییر وضعیت...</option>
+              <option value="active">فعال</option>
+              <option value="withdrawn">انصرافی</option>
+              <option value="graduated">فارغ‌التحصیل</option>
+            </select>
+          )
+        }
+      />
 
-      {student && (
-        <Card className="mb-6">
-          {editingProfile ? (
+      {/* Profile header: avatar, name, grade, academic year, status */}
+      <Card className="mb-6">
+        {!student ? (
+          <SkeletonRows rows={1} cols={3} />
+        ) : (
+          <div className="flex flex-wrap items-center gap-4">
+            <StudentAvatar name={student.fullName} />
+            <div className="min-w-0 flex-1">
+              <div className="text-lg font-bold text-ink dark:text-paper">{student.fullName}</div>
+              <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink/60 dark:text-paper/60">
+                <span>{student.grade?.title ?? 'بدون پایه'}</span>
+                <span>{student.academicYear?.title ?? 'بدون سال تحصیلی'}</span>
+                <StudentStatusBadge status={student.status} />
+              </div>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Grouped profile information */}
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card
+          title="اطلاعات فردی"
+          action={
+            student &&
+            canEditStatus &&
+            !editingProfile && (
+              <Button variant="ghost" size="sm" onClick={() => setEditingProfile(true)}>
+                ویرایش پروفایل
+              </Button>
+            )
+          }
+        >
+          {!student ? (
+            <SkeletonRows rows={4} cols={2} />
+          ) : editingProfile ? (
             <EditProfileForm
               student={student}
               onSaved={() => setEditingProfile(false)}
               onCancel={() => setEditingProfile(false)}
             />
           ) : (
-            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-              <div className="flex flex-wrap gap-x-6 gap-y-1 text-ink/70">
-                <span>
-                  پایه: <span className="text-ink">{student.grade?.title ?? '—'}</span>
-                </span>
-                <span>
-                  والد: <span className="text-ink">{student.guardian?.fullName ?? '—'}</span> ({student.guardian?.phone ?? '—'})
-                </span>
-                <span>
-                  کد ملی: <span className="tabular text-ink">{student.nationalId ?? '—'}</span>
-                </span>
-                <span>
-                  تاریخ ثبت‌نام:{' '}
-                  <span className="tabular text-ink">
-                    {student.enrollmentDate ? formatDate(student.enrollmentDate) : '—'}
-                  </span>
-                </span>
-              </div>
-              {canEditStatus && (
-                <button onClick={() => setEditingProfile(true)} className="shrink-0 text-xs font-medium text-action hover:underline">
-                  ویرایش پروفایل
-                </button>
-              )}
+            <div className="divide-y divide-line dark:divide-white/10">
+              <InfoRow label="پایه تحصیلی" value={student.grade?.title ?? '—'} />
+              <InfoRow label="سال تحصیلی" value={student.academicYear?.title ?? '—'} />
+              <InfoRow label="کد ملی" value={student.nationalId ?? '—'} />
+              <InfoRow
+                label="تاریخ ثبت‌نام"
+                value={student.enrollmentDate ? formatDate(student.enrollmentDate) : '—'}
+              />
             </div>
           )}
         </Card>
-      )}
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <TotalCard label="جمع شهریه" value={statement.totals.totalDue} />
-        <TotalCard label="پرداخت‌شده" value={statement.totals.totalPaid} accent="paid" />
-        <TotalCard label="باقیمانده" value={statement.totals.totalRemaining} accent="overdue" />
+        <Card title="والدین / سرپرست">
+          {!student ? (
+            <SkeletonRows rows={3} cols={2} />
+          ) : student.guardian ? (
+            <div className="divide-y divide-line dark:divide-white/10">
+              <InfoRow label="نام و نام خانوادگی" value={student.guardian.fullName} />
+              <InfoRow label="شماره تلفن" value={student.guardian.phone} />
+              <InfoRow label="کد ملی" value={student.guardian.nationalId ?? '—'} />
+            </div>
+          ) : (
+            <EmptyState message="اطلاعات والد/سرپرست ثبت نشده است." />
+          )}
+        </Card>
       </div>
+
+      {/* Financial summary */}
+      <SectionHeader title="خلاصه مالی" />
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard label="جمع شهریه" value={formatToman(statement.totals.totalDue)} />
+        <StatCard label="پرداخت‌شده" value={formatToman(statement.totals.totalPaid)} accent="paid" />
+        <StatCard label="باقیمانده" value={formatToman(statement.totals.totalRemaining)} accent="overdue" />
+      </div>
+
+      {/* Attendance / assessment: no backing data exists in the backend
+          today (no attendance or assessment module/endpoints) — shown as
+          empty-state placeholders rather than fabricated numbers. */}
+      <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card title="خلاصه حضور و غیاب">
+          <EmptyState
+            message="سیستم حضور و غیاب هنوز راه‌اندازی نشده است."
+            description="با فعال‌سازی این ماژول، خلاصه حضور و غیاب اینجا نمایش داده می‌شود."
+          />
+        </Card>
+        <Card title="خلاصه ارزیابی">
+          <EmptyState
+            message="سیستم ارزیابی هنوز راه‌اندازی نشده است."
+            description="با فعال‌سازی این ماژول، خلاصه نمرات و ارزیابی‌ها اینجا نمایش داده می‌شود."
+          />
+        </Card>
+      </div>
+
+      <SectionHeader title="برنامه شهریه و اقساط" />
 
       {statement.tuitionPlans.length === 0 && <CreateTuitionPlanForm studentId={statement.student.id} />}
 
@@ -271,24 +415,6 @@ export function StudentDetailPage() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-function TotalCard({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: number;
-  accent?: 'paid' | 'overdue';
-}) {
-  const colorClass = accent ? { paid: 'text-paid', overdue: 'text-overdue' }[accent] : 'text-ink';
-  return (
-    <div className="rounded-xl border border-line bg-white p-5 shadow-card">
-      <div className="text-sm text-ink/60">{label}</div>
-      <div className={`tabular mt-2 text-xl font-bold ${colorClass}`}>{formatToman(value)}</div>
     </div>
   );
 }

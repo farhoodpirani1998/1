@@ -11,12 +11,23 @@ import { SchoolsModule } from './modules/schools/schools.module';
 import { AcademicYearsModule } from './modules/academic-years/academic-years.module';
 import { GradesModule } from './modules/grades/grades.module';
 import { StudentsModule } from './modules/students/students.module';
+import { ParentModule } from './modules/parent/parent.module';
+import { AttendanceModule } from './modules/attendance/attendance.module';
+import { StudentAssessmentsModule } from './modules/student-assessments/student-assessments.module';
+import { TeacherModule } from './modules/teacher/teacher.module';
+import { AnnouncementsModule } from './modules/announcements/announcements.module';
+import { StudentDocumentsModule } from './modules/student-documents/student-documents.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { TimetableModule } from './modules/timetable/timetable.module';
+import { HomeworkModule } from './modules/homework/homework.module';
 import { TuitionModule } from './modules/tuition/tuition.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { UsersModule } from './modules/users/users.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
+import { SchoolSettingsModule } from './modules/school-settings/school-settings.module';
+import { SearchModule } from './modules/search/search.module';
 import { AuditModule } from './common/audit/audit.module';
 import { HealthModule } from './modules/health/health.module';
 import { ObservabilityModule } from './common/logging/observability.module';
@@ -73,12 +84,23 @@ import { validateEnv } from './config/env.validation';
     AcademicYearsModule,
     GradesModule,
     StudentsModule,
+    ParentModule,
+    AttendanceModule,
+    StudentAssessmentsModule,
+    TeacherModule,
+    AnnouncementsModule,
+    StudentDocumentsModule,
+    AnalyticsModule,
+    TimetableModule,
+    HomeworkModule,
     LedgerModule,
     AuditModule,
     TuitionModule,
     ReportsModule,
     NotificationsModule,
     SchedulerModule,
+    SchoolSettingsModule,
+    SearchModule,
   ],
   providers: [
     {

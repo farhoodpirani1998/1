@@ -1,13 +1,22 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Link } from 'react-router-dom';
 import { Card } from '../components/Card';
+import { PageHeader } from '../components/PageHeader';
+import { SearchInput } from '../components/SearchInput';
+import { FilterBar } from '../components/FilterBar';
+import { Table, type TableColumn } from '../components/Table';
+import { Pagination, paginate } from '../components/Pagination';
+import { Button } from '../components/Button';
 import { SkeletonRows } from '../components/Skeleton';
 import { formatToman, toPersianDigits } from '../lib/format';
 import { exportToExcel } from '../lib/exportExcel';
 import type { InstallmentStatus } from '../types/tuition.types';
+import type { DebtorStudent } from '../types/report.types';
 import { useOverdueSummary, useDebtorStudents, useMonthlyIncomeTrend } from '../hooks/useReports';
 import { useInstallments } from '../hooks/useInstallments';
+
+const PAGE_SIZE = 10;
 
 const statusLabels: Record<InstallmentStatus, string> = {
   pending: 'در انتظار',
@@ -60,7 +69,7 @@ export function ReportsPage() {
 
   return (
     <div className="fade-in">
-      <h1 className="mb-6 text-xl font-bold text-ink">گزارش‌ها</h1>
+      <PageHeader title="گزارش‌ها" description="نمای کلی وضعیت مالی، بدهکاران و روند درآمد" />
 
       {loading ? (
         <SkeletonRows rows={4} cols={3} />
@@ -149,16 +158,20 @@ function IncomeTrendPanel() {
   }
 
   return (
-    <Card title="روند درآمد (۶ ماه اخیر)" className="mt-4">
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <div className="ml-auto text-sm text-ink/60">
-          جمع ۶ ماه: <span className="tabular font-bold text-paid">{formatToman(total)}</span>
+    <Card
+      title="روند درآمد (۶ ماه اخیر)"
+      className="mt-4"
+      action={
+        <div className="flex items-center gap-3">
+          <div className="text-sm text-ink/60 dark:text-paper/60">
+            جمع ۶ ماه: <span className="tabular font-bold text-paid">{formatToman(total)}</span>
+          </div>
+          <Button variant="secondary" size="sm" onClick={handleExport}>
+            خروجی Excel
+          </Button>
         </div>
-        <button onClick={handleExport} className="rounded-lg border border-line px-3 py-1.5 text-xs hover:bg-paper">
-          خروجی Excel
-        </button>
-      </div>
-
+      }
+    >
       {loading ? (
         <SkeletonRows rows={3} cols={4} />
       ) : (
@@ -180,10 +193,29 @@ function IncomeTrendPanel() {
 
 // GET /reports/debtor-students exists on the backend and was already
 // implemented, but no page consumed it — this was flagged in Phase 0.
+// Filtering/pagination below is presentation-only (client-side, over the
+// already-fetched `debtors` list) — the API call itself is unchanged.
 function DebtorStudentsPanel() {
   const debtorsQuery = useDebtorStudents();
   const debtors = debtorsQuery.data ?? [];
   const loading = debtorsQuery.isLoading;
+
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+
+  const filtered = useMemo(() => {
+    const q = search.trim();
+    if (!q) return debtors;
+    return debtors.filter((d) => d.studentFullName.includes(q));
+  }, [debtors, search]);
+
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const pageItems = useMemo(() => paginate(filtered, page, PAGE_SIZE), [filtered, page]);
+
+  function handleSearchChange(value: string) {
+    setSearch(value);
+    setPage(1);
+  }
 
   function handleExport() {
     exportToExcel(
@@ -193,39 +225,52 @@ function DebtorStudentsPanel() {
     );
   }
 
+  const columns: TableColumn<DebtorStudent>[] = [
+    {
+      key: 'student',
+      header: 'دانش‌آموز',
+      render: (d) => (
+        <Link to={`/students/${d.studentId}`} className="font-medium text-action hover:underline">
+          {d.studentFullName}
+        </Link>
+      ),
+    },
+    {
+      key: 'balance',
+      header: 'مانده بدهی',
+      align: 'left',
+      cellClassName: 'tabular font-semibold text-overdue',
+      render: (d) => formatToman(d.outstandingBalance),
+    },
+  ];
+
   return (
     <Card title="دانش‌آموزان بدهکار" className="mt-4">
-      <div className="mb-3 flex justify-end">
-        <button onClick={handleExport} className="rounded-lg border border-line px-3 py-1.5 text-xs hover:bg-paper">
-          خروجی Excel
-        </button>
-      </div>
-      {loading ? (
-        <SkeletonRows rows={4} cols={2} />
-      ) : debtors.length === 0 ? (
-        <div className="py-6 text-center text-sm text-ink/50">هیچ دانش‌آموز بدهکاری وجود ندارد.</div>
-      ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-line text-right text-ink/50">
-              <th className="py-2 font-medium">دانش‌آموز</th>
-              <th className="py-2 font-medium">مانده بدهی</th>
-            </tr>
-          </thead>
-          <tbody>
-            {debtors.slice(0, 20).map((d) => (
-              <tr key={d.studentId} className="border-b border-line/60 last:border-0">
-                <td className="py-2">
-                  <Link to={`/students/${d.studentId}`} className="text-action hover:underline">
-                    {d.studentFullName}
-                  </Link>
-                </td>
-                <td className="tabular py-2 font-medium text-overdue">{formatToman(d.outstandingBalance)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <FilterBar
+        actions={
+          <Button variant="secondary" size="sm" onClick={handleExport}>
+            خروجی Excel
+          </Button>
+        }
+      >
+        <SearchInput
+          value={search}
+          onChange={handleSearchChange}
+          placeholder="جستجو با نام دانش‌آموز..."
+          containerClassName="w-56 sm:w-64"
+        />
+      </FilterBar>
+
+      <Table
+        columns={columns}
+        data={pageItems}
+        rowKey={(d) => d.studentId}
+        loading={loading}
+        skeletonRows={4}
+        emptyMessage={debtors.length === 0 ? 'هیچ دانش‌آموز بدهکاری وجود ندارد.' : 'نتیجه‌ای برای این جستجو یافت نشد.'}
+      />
+
+      {!loading && filtered.length > 0 && <Pagination page={page} pageCount={pageCount} onChange={setPage} />}
     </Card>
   );
 }

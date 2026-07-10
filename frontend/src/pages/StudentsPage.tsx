@@ -1,8 +1,14 @@
 import { useEffect, useMemo, useState, FormEvent, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Card } from '../components/Card';
-import { SkeletonRows } from '../components/Skeleton';
+import { PageHeader } from '../components/PageHeader';
+import { SearchInput } from '../components/SearchInput';
+import { FilterBar } from '../components/FilterBar';
+import { Table, type TableColumn } from '../components/Table';
 import { Pagination, paginate } from '../components/Pagination';
+import { StatCard } from '../components/StatCard';
+import { Button } from '../components/Button';
+import { SkeletonCards } from '../components/Skeleton';
 import { useToast } from '../lib/toast';
 import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
 import { FormError } from '../components/FormError';
@@ -17,6 +23,37 @@ const statusLabels: Record<Student['status'], string> = {
   withdrawn: 'انصرافی',
   graduated: 'فارغ‌التحصیل',
 };
+
+// Presentation-only badge for a student's status — kept local to this page
+// rather than reusing the shared <StatusBadge/>, which is typed strictly
+// for InstallmentStatus (paid/pending/overdue/...) and doesn't cover
+// active/withdrawn/graduated. Same visual language (.badge class, status
+// color tokens) as the shared component, just for a different domain type.
+const statusBadgeClass: Record<Student['status'], string> = {
+  active: 'bg-paid/10 text-paid border-paid/25',
+  withdrawn: 'bg-overdue/10 text-overdue border-overdue/25',
+  graduated: 'bg-action-soft text-action border-action/25',
+};
+
+function StudentStatusBadge({ status }: { status: Student['status'] }) {
+  return (
+    <span className={`badge ${statusBadgeClass[status]}`}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {statusLabels[status]}
+    </span>
+  );
+}
+
+// Simple initial-letter avatar placeholder — purely presentational, derived
+// from the student's existing fullName (no new/fake data).
+function StudentAvatar({ name }: { name: string }) {
+  const initial = name.trim().charAt(0) || '?';
+  return (
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-action-soft text-sm font-semibold text-action dark:bg-action/15 dark:text-action-light">
+      {initial}
+    </span>
+  );
+}
 
 export function StudentsPage() {
   const { showSuccess, showError } = useToast();
@@ -40,10 +77,14 @@ export function StudentsPage() {
   const academicYears = academicYearsQuery.data ?? [];
   const loading = studentsQuery.isLoading;
 
-  function handleSearch(e: FormEvent) {
-    e.preventDefault();
+  function runSearch() {
     setPage(1);
     setSubmittedSearch(search);
+  }
+
+  function handleSearch(e: FormEvent) {
+    e.preventDefault();
+    runSearch();
   }
 
   function handleExport() {
@@ -63,25 +104,104 @@ export function StudentsPage() {
   const pageCount = Math.max(1, Math.ceil(students.length / PAGE_SIZE));
   const pageItems = useMemo(() => paginate(students, page, PAGE_SIZE), [students, page]);
 
+  // Stats derived entirely from the already-fetched `students` list — no
+  // separate endpoint/mock data. They reflect whatever's currently loaded
+  // (i.e. the active search, if any), same as the table below.
+  const totalCount = students.length;
+  const activeCount = useMemo(() => students.filter((s) => s.status === 'active').length, [students]);
+  const inactiveCount = totalCount - activeCount;
+  // "New this month" only exists because Student.enrollmentDate is a real
+  // backend field — this counts students whose enrollmentDate falls in the
+  // current calendar month/year. Students without an enrollmentDate are
+  // simply not counted, not treated as 0/fake.
+  const newThisMonthCount = useMemo(() => {
+    const now = new Date();
+    return students.filter((s) => {
+      if (!s.enrollmentDate) return false;
+      const d = new Date(s.enrollmentDate);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    }).length;
+  }, [students]);
+
+  const columns: TableColumn<Student>[] = [
+    {
+      key: 'name',
+      header: 'نام',
+      render: (s) => (
+        <div className="flex items-center gap-3">
+          <StudentAvatar name={s.fullName} />
+          <span className="font-medium text-ink dark:text-paper">{s.fullName}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'grade',
+      header: 'پایه',
+      cellClassName: 'text-ink/70 dark:text-paper/70',
+      render: (s) => s.grade?.title ?? '—',
+    },
+    {
+      key: 'guardian',
+      header: 'والد',
+      cellClassName: 'text-ink/70 dark:text-paper/70',
+      render: (s) => s.guardian?.fullName ?? '—',
+    },
+    {
+      key: 'status',
+      header: 'وضعیت',
+      render: (s) => <StudentStatusBadge status={s.status} />,
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'left',
+      render: (s) => (
+        <Link to={`/students/${s.id}`} className="text-sm font-medium text-action hover:underline">
+          صورت‌حساب
+        </Link>
+      ),
+    },
+  ];
+
   return (
     <div className="fade-in">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-bold text-ink">دانش‌آموزان</h1>
-        <div className="flex gap-2">
-          <Link to="/students/archived" className="rounded-lg border border-line px-4 py-2 text-sm hover:bg-paper">
-            غیرفعال‌ها
-          </Link>
-          <button onClick={handleExport} className="rounded-lg border border-line px-4 py-2 text-sm hover:bg-paper">
-            خروجی Excel
-          </button>
-          <button
-            onClick={() => setShowForm((v) => !v)}
-            className="rounded-lg bg-action px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-          >
+      <PageHeader
+        title="دانش‌آموزان"
+        description="مدیریت اطلاعات، وضعیت ثبت‌نام و صورت‌حساب دانش‌آموزان"
+        actions={
+          <Button variant={showForm ? 'secondary' : 'primary'} onClick={() => setShowForm((v) => !v)}>
             {showForm ? 'انصراف' : '+ دانش‌آموز جدید'}
-          </button>
+          </Button>
+        }
+      />
+
+      {loading ? (
+        <div className="mb-2">
+          <SkeletonCards count={4} />
         </div>
-      </div>
+      ) : (
+        <div className="mb-2 grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard label="کل دانش‌آموزان" value={toPersianCount(totalCount)} icon={<UsersIcon />} />
+          <StatCard
+            label="دانش‌آموزان فعال"
+            value={toPersianCount(activeCount)}
+            accent="paid"
+            icon={<CheckIcon />}
+          />
+          <StatCard
+            label="دانش‌آموزان غیرفعال"
+            value={toPersianCount(inactiveCount)}
+            accent="overdue"
+            icon={<AlertIcon />}
+          />
+          <StatCard
+            label="ثبت‌نام جدید این ماه"
+            value={toPersianCount(newThisMonthCount)}
+            accent="action"
+            icon={<CalendarIcon />}
+          />
+        </div>
+      )}
 
       {showForm && (
         <CreateStudentForm
@@ -105,56 +225,87 @@ export function StudentsPage() {
         />
       )}
 
-      <Card className="mt-4">
-        <form onSubmit={handleSearch} className="mb-4 flex gap-2">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="جستجو با نام..."
-            className="input flex-1"
-          />
-          <button type="submit" className="rounded-lg border border-line px-4 py-2 text-sm hover:bg-paper">
-            جستجو
-          </button>
-        </form>
+      <Card className="mt-6">
+        <FilterBar
+          actions={
+            <>
+              <Link to="/students/archived" className="btn-secondary">
+                غیرفعال‌ها
+              </Link>
+              <Button variant="secondary" onClick={handleExport}>
+                خروجی Excel
+              </Button>
+            </>
+          }
+        >
+          <form onSubmit={handleSearch} className="flex gap-2">
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              onSubmit={runSearch}
+              placeholder="جستجو با نام..."
+              containerClassName="w-56 sm:w-64"
+            />
+            <Button type="submit" variant="secondary">
+              جستجو
+            </Button>
+          </form>
+        </FilterBar>
 
-        {loading ? (
-          <SkeletonRows rows={6} cols={5} />
-        ) : students.length === 0 ? (
-          <div className="py-8 text-center text-sm text-ink/50">هنوز دانش‌آموزی ثبت نشده است.</div>
-        ) : (
-          <>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-line text-right text-ink/50">
-                  <th className="py-2 font-medium">نام</th>
-                  <th className="py-2 font-medium">پایه</th>
-                  <th className="py-2 font-medium">والد</th>
-                  <th className="py-2 font-medium">وضعیت</th>
-                  <th className="py-2 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageItems.map((s) => (
-                  <tr key={s.id} className="border-b border-line/60 last:border-0">
-                    <td className="py-3 font-medium text-ink">{s.fullName}</td>
-                    <td className="py-3 text-ink/70">{s.grade?.title ?? '—'}</td>
-                    <td className="py-3 text-ink/70">{s.guardian?.fullName ?? '—'}</td>
-                    <td className="py-3 text-ink/70">{statusLabels[s.status]}</td>
-                    <td className="py-3 text-left">
-                      <Link to={`/students/${s.id}`} className="text-action hover:underline">
-                        صورت‌حساب
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <Pagination page={page} pageCount={pageCount} onChange={setPage} />
-          </>
-        )}
+        <Table
+          columns={columns}
+          data={pageItems}
+          rowKey={(s) => s.id}
+          loading={loading}
+          skeletonRows={6}
+          emptyMessage="هنوز دانش‌آموزی ثبت نشده است."
+          emptyDescription={submittedSearch ? 'برای این جستجو نتیجه‌ای یافت نشد.' : undefined}
+        />
+
+        {!loading && students.length > 0 && <Pagination page={page} pageCount={pageCount} onChange={setPage} />}
       </Card>
     </div>
+  );
+}
+
+function toPersianCount(n: number): string {
+  return n.toLocaleString('fa-IR');
+}
+
+function UsersIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="9" cy="8" r="3" />
+      <path d="M2 20c0-3 3-5.5 7-5.5s7 2.5 7 5.5" />
+      <circle cx="17" cy="8" r="2.5" />
+      <path d="M17 14c2.5.3 4.5 2.3 4.5 4.8" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="m5 13 4 4L19 7" />
+    </svg>
+  );
+}
+
+function AlertIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8v5M12 16h.01" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M3 10h18M8 3v4M16 3v4" />
+    </svg>
   );
 }
 

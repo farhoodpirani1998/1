@@ -14,5 +14,8 @@ import { ReportsService } from './reports.service';
   ],
   controllers: [ReportsController],
   providers: [ReportsService],
+  // Phase 5D: StudentProfileModule reuses studentStatement() for the
+  // profile's tuition/payment summary instead of re-deriving totals.
+  exports: [ReportsService],
 })
 export class ReportsModule {}

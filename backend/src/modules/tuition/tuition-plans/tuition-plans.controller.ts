@@ -30,12 +30,19 @@ export class TuitionPlansController {
     return this.tuitionPlansService.create(dto, user.schoolId, { id: user.id, role: user.role });
   }
 
+  // Financial data (base/discount/final amounts) — previously had no
+  // @Roles, so any authenticated role was let through. Phase 5A's new
+  // 'parent' role must be excluded here same as everywhere else outside
+  // /parent/*; the existing school_admin/accountant/staff access is
+  // unchanged.
   @Get(':id')
+  @Roles('school_admin', 'accountant', 'staff')
   findOne(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
     return this.tuitionPlansService.findOne(id, schoolId);
   }
 
   @Get()
+  @Roles('school_admin', 'accountant', 'staff')
   findByStudent(
     @Query('studentId') studentId: string,
     @CurrentUser('schoolId') schoolId: string,

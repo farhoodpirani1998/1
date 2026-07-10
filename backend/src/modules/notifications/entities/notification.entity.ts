@@ -15,6 +15,16 @@ export enum NotificationStatus {
   FAILED = 'failed',
 }
 
+// Phase 5C: distinguishes *why* a notification exists, independent of
+// NotificationStatus (which only tracks SMS delivery). Parents need this
+// to render/label their in-app notification list; the SMS processor also
+// uses it to pick the right message body.
+export enum NotificationType {
+  PAYMENT_RECEIVED = 'payment_received',
+  OVERDUE_INSTALLMENT = 'overdue_installment',
+  UPCOMING_DUE = 'upcoming_due',
+}
+
 @Entity('notifications')
 export class Notification {
   @PrimaryGeneratedColumn('uuid')
@@ -44,9 +54,28 @@ export class Notification {
   })
   status: NotificationStatus;
 
+  // Phase 5C: what this notification is about — see NotificationType.
+  // Defaulted at the DB level to OVERDUE_INSTALLMENT (the only kind that
+  // existed before this phase) so the migration doesn't need to backfill
+  // existing rows individually.
+  @Column({
+    type: 'varchar',
+    length: 30,
+    default: NotificationType.OVERDUE_INSTALLMENT,
+  })
+  type: NotificationType;
+
   @Column({ name: 'sent_at', type: 'timestamp', nullable: true })
   sentAt: Date | null;
+
+  // Phase 5C: parent-portal "read" state, separate from `status` (SMS
+  // delivery) — a notification can be SENT via SMS and still unread in
+  // the parent's in-app list, or never sent by SMS (e.g. no phone on
+  // file) yet still readable/markable in the portal.
+  @Column({ name: 'read_at', type: 'timestamp', nullable: true })
+  readAt: Date | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }
+
