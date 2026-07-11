@@ -2,8 +2,9 @@
 
 Covers what Phase 4B added: observability, health checks, environment
 validation, and Docker packaging. For prior hardening (auth, tenant
-isolation, reliability, performance), see `ARCHITECTURE_CHANGES.md` and
-`docs/security-roadmap.md`.
+isolation, reliability, performance), see
+[`../architecture/ARCHITECTURE_CHANGES.md`](../architecture/ARCHITECTURE_CHANGES.md)
+and [`../security/security-roadmap.md`](../security/security-roadmap.md).
 
 ## Environment variables
 

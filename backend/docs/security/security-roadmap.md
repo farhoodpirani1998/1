@@ -6,25 +6,27 @@ Update this file whenever a new gap is spotted or an item below gets fixed.
 
 ## Authorization TODO
 
-- **JWT role staleness (highest priority of this list).** `role` is signed
-  into the JWT at login (`AuthService.login`, `JwtStrategy.validate`) and
-  never re-checked against the DB until the token expires
-  (`signOptions: { expiresIn: '7d' }` in `auth.module.ts`). If an admin
-  demotes or deactivates a user, that user's *existing* token keeps working
-  — with the *old* role/active-status — for up to 7 days. This matters most
-  for `Permission.PAYMENT_VOID`: someone stripped of `school_admin` could
-  still void a payment for up to a week.
-  Options, roughly cheapest → most work:
-  1. Shorten `expiresIn` (e.g. 1h) + add a refresh token flow.
-  2. Add a `tokenVersion` column on `users`; bump it on role change /
-     deactivation; `JwtStrategy.validate` checks the DB's current
-     `tokenVersion` against the token's and rejects if mismatched. Doesn't
-     need full refresh-token infra, but does add one DB read per request.
-  3. Full refresh-token + short-lived access-token pair (standard, more
-     moving parts: revocation list, rotation, storage).
-  Decide once actual deactivation/demotion frequency is known — for ~10
-  schools this may not be worth solving before it's observed as a real
-  problem.
+- **JWT staleness on deactivation — closed.** `users.token_version`
+  (migration `1736400000000-UserTokenVersion`) is bumped by
+  `UsersService.setActive()` on every activate/deactivate call and by
+  `AuthService.changePassword()`; `JwtStrategy.validate` rejects any token
+  whose embedded `tokenVersion` doesn't match the DB's current value
+  (`src/modules/auth/strategies/jwt.strategy.ts`). A deactivated user's
+  existing token — and any other still-logged-in session of that user's —
+  stops working on the very next request instead of surviving up to the
+  7-day `expiresIn`. This was option 2 from the original version of this
+  note, implemented; kept here (not deleted) so it isn't rediscovered as an
+  open gap. Covered by `auth-security.e2e-spec.ts`.
+
+- **JWT role staleness — not yet applicable.** The fix above closes
+  *deactivation* staleness, but there is still no endpoint that changes an
+  existing user's `role` after creation (no `updateRole`/`changeRole` on
+  `UsersService`, no matching route). A role is fixed at registration
+  today, so "an admin demotes a user and their old-role token keeps
+  working" isn't currently reachable — not because it was fixed, but
+  because the feature it would require doesn't exist yet. If a role-change
+  endpoint is ever added, it must also bump `tokenVersion` (the same call
+  `setActive()` already makes) or this gap reopens immediately.
 
 - **Dynamic (DB-driven) permissions — only if a real need shows up.**
   Deliberately not built (see `common/authorization/permissions.ts`
@@ -32,12 +34,16 @@ Update this file whenever a new gap is spotted or an item below gets fixed.
   (~10 schools, 3000 students). Revisit only if a school needs a custom
   role that doesn't fit `super_admin / school_admin / accountant / staff`.
 
-- **`RolesGuard` open-by-default.** Any endpoint without `@Roles(...)`
-  is reachable by *any* authenticated role, not just an intended subset
-  (e.g. today `GET /payments`, `GET /reports/student/:id/statement` have
-  no `@Roles()`). Worth an audit pass: go through every controller once
-  and confirm each route's absence of `@Roles()` is intentional, not an
-  oversight.
+- **`RolesGuard` open-by-default — audit pass done, stays a design note.**
+  `RolesGuard` still falls open to any authenticated role when a route
+  carries no `@Roles(...)` (see `src/common/guards/roles.guard.ts`); that
+  behavior itself is unchanged and intentional. The two examples
+  previously listed here (`GET /payments`, `GET /reports/student/:id/statement`)
+  have since been closed — both now carry `@Roles('school_admin', 'accountant')`
+  (`payments.controller.ts`, `reports.controller.ts`). No further gaps are
+  known, but re-run this audit whenever a new controller is added, since
+  the guard's open-by-default behavior means a missing `@Roles()` fails
+  silently rather than loudly.
 
 - **Controllers still pass role strings, not `Role` enum values, to
   `@Roles(...)`.** (e.g. `@Roles('school_admin', 'accountant')`.)
