@@ -41,7 +41,7 @@ export class Payment {
   })
   paymentMethod: PaymentMethod | null;
 
-  @Column({ name: 'reference_number', length: 100, nullable: true })
+  @Column({ name: 'reference_number', type: 'varchar', length: 100, nullable: true })
   referenceNumber: string | null;
 
   @ManyToOne(() => User, { nullable: true })
@@ -57,13 +57,13 @@ export class Payment {
   @Column({ type: 'text', nullable: true })
   note: string | null;
 
-  @Column({ name: 'idempotency_key', length: 100, nullable: true })
+  @Column({ name: 'idempotency_key', type: 'varchar', length: 100, nullable: true })
   idempotencyKey: string | null;
 
   // Format "<jalali-year>-<6-digit-sequence>", e.g. "1405-000001".
   // Assigned once, inside the same transaction that creates the payment —
   // see PaymentsService.create() and receipt_counters in the migration.
-  @Column({ name: 'receipt_number', length: 30, nullable: true })
+  @Column({ name: 'receipt_number', type: 'varchar', length: 30, nullable: true })
   receiptNumber: string | null;
 
   @ManyToOne(() => User, { nullable: true })

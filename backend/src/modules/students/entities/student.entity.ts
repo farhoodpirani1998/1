@@ -54,7 +54,7 @@ export class Student {
   @Column({ name: 'full_name', length: 150 })
   fullName: string;
 
-  @Column({ name: 'national_id', length: 20, nullable: true })
+  @Column({ name: 'national_id', type: 'varchar', length: 20, nullable: true })
   nationalId: string | null;
 
   @Column({ type: 'varchar', length: 20, default: StudentStatus.ACTIVE })

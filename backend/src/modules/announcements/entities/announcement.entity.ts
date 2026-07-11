@@ -43,7 +43,7 @@ export class Announcement {
   @Column({ name: 'school_id' })
   schoolId: string;
 
-  @Column({ length: 200 })
+  @Column({ type: 'varchar', length: 200 })
   title: string;
 
   @Column({ type: 'text' })

@@ -62,7 +62,7 @@ export class StudentDocument {
   @Column({ name: 'uploaded_by', nullable: true })
   uploadedById: string | null;
 
-  @Column({ length: 200 })
+  @Column({ type: 'varchar', length: 200 })
   title: string;
 
   @Column({ name: 'document_type', type: 'varchar', length: 20 })

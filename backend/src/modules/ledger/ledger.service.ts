@@ -57,7 +57,7 @@ export class LedgerService {
       });
     }
 
-    await manager.getRepository(LedgerEntry).insert(entries);
+    await manager.getRepository(LedgerEntry).insert(entries as any);
   }
 
   /**

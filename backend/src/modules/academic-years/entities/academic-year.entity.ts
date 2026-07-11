@@ -13,7 +13,7 @@ export class AcademicYear {
   @Column({ name: 'school_id' })
   schoolId: string;
 
-  @Column({ length: 50 })
+  @Column({ type: 'varchar', length: 50 })
   title: string; // e.g. "۱۴۰۴-۱۴۰۵"
 
   @Column({ name: 'start_date', type: 'date', nullable: true })

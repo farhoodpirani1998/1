@@ -20,16 +20,16 @@ export class User {
   @Column({ name: 'school_id', nullable: true })
   schoolId: string | null; // null only for super_admin
 
-  @Column({ name: 'full_name', length: 150 })
+  @Column({ name: 'full_name', type: 'varchar', length: 150 })
   fullName: string;
 
-  @Column({ length: 20, unique: true })
+  @Column({ type: 'varchar', length: 20, unique: true })
   phone: string;
 
-  @Column({ name: 'password_hash', length: 255 })
+  @Column({ name: 'password_hash', type: 'varchar', length: 255 })
   passwordHash: string;
 
-  @Column({ length: 30 })
+  @Column({ type: 'varchar', length: 30 })
   role: string; // super_admin, school_admin, accountant, staff
 
   @Column({ name: 'is_active', default: true })

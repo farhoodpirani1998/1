@@ -1,5 +1,5 @@
 import { INestApplication } from '@nestjs/common';
-import * as request from 'supertest';
+import request from 'supertest';
 import { createTestApp, closeTestApp, truncateAll, getDataSource } from './setup/test-app';
 import {
   createSchool,

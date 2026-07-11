@@ -8,6 +8,6 @@ export class Grade {
   @Column({ name: 'school_id' })
   schoolId: string;
 
-  @Column({ length: 50 })
+  @Column({ type: 'varchar', length: 50 })
   title: string; // e.g. "پایه هفتم"
 }

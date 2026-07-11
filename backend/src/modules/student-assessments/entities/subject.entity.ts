@@ -15,6 +15,6 @@ export class Subject {
   @Column({ name: 'school_id' })
   schoolId: string;
 
-  @Column({ length: 100 })
+  @Column({ type: 'varchar', length: 100 })
   title: string; // e.g. "ریاضی"
 }

@@ -42,7 +42,7 @@ export class TuitionPlan {
   })
   discountAmount: number;
 
-  @Column({ name: 'discount_reason', length: 200, nullable: true })
+  @Column({ name: 'discount_reason', type: 'varchar', length: 200, nullable: true })
   discountReason: string | null;
 
   @Column({ name: 'final_amount', type: 'numeric', precision: 14, scale: 0 })

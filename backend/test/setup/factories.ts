@@ -50,8 +50,8 @@ export async function createSchool(
     address: overrides.address ?? null,
     phone: overrides.phone ?? null,
     isActive: overrides.isActive ?? true,
-  });
-  return repo.save(school);
+  } as any);
+  return repo.save(school as any);
 }
 
 export const TEST_PASSWORD = 'Passw0rd!2345';

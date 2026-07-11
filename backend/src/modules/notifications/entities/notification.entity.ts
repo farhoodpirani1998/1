@@ -44,7 +44,7 @@ export class Notification {
   @Column({ name: 'installment_id' })
   installmentId: string;
 
-  @Column({ length: 20, default: 'sms' })
+  @Column({ type: 'varchar', length: 20, default: 'sms' })
   channel: string;
 
   @Column({

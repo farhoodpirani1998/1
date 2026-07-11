@@ -28,31 +28,31 @@ export class SchoolSettings {
   @JoinColumn({ name: 'school_id' })
   school: School;
 
-  @Column({ name: 'school_name', length: 200 })
+  @Column({ name: 'school_name', type: 'varchar', length: 200 })
   schoolName: string;
 
   @Column({ name: 'logo_url', type: 'text', nullable: true })
   logoUrl: string | null;
 
-  @Column({ length: 500, nullable: true })
+  @Column({ type: 'varchar', length: 500, nullable: true })
   address: string | null;
 
-  @Column({ length: 20, nullable: true })
+  @Column({ type: 'varchar', length: 20, nullable: true })
   phone: string | null;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   email: string | null;
 
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   website: string | null;
 
-  @Column({ length: 50, default: 'Asia/Tehran' })
+  @Column({ type: 'varchar', length: 50, default: 'Asia/Tehran' })
   timezone: string;
 
-  @Column({ length: 10, default: 'fa' })
+  @Column({ type: 'varchar', length: 10, default: 'fa' })
   language: string;
 
-  @Column({ length: 10, default: 'IRR' })
+  @Column({ type: 'varchar', length: 10, default: 'IRR' })
   currency: string;
 
   @Column({ name: 'week_starts_on', type: 'smallint', default: Weekday.SATURDAY })
@@ -79,10 +79,10 @@ export class SchoolSettings {
   @Column({ name: 'email_enabled', default: false })
   emailEnabled: boolean;
 
-  @Column({ name: 'primary_color', length: 7, nullable: true })
+  @Column({ name: 'primary_color', type: 'varchar', length: 7, nullable: true })
   primaryColor: string | null;
 
-  @Column({ name: 'secondary_color', length: 7, nullable: true })
+  @Column({ name: 'secondary_color', type: 'varchar', length: 7, nullable: true })
   secondaryColor: string | null;
 
   @CreateDateColumn({ name: 'created_at' })

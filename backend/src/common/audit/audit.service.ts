@@ -41,8 +41,8 @@ export class AuditService {
         action: params.action,
         entityType: params.entityType,
         entityId: params.entityId,
-        oldValue: params.oldValue ?? null,
-        newValue: params.newValue ?? null,
+        oldValue: (params.oldValue as any) ?? null,
+        newValue: (params.newValue as any) ?? null,
       });
     } catch (err) {
       this.logger.error(

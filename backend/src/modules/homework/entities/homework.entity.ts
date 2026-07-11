@@ -63,7 +63,7 @@ export class Homework {
   @Column({ name: 'teacher_id' })
   teacherId: string;
 
-  @Column({ length: 200 })
+  @Column({ type: 'varchar', length: 200 })
   title: string;
 
   @Column({ type: 'text' })

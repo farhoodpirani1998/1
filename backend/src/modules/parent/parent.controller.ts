@@ -124,8 +124,8 @@ export class ParentController {
     );
     return toParentTuitionView({
       ...plan,
-      academicYear: { title: plan.academicYear?.title ?? '' },
-    });
+      academicYear: plan.academicYear ? { ...plan.academicYear, title: plan.academicYear.title } : undefined,
+    } as any);
   }
 
   @Get('students/:id/installments')
