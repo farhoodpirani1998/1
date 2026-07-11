@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { User } from '../users/entities/user.entity';
 import { School } from '../schools/entities/school.entity';
@@ -13,11 +14,16 @@ import { JwtStrategy } from './strategies/jwt.strategy';
   imports: [
     TypeOrmModule.forFeature([User, School]),
     PassportModule,
-    JwtModule.register({
-      // In real setup, load these from ConfigService (config/configuration.ts)
-      // instead of process.env directly.
-      secret: process.env.JWT_SECRET,
-      signOptions: { expiresIn: '7d' },
+    JwtModule.registerAsync({
+      // Loaded from ConfigService rather than process.env directly, so the
+      // secret is only read once Nest's DI has resolved config — not at
+      // module-import time.
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get<string>('JWT_SECRET'),
+        signOptions: { expiresIn: '7d' },
+      }),
     }),
   ],
   controllers: [AuthController],
