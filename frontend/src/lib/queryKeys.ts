@@ -74,4 +74,13 @@ export const queryKeys = {
     all: () => ['analytics'] as const,
     dashboard: () => [...queryKeys.analytics.all(), 'dashboard'] as const,
   },
+
+  parent: {
+    all: () => ['parent'] as const,
+    students: () => [...queryKeys.parent.all(), 'students'] as const,
+    tuition: (studentId: string) => [...queryKeys.parent.all(), 'tuition', studentId] as const,
+    installments: (studentId: string) => [...queryKeys.parent.all(), 'installments', studentId] as const,
+    payments: (studentId: string) => [...queryKeys.parent.all(), 'payments', studentId] as const,
+    announcements: () => [...queryKeys.parent.all(), 'announcements'] as const,
+  },
 } as const;

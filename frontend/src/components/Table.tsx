@@ -2,6 +2,10 @@ import type { ReactNode } from 'react';
 import { SkeletonTable } from './Skeleton';
 import { EmptyState } from './EmptyState';
 
+// Used by useTableSort.ts — kept here since it's a Table-adjacent concept,
+// even though Table itself doesn't render sort UI yet.
+export type SortDirection = 'asc' | 'desc';
+
 export interface TableColumn<T> {
   key: string;
   header: ReactNode;

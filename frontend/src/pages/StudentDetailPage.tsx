@@ -1,4 +1,4 @@
-import { useState, FormEvent, Fragment, ReactNode } from 'react';
+import { useState, FormEvent, Fragment } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { PageHeader } from '../components/PageHeader';
@@ -8,6 +8,7 @@ import { Button } from '../components/Button';
 import { EmptyState } from '../components/EmptyState';
 import { StatusBadge } from '../components/StatusBadge';
 import { SkeletonRows, SkeletonCards } from '../components/Skeleton';
+import { InfoRow } from '../components/InfoRow';
 import { RecordPaymentModal, PayableInstallment } from '../components/RecordPaymentModal';
 import { VoidPaymentDialog } from '../components/VoidPaymentDialog';
 import { FormError } from '../components/FormError';
@@ -61,15 +62,6 @@ function StudentAvatar({ name }: { name: string }) {
 // Small label/value row used inside the Personal Information / Guardian
 // cards — presentational only, replaces the inline "label: value" spans
 // the page already rendered, just laid out more clearly per field.
-function InfoRow({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-3 py-2 text-sm">
-      <span className="text-ink/50 dark:text-paper/50">{label}</span>
-      <span className="tabular text-ink dark:text-paper">{value}</span>
-    </div>
-  );
-}
-
 // Full-page loading skeleton, shown while the statement (and/or student)
 // query is still in flight. Built entirely from the existing Skeleton
 // primitives — no new loading UI concepts introduced.

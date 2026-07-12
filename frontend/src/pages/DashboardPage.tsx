@@ -19,14 +19,14 @@ import { StatCard } from '../components/StatCard';
 import { KPICard } from '../components/KPICard';
 import { Table, type TableColumn } from '../components/Table';
 import { SkeletonCards, SkeletonRows } from '../components/Skeleton';
-import { formatToman, formatDate, toPersianDigits } from '../lib/format';
+import { formatToman, formatDate, toPersianDigits, paymentMethodLabels } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { useOverdueSummary, useDebtorStudents, useMonthlyIncome, useMonthlyIncomeTrend } from '../hooks/useReports';
 import { useStudents } from '../hooks/useStudents';
 import { usePayments } from '../hooks/usePayments';
 import { useDashboard } from '../hooks/useAnalytics';
 import type { DebtorStudent } from '../types/report.types';
-import type { PaymentWithContext, PaymentMethod } from '../types/payment.types';
+import type { PaymentWithContext } from '../types/payment.types';
 import type { DashboardStudentAverage } from '../types/analytics.types';
 
 // Persian calendar month names for x-axis labels — same list ReportsPage's
@@ -304,12 +304,6 @@ function SchoolAdminDashboard() {
     </div>
   );
 }
-
-const paymentMethodLabels: Record<PaymentMethod, string> = {
-  cash: 'نقدی',
-  card_to_card: 'کارت‌به‌کارت',
-  cheque: 'چک',
-};
 
 function FinancialDashboard() {
   const now = new Date();

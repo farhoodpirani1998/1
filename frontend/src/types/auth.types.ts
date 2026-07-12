@@ -5,7 +5,7 @@
 
 import type { ManagedUser } from './user.types';
 
-export type UserRole = 'super_admin' | 'school_admin' | 'accountant' | 'staff';
+export type UserRole = 'super_admin' | 'school_admin' | 'accountant' | 'staff' | 'parent';
 
 export interface AuthUser {
   id: string;

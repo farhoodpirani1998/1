@@ -17,6 +17,13 @@ const navItems: NavItem[] = [
   { to: '/settings', label: 'تنظیمات', icon: SettingsIcon, roles: ['school_admin'] },
   { to: '/schools', label: 'مدارس', icon: SchoolsIcon, roles: ['super_admin'] },
   { to: '/users', label: 'کاربران', icon: UsersIcon, roles: ['super_admin'] },
+
+  // Parent portal — only ever visible to a signed-in parent, on the
+  // separate /parent/* route group (see App.tsx).
+  { to: '/parent/dashboard', label: 'داشبورد', icon: DashboardIcon, roles: ['parent'] },
+  { to: '/parent/tuition', label: 'وضعیت شهریه', icon: TuitionIcon, roles: ['parent'] },
+  { to: '/parent/installments', label: 'اقساط', icon: InstallmentsIcon, roles: ['parent'] },
+  { to: '/parent/payments', label: 'تاریخچه پرداخت‌ها', icon: PaymentsIcon, roles: ['parent'] },
 ];
 
 const roleLabels: Record<string, string> = {
@@ -24,11 +31,13 @@ const roleLabels: Record<string, string> = {
   school_admin: 'مدیر مدرسه',
   accountant: 'حسابدار',
   staff: 'کارمند',
+  parent: 'والد',
 };
 
 export function Sidebar() {
   const { user } = useAuth();
   const visibleItems = navItems.filter((item) => user && item.roles.includes(user.role));
+  const isParent = user?.role === 'parent';
 
   return (
     <aside className="flex h-screen w-64 flex-col border-l border-white/[0.06] bg-navy text-white">
@@ -39,8 +48,10 @@ export function Sidebar() {
           </svg>
         </div>
         <div>
-          <div className="text-[15px] font-bold leading-tight">دفتر مدرسه</div>
-          <div className="mt-0.5 text-[11px] text-white/45">پنل مدیریت مالی</div>
+          <div className="text-[15px] font-bold leading-tight">{isParent ? 'پنل والدین' : 'دفتر مدرسه'}</div>
+          <div className="mt-0.5 text-[11px] text-white/45">
+            {isParent ? 'وضعیت شهریه فرزندان' : 'پنل مدیریت مالی'}
+          </div>
         </div>
       </div>
 
@@ -138,6 +149,24 @@ function SchoolsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <path d="M3 21h18M4 21V9l8-5 8 5v12M9 21v-6h6v6" />
+    </svg>
+  );
+}
+
+function TuitionIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v10M9.5 9.5c0-1.4 1.2-2.2 2.5-2.2s2.5.8 2.5 2c0 1.4-1.2 1.8-2.5 2.2-1.3.4-2.5.8-2.5 2.2 0 1.2 1.2 2 2.5 2s2.5-.8 2.5-2.2" />
+    </svg>
+  );
+}
+
+function PaymentsIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <path d="M3 10h18M7 15h4" />
     </svg>
   );
 }

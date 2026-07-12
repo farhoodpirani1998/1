@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './lib/auth';
 import { ToastProvider } from './lib/toast';
@@ -17,6 +17,13 @@ import { UsersPage } from './pages/UsersPage';
 import { PrintReceiptPage } from './pages/PrintReceiptPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { HomeRedirect } from './components/HomeRedirect';
+import { ParentLoginPage } from './pages/parent/ParentLoginPage';
+import { ParentForgotPasswordPage } from './pages/parent/ParentForgotPasswordPage';
+import { ParentDashboardPage } from './pages/parent/ParentDashboardPage';
+import { ParentTuitionPage } from './pages/parent/ParentTuitionPage';
+import { ParentInstallmentsPage } from './pages/parent/ParentInstallmentsPage';
+import { ParentPaymentsPage } from './pages/parent/ParentPaymentsPage';
+import { ParentStudentProvider } from './lib/parentStudent';
 
 // This is a school back-office / accounting tool, not a realtime feed:
 // refetch-on-focus would just add flicker when switching tabs, and
@@ -50,6 +57,8 @@ export function App() {
           <AuthProvider>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/parent/login" element={<ParentLoginPage />} />
+              <Route path="/parent/forgot-password" element={<ParentForgotPasswordPage />} />
               <Route path="/print/receipt" element={<PrintReceiptPage />} />
 
               <Route element={<AppLayout />}>
@@ -97,6 +106,24 @@ export function App() {
                     </RequireRole>
                   }
                 />
+              </Route>
+
+              <Route element={<AppLayout loginPath="/parent/login" />}>
+                <Route
+                  path="/parent"
+                  element={
+                    <RequireRole roles={['parent']}>
+                      <ParentStudentProvider>
+                        <Outlet />
+                      </ParentStudentProvider>
+                    </RequireRole>
+                  }
+                >
+                  <Route path="dashboard" element={<ParentDashboardPage />} />
+                  <Route path="tuition" element={<ParentTuitionPage />} />
+                  <Route path="installments" element={<ParentInstallmentsPage />} />
+                  <Route path="payments" element={<ParentPaymentsPage />} />
+                </Route>
               </Route>
 
               <Route path="*" element={<NotFoundPage />} />

@@ -1,3 +1,5 @@
+import type { PaymentMethod } from '../types/payment.types';
+
 const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
 
 export function toPersianDigits(input: string | number): string {
@@ -19,3 +21,12 @@ export function formatDate(isoDate: string): string {
     return isoDate;
   }
 }
+
+// Was previously a module-private const duplicated in DashboardPage.tsx —
+// moved here so every page (admin DashboardPage, parent portal pages)
+// shares one source instead of each redefining the same three labels.
+export const paymentMethodLabels: Record<PaymentMethod, string> = {
+  cash: 'نقدی',
+  card_to_card: 'کارت‌به‌کارت',
+  cheque: 'چک',
+};

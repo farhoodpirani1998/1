@@ -4,12 +4,17 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { useAuth } from '../lib/auth';
 
-export function AppLayout() {
+// loginPath defaults to '/login' so every existing call site (admin/
+// accountant/staff routes) keeps its exact current behavior unchanged.
+// The parent route group passes loginPath="/parent/login" so an
+// unauthenticated visit to e.g. /parent/dashboard lands on the parent
+// login page instead of the staff one.
+export function AppLayout({ loginPath = '/login' }: { loginPath?: string }) {
   const { user } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={loginPath} replace />;
   }
 
   return (

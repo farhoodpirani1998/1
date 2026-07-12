@@ -23,6 +23,7 @@ const roleLabels: Record<UserRole, string> = {
   school_admin: 'مدیر مدرسه',
   accountant: 'حسابدار',
   staff: 'کارمند',
+  parent: 'والد',
 };
 
 const ROLE_FILTER_OPTIONS: { value: UserRole | 'all'; label: string }[] = [

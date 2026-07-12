@@ -8,3 +8,4 @@ export * from './reports.api';
 export * from './schools.api';
 export * from './users.api';
 export * from './analytics.api';
+export * from './parent.api';
