@@ -69,4 +69,9 @@ export const queryKeys = {
     debtorStudents: () => [...queryKeys.reports.all(), 'debtorStudents'] as const,
     studentStatement: (studentId: string) => [...queryKeys.reports.all(), 'studentStatement', studentId] as const,
   },
+
+  analytics: {
+    all: () => ['analytics'] as const,
+    dashboard: () => [...queryKeys.analytics.all(), 'dashboard'] as const,
+  },
 } as const;

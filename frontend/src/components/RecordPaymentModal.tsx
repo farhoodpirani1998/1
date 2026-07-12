@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { formatToman } from '../lib/format';
 import { useToast } from '../lib/toast';
 import { useCreatePayment } from '../hooks/usePayments';
 import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
 import { FormError } from './FormError';
+import type { ReceiptData } from '../pages/PrintReceiptPage';
 
 export interface PayableInstallment {
   id: string;
@@ -15,6 +17,7 @@ export interface PayableInstallment {
 export function RecordPaymentModal({
   installment,
   studentId,
+  studentName,
   onClose,
   onSaved,
 }: {
@@ -25,10 +28,15 @@ export function RecordPaymentModal({
   // broader reports.all()/installments.all() invalidation instead — see
   // usePayments.ts.
   studentId?: string;
+  // Used to build the receipt (see ReceiptData in PrintReceiptPage) once
+  // the payment succeeds — both call sites (StudentDetailPage,
+  // InstallmentsPage) already have the student's name in context.
+  studentName: string;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const { showSuccess, showError } = useToast();
+  const navigate = useNavigate();
   const createPayment = useCreatePayment();
   const remaining = installment.amount - installment.paidAmount;
   const [amount, setAmount] = useState(remaining);
@@ -58,9 +66,23 @@ export function RecordPaymentModal({
         },
       },
       {
-        onSuccess: () => {
+        onSuccess: (payment) => {
           showSuccess('پرداخت با موفقیت ثبت شد');
           onSaved();
+          // One-step flow: go straight to the existing receipt page instead
+          // of leaving the user to find a "چاپ رسید" link for the payment
+          // they just made. Reuses the same ReceiptData shape the manual
+          // print links already build (see StudentDetailPage) — no new
+          // fields, no backend change.
+          const receipt: ReceiptData = {
+            studentName,
+            installmentNumber: installment.installmentNumber,
+            amount: payment.amount,
+            paymentMethod: payment.paymentMethod ?? paymentMethod,
+            referenceNumber: payment.referenceNumber ?? undefined,
+            paidAt: payment.paidAt,
+          };
+          navigate('/print/receipt', { state: receipt });
         },
         onError: (err) => {
           setError(parseApiError(err));

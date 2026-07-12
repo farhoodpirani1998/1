@@ -400,6 +400,7 @@ export function StudentDetailPage() {
         <RecordPaymentModal
           installment={payingInstallment}
           studentId={statement.student.id}
+          studentName={statement.student.fullName}
           onClose={() => setPayingInstallment(null)}
           onSaved={() => setPayingInstallment(null)}
         />
