@@ -15,6 +15,8 @@ import { formatToman, formatDate, toPersianDigits } from '../lib/format';
 import { exportToExcel } from '../lib/exportExcel';
 import type { InstallmentWithStudent, InstallmentStatus } from '../types/tuition.types';
 import { useInstallments } from '../hooks/useInstallments';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useTableSort } from '../hooks/useTableSort';
 
 const PAGE_SIZE = 15;
 
@@ -49,14 +51,50 @@ export function InstallmentsPage() {
   const installments = installmentsQuery.data ?? [];
   const loading = installmentsQuery.isLoading;
 
-  useEffect(() => setPage(1), [status, nameFilter]);
+  // Note: this filter runs entirely client-side against the already-
+  // fetched `installments` list — the backend's /installments endpoint
+  // has no `search` query param, so there's no request to debounce here.
+  // The debounce still applies to when the filter itself (re)computes,
+  // so typing doesn't re-filter/re-render on every keystroke.
+  const debouncedNameFilter = useDebouncedValue(nameFilter, 400);
 
-  const filtered = nameFilter
-    ? installments.filter((i) => i.tuitionPlan.student.fullName.includes(nameFilter))
+  useEffect(() => setPage(1), [status, debouncedNameFilter]);
+
+  const filtered = debouncedNameFilter
+    ? installments.filter((i) => i.tuitionPlan.student.fullName.includes(debouncedNameFilter))
     : installments;
 
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const pageItems = useMemo(() => paginate(filtered, page, PAGE_SIZE), [filtered, page]);
+  const { sort, toggleSort } = useTableSort();
+
+  // Sorting runs after status + name filtering (`filtered`, above) and
+  // before pagination slices it — same ordering the filters already use.
+  // Only the three columns actually rendered below (Due Date, Amount,
+  // Status) are sortable.
+  const sorted = useMemo(() => {
+    if (!sort) return filtered;
+    const arr = [...filtered].sort((a, b) => {
+      let cmp = 0;
+      if (sort.key === 'dueDate') {
+        cmp = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      } else if (sort.key === 'amount') {
+        cmp = a.amount - b.amount;
+      } else if (sort.key === 'status') {
+        cmp = a.status.localeCompare(b.status);
+      }
+      return sort.direction === 'asc' ? cmp : -cmp;
+    });
+    return arr;
+  }, [filtered, sort]);
+
+  const pageCount = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const pageItems = useMemo(() => paginate(sorted, page, PAGE_SIZE), [sorted, page]);
+
+  // Two distinct empty states, same idea as StudentsPage: no installments
+  // exist at all yet (guide the user to Students, since tuition
+  // plans/installments are created from a student's profile — this page
+  // has no create-tuition-plan flow of its own) vs. status/name filters
+  // simply match nothing (guide the user to adjust them instead).
+  const hasActiveFilters = Boolean(status || debouncedNameFilter);
 
   function handleExport() {
     exportToExcel(
@@ -98,18 +136,21 @@ export function InstallmentsPage() {
     {
       key: 'dueDate',
       header: 'سررسید',
+      sortable: true,
       cellClassName: 'tabular text-ink/70 dark:text-paper/70',
       render: (inst) => formatDate(inst.dueDate),
     },
     {
       key: 'amount',
       header: 'مبلغ',
+      sortable: true,
       cellClassName: 'tabular font-medium',
       render: (inst) => formatToman(inst.amount),
     },
     {
       key: 'status',
       header: 'وضعیت',
+      sortable: true,
       render: (inst) => <StatusBadge status={inst.status} />,
     },
     {
@@ -172,8 +213,23 @@ export function InstallmentsPage() {
           rowKey={(inst) => inst.id}
           loading={loading}
           skeletonRows={8}
-          emptyMessage="موردی یافت نشد."
-          emptyDescription="فیلترها را تغییر دهید یا عبارت جستجو را پاک کنید."
+          emptyMessage={hasActiveFilters ? 'قسطی یافت نشد.' : 'هنوز قسطی ثبت نشده است.'}
+          emptyDescription={
+            hasActiveFilters
+              ? 'فیلترها را تغییر دهید یا عبارت جستجو را پاک کنید.'
+              : 'اقساط با ایجاد برنامه شهریه برای یک دانش‌آموز ساخته می‌شوند.'
+          }
+          emptyIcon={<InstallmentsIcon />}
+          emptyAction={
+            !hasActiveFilters ? (
+              <Link to="/students" className="btn-secondary text-sm">
+                رفتن به دانش‌آموزان
+              </Link>
+            ) : undefined
+          }
+          sortKey={sort?.key ?? null}
+          sortDirection={sort?.direction ?? null}
+          onSortChange={toggleSort}
         />
 
         {!loading && filtered.length > 0 && <Pagination page={page} pageCount={pageCount} onChange={setPage} />}
@@ -187,5 +243,17 @@ export function InstallmentsPage() {
         />
       )}
     </div>
+  );
+}
+
+// Local, inline-SVG icon — same convention already used for icons across
+// the app (e.g. UsersIcon/CalendarIcon in StudentsPage): a small stroked
+// glyph colocated with the page that uses it, not a shared component.
+function InstallmentsIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M6 3h9l4 4v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
+      <path d="M14 3v4a1 1 0 0 0 1 1h4M8 12h7M8 16h4" />
+    </svg>
   );
 }

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { PageHeader } from '../components/PageHeader';
 import { SearchInput } from '../components/SearchInput';
+import { Select } from '../components/Select';
 import { FilterBar } from '../components/FilterBar';
 import { Table, type TableColumn } from '../components/Table';
 import { Pagination, paginate } from '../components/Pagination';
@@ -14,7 +15,10 @@ import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-han
 import { FormError } from '../components/FormError';
 import { exportToExcel } from '../lib/exportExcel';
 import type { Student, Grade, AcademicYear } from '../types/student.types';
+import type { QueryStudentsParams } from '../api/students.api';
 import { useStudents, useCreateStudent, useGrades, useAcademicYears } from '../hooks/useStudents';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useTableSort } from '../hooks/useTableSort';
 
 const PAGE_SIZE = 10;
 
@@ -59,15 +63,31 @@ export function StudentsPage() {
   const { showSuccess, showError } = useToast();
   const [showForm, setShowForm] = useState(false);
   const [search, setSearch] = useState('');
-  // Search is submit-triggered (not live-as-you-type) — matches the
-  // original behavior exactly. This is the value actually sent to the
-  // API / used in the query key; `search` above is just the input's
-  // live text.
-  const [submittedSearch, setSubmittedSearch] = useState('');
+  // Live search: `search` is the input's live text; `debouncedSearch` is
+  // the value actually sent to the API / used in the query key, updated
+  // 400ms after the user stops typing (no submit button anymore).
+  const debouncedSearch = useDebouncedValue(search, 400);
+  // Connects the FilterBar's Grade / Academic Year selects to the
+  // backend, which already accepts both as query params (see
+  // students.api.ts / QueryStudentsParams) — same request as search,
+  // just more fields on it.
+  const [gradeFilter, setGradeFilter] = useState('');
+  const [academicYearFilter, setAcademicYearFilter] = useState('');
   const [page, setPage] = useState(1);
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
 
-  const studentsQuery = useStudents(submittedSearch ? { search: submittedSearch } : undefined);
+  // Search + filters are sent together in one request (the backend
+  // already ANDs them in a single query) — this is the "Search ->
+  // Filters" step; sorting and pagination both happen client-side on
+  // the result, below.
+  const studentsQueryParams: Partial<QueryStudentsParams> = {
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
+    ...(gradeFilter ? { gradeId: gradeFilter } : {}),
+    ...(academicYearFilter ? { academicYearId: academicYearFilter } : {}),
+  };
+  const studentsQuery = useStudents(
+    Object.keys(studentsQueryParams).length > 0 ? studentsQueryParams : undefined,
+  );
   const gradesQuery = useGrades();
   const academicYearsQuery = useAcademicYears();
   const createStudent = useCreateStudent();
@@ -77,15 +97,12 @@ export function StudentsPage() {
   const academicYears = academicYearsQuery.data ?? [];
   const loading = studentsQuery.isLoading;
 
-  function runSearch() {
+  // Reset to page 1 whenever the *debounced* search term or either filter
+  // changes (not on every keystroke) — same "new search/filter -> back
+  // to page 1" behavior as before, now extended to Grade/Academic Year.
+  useEffect(() => {
     setPage(1);
-    setSubmittedSearch(search);
-  }
-
-  function handleSearch(e: FormEvent) {
-    e.preventDefault();
-    runSearch();
-  }
+  }, [debouncedSearch, gradeFilter, academicYearFilter]);
 
   function handleExport() {
     exportToExcel(
@@ -101,8 +118,36 @@ export function StudentsPage() {
     );
   }
 
-  const pageCount = Math.max(1, Math.ceil(students.length / PAGE_SIZE));
-  const pageItems = useMemo(() => paginate(students, page, PAGE_SIZE), [students, page]);
+  const { sort, toggleSort } = useTableSort();
+
+  // Sorting runs after the (backend-filtered) `students` list is fetched
+  // and before pagination slices it — same ordering as filtering already
+  // works for this page. Only the two columns actually rendered below
+  // (Name, Grade) are sortable.
+  const sortedStudents = useMemo(() => {
+    if (!sort) return students;
+    const arr = [...students].sort((a, b) => {
+      let cmp = 0;
+      if (sort.key === 'name') {
+        cmp = a.fullName.localeCompare(b.fullName, 'fa');
+      } else if (sort.key === 'grade') {
+        cmp = (a.grade?.title ?? '').localeCompare(b.grade?.title ?? '', 'fa');
+      }
+      return sort.direction === 'asc' ? cmp : -cmp;
+    });
+    return arr;
+  }, [students, sort]);
+
+  const pageCount = Math.max(1, Math.ceil(sortedStudents.length / PAGE_SIZE));
+  const pageItems = useMemo(() => paginate(sortedStudents, page, PAGE_SIZE), [sortedStudents, page]);
+
+  // Two distinct empty states, replacing the previous description-only
+  // version: no students exist yet at all (show a CTA to create one), vs.
+  // search/filters are active and simply match nothing (guide the user to
+  // adjust them instead — creating a student isn't the relevant action
+  // there). No new navigation/routes: "Create Student" just opens the
+  // existing inline form via `setShowForm`, same as the header button.
+  const hasActiveFilters = Boolean(debouncedSearch || gradeFilter || academicYearFilter);
 
   // Stats derived entirely from the already-fetched `students` list — no
   // separate endpoint/mock data. They reflect whatever's currently loaded
@@ -127,6 +172,7 @@ export function StudentsPage() {
     {
       key: 'name',
       header: 'نام',
+      sortable: true,
       render: (s) => (
         <div className="flex items-center gap-3">
           <StudentAvatar name={s.fullName} />
@@ -137,6 +183,7 @@ export function StudentsPage() {
     {
       key: 'grade',
       header: 'پایه',
+      sortable: true,
       cellClassName: 'text-ink/70 dark:text-paper/70',
       render: (s) => s.grade?.title ?? '—',
     },
@@ -238,18 +285,30 @@ export function StudentsPage() {
             </>
           }
         >
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              onSubmit={runSearch}
-              placeholder="جستجو با نام..."
-              containerClassName="w-56 sm:w-64"
-            />
-            <Button type="submit" variant="secondary">
-              جستجو
-            </Button>
-          </form>
+          <Select
+            value={academicYearFilter}
+            onChange={(e) => setAcademicYearFilter(e.target.value)}
+            options={[
+              { value: '', label: 'همه سال‌های تحصیلی' },
+              ...academicYears.map((y) => ({
+                value: y.id,
+                label: `${y.title}${y.isCurrent ? ' (جاری)' : ''}`,
+              })),
+            ]}
+            containerClassName="w-auto"
+          />
+          <Select
+            value={gradeFilter}
+            onChange={(e) => setGradeFilter(e.target.value)}
+            options={[{ value: '', label: 'همه پایه‌ها' }, ...grades.map((g) => ({ value: g.id, label: g.title }))]}
+            containerClassName="w-auto"
+          />
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            placeholder="جستجو با نام..."
+            containerClassName="w-56 sm:w-64"
+          />
         </FilterBar>
 
         <Table
@@ -258,8 +317,23 @@ export function StudentsPage() {
           rowKey={(s) => s.id}
           loading={loading}
           skeletonRows={6}
-          emptyMessage="هنوز دانش‌آموزی ثبت نشده است."
-          emptyDescription={submittedSearch ? 'برای این جستجو نتیجه‌ای یافت نشد.' : undefined}
+          emptyMessage={hasActiveFilters ? 'دانش‌آموزی یافت نشد.' : 'هنوز دانش‌آموزی ثبت نشده است.'}
+          emptyDescription={
+            hasActiveFilters
+              ? 'با این عبارت جستجو یا فیلترها نتیجه‌ای پیدا نشد. آن‌ها را تغییر دهید یا پاک کنید.'
+              : 'برای شروع، اولین دانش‌آموز را ثبت کنید.'
+          }
+          emptyIcon={<UsersIcon />}
+          emptyAction={
+            !hasActiveFilters && !showForm ? (
+              <Button variant="secondary" size="sm" onClick={() => setShowForm(true)}>
+                + دانش‌آموز جدید
+              </Button>
+            ) : undefined
+          }
+          sortKey={sort?.key ?? null}
+          sortDirection={sort?.direction ?? null}
+          onSortChange={toggleSort}
         />
 
         {!loading && students.length > 0 && <Pagination page={page} pageCount={pageCount} onChange={setPage} />}
