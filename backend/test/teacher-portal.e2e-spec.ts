@@ -39,6 +39,11 @@ import {
  *    (except the school_admin-only /teacher/assignments management
  *    routes), and every /teacher/assignments route is rejected for
  *    every non-school_admin role.
+ * 7. Sprint 2B: assignment responses (POST and GET) also carry the
+ *    resolved teacherName/gradeTitle/subjectTitle, and GET /teacher/list
+ *    (school_admin-only) returns the caller's own school's teacher-role
+ *    users only, never a passwordHash, for the assignment picker on
+ *    TeacherAssignmentsPage.
  */
 describe('Teacher Portal (Phase 5G e2e)', () => {
   let app: INestApplication;
@@ -130,6 +135,11 @@ describe('Teacher Portal (Phase 5G e2e)', () => {
       expect(res.body.teacherId).toBe(teacherA.id);
       expect(res.body.gradeId).toBe(gradeA1.id);
       expect(res.body.subjectId).toBe(subjectA1.id);
+      // Sprint 2B: assignment responses now also carry the resolved
+      // teacher name / grade title / subject title.
+      expect(res.body.teacherName).toBe('Teacher A');
+      expect(res.body.gradeTitle).toBe('Grade 7');
+      expect(res.body.subjectTitle).toBe('Math');
     });
 
     it('is idempotent: assigning the same triple twice returns the same row, not a duplicate', async () => {
@@ -145,6 +155,7 @@ describe('Teacher Portal (Phase 5G e2e)', () => {
       expect(first.status).toBe(201);
       expect(second.status).toBe(201);
       expect(second.body.id).toBe(first.body.id);
+      expect(second.body.teacherName).toBe('Teacher A');
 
       const list = await request(server)
         .get('/api/v1/teacher/assignments')
@@ -252,6 +263,39 @@ describe('Teacher Portal (Phase 5G e2e)', () => {
         .delete(`/api/v1/teacher/assignments/${assignment.id}`)
         .set('Authorization', authHeader(app, schoolAdminB));
       expect(res.status).toBe(404);
+    });
+  });
+
+  describe('GET /teacher/list (Sprint 2B)', () => {
+    it("returns only the caller's school's teacher-role users, sorted by name", async () => {
+      const res = await request(server)
+        .get('/api/v1/teacher/list')
+        .set('Authorization', authHeader(app, schoolAdminA));
+
+      expect(res.status).toBe(200);
+      const names = res.body.map((t: { fullName: string }) => t.fullName);
+      expect(names).toEqual(['Other Teacher', 'Teacher A']);
+      expect(names).not.toContain('Teacher B');
+    });
+
+    it('never includes a passwordHash', async () => {
+      const res = await request(server)
+        .get('/api/v1/teacher/list')
+        .set('Authorization', authHeader(app, schoolAdminA));
+      for (const teacher of res.body) {
+        expect(teacher.passwordHash).toBeUndefined();
+      }
+    });
+
+    it.each([
+      ['teacher', () => teacherA],
+      ['staff', () => staffA],
+      ['accountant', () => accountantA],
+    ])('rejects %s on the admin-only teacher list', async (_label, getUser) => {
+      const res = await request(server)
+        .get('/api/v1/teacher/list')
+        .set('Authorization', authHeader(app, getUser()));
+      expect(res.status).toBe(403);
     });
   });
 

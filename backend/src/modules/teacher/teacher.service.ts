@@ -16,7 +16,12 @@ import { AttendanceService } from '../attendance/attendance.service';
 import { AssessmentsService } from '../student-assessments/assessments.service';
 import { Role } from '../../common/authorization/roles.enum';
 
-const ASSIGNMENT_RELATIONS = ['grade', 'subject'];
+// Sprint 2B: 'teacher' added alongside 'grade'/'subject' so
+// toTeacherAssignmentView can populate teacherName as well as
+// gradeTitle/subjectTitle. Used by both assign() and listAssignments()
+// below -- every admin-facing assignment read now carries all three
+// relations, never just grade/subject.
+const ASSIGNMENT_RELATIONS = ['teacher', 'grade', 'subject'];
 
 @Injectable()
 export class TeacherService {
@@ -85,6 +90,7 @@ export class TeacherService {
 
     const existing = await this.assignmentRepo.findOne({
       where: { teacherId: dto.teacherId, gradeId: dto.gradeId, subjectId: dto.subjectId },
+      relations: ASSIGNMENT_RELATIONS,
     });
     if (existing) {
       return existing;
@@ -96,7 +102,15 @@ export class TeacherService {
       gradeId: dto.gradeId,
       subjectId: dto.subjectId,
     });
-    return this.assignmentRepo.save(assignment);
+    const saved = await this.assignmentRepo.save(assignment);
+    // save() only returns the columns TypeORM just wrote, not the
+    // relations -- reload once with ASSIGNMENT_RELATIONS so the response
+    // carries teacherName/gradeTitle/subjectTitle the same as the
+    // `existing` branch above and listAssignments() below.
+    return (await this.assignmentRepo.findOne({
+      where: { id: saved.id },
+      relations: ASSIGNMENT_RELATIONS,
+    })) as TeacherAssignment;
   }
 
   /**
@@ -108,6 +122,21 @@ export class TeacherService {
       where: teacherId ? { schoolId, teacherId } : { schoolId },
       relations: ASSIGNMENT_RELATIONS,
       order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Sprint 2B: school_admin-facing roster of this school's teacher-role
+   * users, for the assignment picker on TeacherAssignmentsPage. There is
+   * no equivalent on UsersController (GET /users is @Roles('super_admin')
+   * only and isn't school-scoped), so this stays here rather than being
+   * bolted onto that module -- same "dedicated portal controller reads
+   * its own narrow slice" reasoning as the rest of this service.
+   */
+  async listTeachers(schoolId: string): Promise<User[]> {
+    return this.userRepo.find({
+      where: { schoolId, role: Role.TEACHER },
+      order: { fullName: 'ASC' },
     });
   }
 

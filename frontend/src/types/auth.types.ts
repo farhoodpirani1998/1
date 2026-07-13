@@ -5,7 +5,11 @@
 
 import type { ManagedUser } from './user.types';
 
-export type UserRole = 'super_admin' | 'school_admin' | 'accountant' | 'staff' | 'parent';
+// 'teacher' added in Sprint 1 of the Teacher Portal — mirrors Role.TEACHER
+// on the backend (common/authorization/roles.enum.ts), same isolation
+// shape as 'parent' (never granted on staff-facing endpoints, only on its
+// own dedicated /teacher/* route group — see App.tsx).
+export type UserRole = 'super_admin' | 'school_admin' | 'accountant' | 'staff' | 'parent' | 'teacher';
 
 export interface AuthUser {
   id: string;

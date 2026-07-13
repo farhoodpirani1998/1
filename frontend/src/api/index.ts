@@ -9,3 +9,5 @@ export * from './schools.api';
 export * from './users.api';
 export * from './analytics.api';
 export * from './parent.api';
+export * from './teacher.api';
+export * from './subjects.api';

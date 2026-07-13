@@ -15,6 +15,8 @@ const navItems: NavItem[] = [
   { to: '/installments', label: 'اقساط و پرداخت‌ها', icon: InstallmentsIcon, roles: ['school_admin', 'accountant'] },
   { to: '/reports', label: 'گزارش‌ها', icon: ReportsIcon, roles: ['school_admin', 'accountant'] },
   { to: '/settings', label: 'تنظیمات', icon: SettingsIcon, roles: ['school_admin'] },
+  // Sprint 2A: Teacher Assignments admin page (school_admin-only).
+  { to: '/teacher-assignments', label: 'تخصیص معلمان', icon: AssignmentsIcon, roles: ['school_admin'] },
   { to: '/schools', label: 'مدارس', icon: SchoolsIcon, roles: ['super_admin'] },
   { to: '/users', label: 'کاربران', icon: UsersIcon, roles: ['super_admin'] },
 
@@ -24,6 +26,18 @@ const navItems: NavItem[] = [
   { to: '/parent/tuition', label: 'وضعیت شهریه', icon: TuitionIcon, roles: ['parent'] },
   { to: '/parent/installments', label: 'اقساط', icon: InstallmentsIcon, roles: ['parent'] },
   { to: '/parent/payments', label: 'تاریخچه پرداخت‌ها', icon: PaymentsIcon, roles: ['parent'] },
+
+  // Teacher portal (Sprint 1) — only ever visible to a signed-in teacher,
+  // on the separate /teacher/* route group (see App.tsx). Only Dashboard
+  // is a real page this sprint; the rest point at a shared placeholder
+  // page (TeacherComingSoonPage) until the sprints that build them.
+  { to: '/teacher/dashboard', label: 'داشبورد', icon: DashboardIcon, roles: ['teacher'] },
+  { to: '/teacher/students', label: 'دانش‌آموزان', icon: StudentsIcon, roles: ['teacher'] },
+  { to: '/teacher/attendance', label: 'حضور و غیاب', icon: InstallmentsIcon, roles: ['teacher'] },
+  { to: '/teacher/assessments', label: 'ارزیابی‌ها', icon: TuitionIcon, roles: ['teacher'] },
+  { to: '/teacher/homework', label: 'تکالیف', icon: ReportsIcon, roles: ['teacher'] },
+  { to: '/teacher/timetable', label: 'برنامه هفتگی', icon: PaymentsIcon, roles: ['teacher'] },
+  { to: '/teacher/announcements', label: 'اطلاعیه‌ها', icon: SettingsIcon, roles: ['teacher'] },
 ];
 
 const roleLabels: Record<string, string> = {
@@ -32,12 +46,14 @@ const roleLabels: Record<string, string> = {
   accountant: 'حسابدار',
   staff: 'کارمند',
   parent: 'والد',
+  teacher: 'معلم',
 };
 
 export function Sidebar() {
   const { user } = useAuth();
   const visibleItems = navItems.filter((item) => user && item.roles.includes(user.role));
   const isParent = user?.role === 'parent';
+  const isTeacher = user?.role === 'teacher';
 
   return (
     <aside className="flex h-screen w-64 flex-col border-l border-white/[0.06] bg-navy text-white">
@@ -48,9 +64,11 @@ export function Sidebar() {
           </svg>
         </div>
         <div>
-          <div className="text-[15px] font-bold leading-tight">{isParent ? 'پنل والدین' : 'دفتر مدرسه'}</div>
+          <div className="text-[15px] font-bold leading-tight">
+            {isParent ? 'پنل والدین' : isTeacher ? 'پنل معلمان' : 'دفتر مدرسه'}
+          </div>
           <div className="mt-0.5 text-[11px] text-white/45">
-            {isParent ? 'وضعیت شهریه فرزندان' : 'پنل مدیریت مالی'}
+            {isParent ? 'وضعیت شهریه فرزندان' : isTeacher ? 'مدیریت کلاس‌های درسی' : 'پنل مدیریت مالی'}
           </div>
         </div>
       </div>
@@ -167,6 +185,15 @@ function PaymentsIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <rect x="3" y="5" width="18" height="14" rx="2" />
       <path d="M3 10h18M7 15h4" />
+    </svg>
+  );
+}
+
+function AssignmentsIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <path d="M9 9h6M9 13h6M9 17h3" />
     </svg>
   );
 }

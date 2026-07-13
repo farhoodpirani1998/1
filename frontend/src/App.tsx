@@ -14,6 +14,7 @@ import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SchoolsPage } from './pages/SchoolsPage';
 import { UsersPage } from './pages/UsersPage';
+import { TeacherAssignmentsPage } from './pages/TeacherAssignmentsPage';
 import { PrintReceiptPage } from './pages/PrintReceiptPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { HomeRedirect } from './components/HomeRedirect';
@@ -24,6 +25,14 @@ import { ParentTuitionPage } from './pages/parent/ParentTuitionPage';
 import { ParentInstallmentsPage } from './pages/parent/ParentInstallmentsPage';
 import { ParentPaymentsPage } from './pages/parent/ParentPaymentsPage';
 import { ParentStudentProvider } from './lib/parentStudent';
+import { TeacherLoginPage } from './pages/teacher/TeacherLoginPage';
+import { TeacherDashboardPage } from './pages/teacher/TeacherDashboardPage';
+import { TeacherStudentsPage } from './pages/teacher/TeacherStudentsPage';
+import { TeacherAttendancePage } from './pages/teacher/TeacherAttendancePage';
+import { TeacherAssessmentsPage } from './pages/teacher/TeacherAssessmentsPage';
+import { TeacherHomeworkPage } from './pages/teacher/TeacherHomeworkPage';
+import { TeacherTimetablePage } from './pages/teacher/TeacherTimetablePage';
+import { TeacherComingSoonPage } from './pages/teacher/TeacherComingSoonPage';
 
 // This is a school back-office / accounting tool, not a realtime feed:
 // refetch-on-focus would just add flicker when switching tabs, and
@@ -59,6 +68,7 @@ export function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/parent/login" element={<ParentLoginPage />} />
               <Route path="/parent/forgot-password" element={<ParentForgotPasswordPage />} />
+              <Route path="/teacher/login" element={<TeacherLoginPage />} />
               <Route path="/print/receipt" element={<PrintReceiptPage />} />
 
               <Route element={<AppLayout />}>
@@ -106,6 +116,17 @@ export function App() {
                     </RequireRole>
                   }
                 />
+                {/* Sprint 2A: Teacher Assignments — school_admin-only admin
+                    page for managing teacher_assignments rows. Distinct
+                    from the /teacher/* self-service portal group below. */}
+                <Route
+                  path="/teacher-assignments"
+                  element={
+                    <RequireRole roles={['school_admin']}>
+                      <TeacherAssignmentsPage />
+                    </RequireRole>
+                  }
+                />
               </Route>
 
               <Route element={<AppLayout loginPath="/parent/login" />}>
@@ -123,6 +144,32 @@ export function App() {
                   <Route path="tuition" element={<ParentTuitionPage />} />
                   <Route path="installments" element={<ParentInstallmentsPage />} />
                   <Route path="payments" element={<ParentPaymentsPage />} />
+                </Route>
+              </Route>
+
+              {/* Teacher portal. Same AppLayout-with-loginPath shape as
+                  the parent route group above — RequireRole gates every
+                  route on 'teacher', and AppLayout redirects an
+                  unauthenticated visit to /teacher/login instead of the
+                  staff /login. Only /teacher/announcements still points
+                  at the shared placeholder (TeacherComingSoonPage);
+                  every other route below is a real page. */}
+              <Route element={<AppLayout loginPath="/teacher/login" />}>
+                <Route
+                  path="/teacher"
+                  element={
+                    <RequireRole roles={['teacher']}>
+                      <Outlet />
+                    </RequireRole>
+                  }
+                >
+                  <Route path="dashboard" element={<TeacherDashboardPage />} />
+                  <Route path="students" element={<TeacherStudentsPage />} />
+                  <Route path="attendance" element={<TeacherAttendancePage />} />
+                  <Route path="assessments" element={<TeacherAssessmentsPage />} />
+                  <Route path="homework" element={<TeacherHomeworkPage />} />
+                  <Route path="timetable" element={<TeacherTimetablePage />} />
+                  <Route path="announcements" element={<TeacherComingSoonPage title="اطلاعیه‌ها" />} />
                 </Route>
               </Route>
 

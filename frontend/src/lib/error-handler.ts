@@ -64,6 +64,8 @@ const FIELD_LABELS: Record<string, string> = {
   role: 'نقش',
   schoolId: 'مدرسه',
   status: 'وضعیت',
+  teacherId: 'معلم',
+  subjectId: 'درس',
 };
 
 function fieldLabel(field: string): string {

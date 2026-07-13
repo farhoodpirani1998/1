@@ -24,6 +24,12 @@ const roleLabels: Record<UserRole, string> = {
   accountant: 'حسابدار',
   staff: 'کارمند',
   parent: 'والد',
+  // Sprint 1 (Teacher Portal Foundation): teacher accounts aren't created
+  // from this page (same as 'parent' above — neither appears in
+  // ROLE_FILTER_OPTIONS or the create-role Select below), but this map is
+  // typed Record<UserRole, string>, so every role needs an entry here to
+  // label a teacher row correctly if/when one shows up in the users list.
+  teacher: 'معلم',
 };
 
 const ROLE_FILTER_OPTIONS: { value: UserRole | 'all'; label: string }[] = [

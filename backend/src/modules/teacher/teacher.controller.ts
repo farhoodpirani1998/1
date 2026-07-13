@@ -6,7 +6,7 @@ import { CreateAttendanceDto } from '../attendance/dto/create-attendance.dto';
 import { toAttendanceView } from '../attendance/dto/attendance-view.dto';
 import { CreateAssessmentDto } from '../student-assessments/dto/create-assessment.dto';
 import { toAssessmentView } from '../student-assessments/dto/assessment-view.dto';
-import { toTeacherProfileView, toTeacherAssignmentView } from './dto/teacher-view.dto';
+import { toTeacherProfileView, toTeacherAssignmentView, toTeacherListItemView } from './dto/teacher-view.dto';
 import { AnnouncementsService } from '../announcements/announcements.service';
 import { AnnouncementTargetType } from '../announcements/entities/announcement.entity';
 import { toRecipientAnnouncementView } from '../announcements/dto/announcement-view.dto';
@@ -71,6 +71,19 @@ export class TeacherController {
   @HttpCode(204)
   async unassign(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
     await this.teacherService.unassign(id, schoolId);
+  }
+
+  // Sprint 2B: the teacher picker on TeacherAssignmentsPage needs a
+  // school-scoped roster of teacher-role users -- GET /users can't serve
+  // this (@Roles('super_admin') only, and not school-scoped), so this is
+  // a dedicated route here, same "admin management lives next to the
+  // assignment routes it supports" reasoning as assign()/listAssignments()
+  // above.
+  @Get('list')
+  @Roles('school_admin')
+  async listTeachers(@CurrentUser('schoolId') schoolId: string) {
+    const teachers = await this.teacherService.listTeachers(schoolId);
+    return teachers.map(toTeacherListItemView);
   }
 
   // ---------------------------------------------------------------------
