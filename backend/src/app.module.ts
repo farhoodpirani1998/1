@@ -28,6 +28,7 @@ import { UsersModule } from './modules/users/users.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
 import { SchoolSettingsModule } from './modules/school-settings/school-settings.module';
 import { SearchModule } from './modules/search/search.module';
+import { FounderModule } from './modules/founder/founder.module';
 import { AuditModule } from './common/audit/audit.module';
 import { HealthModule } from './modules/health/health.module';
 import { ObservabilityModule } from './common/logging/observability.module';
@@ -101,6 +102,7 @@ import { validateEnv } from './config/env.validation';
     SchedulerModule,
     SchoolSettingsModule,
     SearchModule,
+    FounderModule,
   ],
   providers: [
     {

@@ -34,4 +34,13 @@ export enum Role {
   // dedicated /teacher/* routes in modules/teacher, same isolation shape
   // as PARENT and /parent/*.
   TEACHER = 'teacher',
+  // Phase 5O: a read-only owner login for whoever owns one or more
+  // schools (مؤسس). Not tied to a single schoolId — like SUPER_ADMIN,
+  // schoolId stays null on the users row — instead scoped to an explicit
+  // list of schools via the founder_schools join table (see
+  // FounderSchool, modules/founder/entities/founder-school.entity.ts).
+  // Only ever gets a @Roles() grant on the dedicated /founder/* routes in
+  // modules/founder, same isolation shape as PARENT/TEACHER, except "one
+  // owner, many schools" instead of "one login, one school".
+  FOUNDER = 'founder',
 }

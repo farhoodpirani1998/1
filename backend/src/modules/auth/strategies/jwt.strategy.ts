@@ -55,9 +55,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('نشست شما معتبر نیست، لطفاً دوباره وارد شوید');
     }
 
-    // super_admin has no school, so there's nothing to check; every other
+    // super_admin and founder have no single school, so there's nothing
+    // to check here for them (founder's per-school access is checked per
+    // request in FounderService against founder_schools); every other
     // role must belong to a currently-active school.
-    if (user.role !== Role.SUPER_ADMIN) {
+    if (user.role !== Role.SUPER_ADMIN && user.role !== Role.FOUNDER) {
       if (!user.schoolId) {
         throw new UnauthorizedException('نشست شما معتبر نیست، لطفاً دوباره وارد شوید');
       }

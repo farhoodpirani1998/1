@@ -12,6 +12,7 @@ import { TuitionPlan } from '../../src/modules/tuition/entities/tuition-plan.ent
 import { Installment, InstallmentStatus } from '../../src/modules/tuition/entities/installment.entity';
 import { Payment, PaymentMethod } from '../../src/modules/tuition/entities/payment.entity';
 import { ParentStudent } from '../../src/modules/parent/entities/parent-student.entity';
+import { FounderSchool } from '../../src/modules/founder/entities/founder-school.entity';
 import { LedgerEntry, LedgerEntryType, LedgerReferenceType } from '../../src/modules/ledger/entities/ledger-entry.entity';
 import {
   Notification,
@@ -206,6 +207,17 @@ export async function linkParentStudent(
   const ds = getDataSource(app);
   const repo = ds.getRepository(ParentStudent);
   const link = repo.create({ parentId, studentId });
+  return repo.save(link);
+}
+
+export async function linkFounderSchool(
+  app: INestApplication,
+  founderId: string,
+  schoolId: string,
+): Promise<FounderSchool> {
+  const ds = getDataSource(app);
+  const repo = ds.getRepository(FounderSchool);
+  const link = repo.create({ founderId, schoolId });
   return repo.save(link);
 }
 

@@ -95,6 +95,7 @@ export async function truncateAll(app: INestApplication): Promise<void> {
     'installments',
     'tuition_plans',
     'parent_students',
+    'founder_schools',
     'students',
     'guardians',
     'grades',

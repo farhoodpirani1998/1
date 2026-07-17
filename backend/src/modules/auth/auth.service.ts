@@ -31,10 +31,13 @@ export class AuthService {
 
   async register(dto: RegisterDto): Promise<Omit<User, 'passwordHash'>> {
     // Belt-and-suspenders alongside RegisterDto's @ValidateIf: every role
-    // except super_admin must own a school. Kept here too in case this
-    // method is ever called from somewhere that bypasses the HTTP
-    // ValidationPipe (e.g. a future seed/import script).
-    if (dto.role !== Role.SUPER_ADMIN && !dto.schoolId) {
+    // except super_admin and founder must own a school (founder's schools
+    // are attached afterwards via POST /founder/link, same shape as a
+    // parent login getting linked to students via POST /parent/link).
+    // Kept here too in case this method is ever called from somewhere
+    // that bypasses the HTTP ValidationPipe (e.g. a future seed/import
+    // script).
+    if (dto.role !== Role.SUPER_ADMIN && dto.role !== Role.FOUNDER && !dto.schoolId) {
       throw new BadRequestException('برای این نقش، مدرسه الزامی است');
     }
 
@@ -73,10 +76,12 @@ export class AuthService {
       throw new UnauthorizedException('شماره تلفن یا رمز عبور اشتباه است');
     }
 
-    // super_admin has no school; every other role must belong to a
-    // currently-active school — otherwise they'd get a token here only
-    // to have every subsequent request rejected by JwtStrategy anyway.
-    if (user.role !== Role.SUPER_ADMIN) {
+    // super_admin and founder have no single school (founder's schools
+    // are the founder_schools join table, checked per-request in
+    // FounderService instead) — every other role must belong to a
+    // currently-active school, otherwise they'd get a token here only to
+    // have every subsequent request rejected by JwtStrategy anyway.
+    if (user.role !== Role.SUPER_ADMIN && user.role !== Role.FOUNDER) {
       const school = user.schoolId
         ? await this.schoolRepo.findOne({ where: { id: user.schoolId } })
         : null;

@@ -33,5 +33,8 @@ import { AnalyticsService } from './analytics.service';
   ],
   controllers: [AnalyticsController],
   providers: [AnalyticsService],
+  // Phase 5M: FounderModule reuses getDashboard() wholesale for a single
+  // owned school's dashboard instead of re-deriving any of its queries.
+  exports: [AnalyticsService],
 })
 export class AnalyticsModule {}

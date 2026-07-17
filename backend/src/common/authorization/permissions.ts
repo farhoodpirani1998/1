@@ -48,6 +48,12 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   // permission from this list applies to any of those routes — listed
   // explicitly for the same "considered, not missed" reason as PARENT.
   [Role.TEACHER]: [],
+  // Founders only ever hit the read-only /founder/* routes (see
+  // modules/founder) — no write endpoint anywhere checks
+  // @RequirePermission for this role, so this stays empty forever, not
+  // just "for now". Listed explicitly for the same "considered, not
+  // missed" reason as PARENT/TEACHER.
+  [Role.FOUNDER]: [],
 };
 
 export function roleHasPermission(role: string, permission: Permission): boolean {

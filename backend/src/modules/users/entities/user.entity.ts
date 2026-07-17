@@ -18,7 +18,7 @@ export class User {
   school: School | null;
 
   @Column({ name: 'school_id', nullable: true })
-  schoolId: string | null; // null only for super_admin
+  schoolId: string | null; // null for super_admin and founder (founder's schools live in founder_schools instead)
 
   @Column({ name: 'full_name', type: 'varchar', length: 150 })
   fullName: string;
