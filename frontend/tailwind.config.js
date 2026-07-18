@@ -30,6 +30,14 @@ export default {
           dark: '#6D28D9',
         },
 
+        // Brand gold — from the school's logo/brand palette (#C9A227).
+        // Used sparingly for brand moments (login, sidebar mark) —
+        // never for status, which stays on paid/warning/overdue.
+        gold: {
+          DEFAULT: '#C9A227',
+          light: '#E8C763',
+        },
+
         // Status semantics
         paid: {
           DEFAULT: '#059669', // success green

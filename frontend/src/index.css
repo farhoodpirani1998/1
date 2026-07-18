@@ -85,6 +85,20 @@ body {
     stroke-dashoffset: 24;
     animation: checkDraw 0.35s ease-out 0.05s forwards;
   }
+  .brand-glow {
+    animation: brandGlow 5s ease-in-out infinite;
+  }
+}
+@keyframes brandGlow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.08);
+  }
 }
 @keyframes fadeIn {
   from {
