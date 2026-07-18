@@ -1,6 +1,36 @@
 # Changelog — Integration Build
 
-## Custom icon set integration (this change)
+## StaffDashboard: "چک‌لیست امروز" placeholder section (this change)
+
+Added a "Today's checklist" section to the staff dashboard
+(`DashboardPage.tsx` → `StaffDashboard`), addressing feedback that the
+dashboard was too thin — three sub-sections: unrecorded attendance,
+incomplete student documents, upcoming tuition-due reminders.
+
+**Explicitly NOT wired to a real API.** None of the three data sources
+exist in this frontend today:
+- Attendance: the only endpoint is `POST /teacher/attendance`
+  (`@Roles('teacher')`, one-student-at-a-time recording) — there's no
+  staff-facing list/summary endpoint to say which classes are unrecorded.
+- Student documents: no `student-documents` API/types file exists anywhere
+  in `src/api` or `src/types`.
+- Notifications/reminders: no `notifications` API file exists either,
+  despite the backend module reportedly already existing.
+
+Each sub-section renders from a hardcoded `SAMPLE_*` array and shows a
+visible "این بخش فعلاً با داده نمونه نمایش داده می‌شود" banner, with every
+per-row action button disabled (tooltip: "پس از اتصال به بک‌اند فعال
+می‌شود"). Layout/shape only — **do not ship this to production as-is**;
+swap the `SAMPLE_*` arrays for real query hooks (and enable the action
+buttons) once the three backend contracts above are shared.
+
+**New/modified:** `frontend/src/pages/DashboardPage.tsx` — added
+`TodayChecklist`, `ChecklistSection`, three `SAMPLE_*` constants; added
+`AttendanceIcon`, `AssignmentsIcon`, `CalendarIcon` to the existing
+`SchoolIcons` import; added `ReactNode` type import.
+
+## Custom icon set integration
+
 
 Replaced the app's ad-hoc, repeatedly-duplicated generic icon set with the
 new custom-designed set (`SchoolIcons.tsx` — geometric outline style with

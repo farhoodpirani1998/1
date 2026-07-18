@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   PieChart,
@@ -26,6 +26,9 @@ import {
   ListIcon,
   UsersIcon,
   TargetIcon,
+  AttendanceIcon,
+  AssignmentsIcon,
+  CalendarIcon,
 } from '../components/icons/SchoolIcons';
 import { formatToman, formatDate, toPersianDigits, paymentMethodLabels } from '../lib/format';
 import { useAuth } from '../lib/auth';
@@ -139,7 +142,120 @@ function StaffDashboard() {
           </Link>
         </div>
       </Card>
+
+      <TodayChecklist />
     </div>
+  );
+}
+
+// Placeholder "today's checklist" for the staff dashboard — attendance
+// follow-up, incomplete-document follow-up, and upcoming tuition
+// reminders. NOT wired to a real API yet: the backend's attendance module
+// only exposes a teacher-facing recording endpoint today (no staff-facing
+// list), and there's no student-documents or notifications endpoint
+// anywhere in this frontend to call. Shown here with sample data, clearly
+// labeled, so the shape/layout is ready to swap for real queries the
+// moment those endpoints exist — see CHANGELOG.
+const SAMPLE_ATTENDANCE_PENDING = [
+  { id: 's1', label: 'کلاس دوم - ریاضی', detail: '۱۸ دانش‌آموز، هنوز ثبت نشده' },
+  { id: 's2', label: 'کلاس سوم - علوم', detail: '۲۲ دانش‌آموز، هنوز ثبت نشده' },
+];
+
+const SAMPLE_INCOMPLETE_DOCUMENTS = [
+  { id: 'd1', label: 'سارا محمدی', detail: 'کپی شناسنامه ناقص است' },
+  { id: 'd2', label: 'امیر رضایی', detail: 'عکس پرسنلی ارسال نشده' },
+  { id: 'd3', label: 'نگار احمدی', detail: 'مدرک تحصیلی قبلی ناقص است' },
+];
+
+const SAMPLE_TUITION_REMINDERS = [
+  { id: 'r1', label: 'محمد کریمی', detail: 'سررسید قسط: ۳ روز دیگر' },
+  { id: 'r2', label: 'زهرا حسینی', detail: 'سررسید قسط: فردا' },
+];
+
+function ChecklistSection({
+  title,
+  icon,
+  items,
+  actionLabel,
+  emptyLabel,
+}: {
+  title: string;
+  icon: ReactNode;
+  items: { id: string; label: string; detail: string }[];
+  actionLabel: string;
+  emptyLabel: string;
+}) {
+  return (
+    <div className="rounded-lg border border-line p-3.5 dark:border-white/10">
+      <div className="mb-3 flex items-center gap-2 text-sm font-medium text-ink dark:text-paper">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-ink/5 text-ink/60 dark:bg-white/10 dark:text-paper/60">
+          {icon}
+        </span>
+        {title}
+      </div>
+      {items.length === 0 ? (
+        <p className="py-3 text-center text-xs text-ink/40 dark:text-paper/40">{emptyLabel}</p>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((item) => (
+            <li
+              key={item.id}
+              className="flex items-center justify-between gap-2 rounded-md bg-paper px-2.5 py-2 text-xs dark:bg-white/5"
+            >
+              <div className="min-w-0">
+                <div className="truncate font-medium text-ink/80 dark:text-paper/80">{item.label}</div>
+                <div className="truncate text-ink/45 dark:text-paper/45">{item.detail}</div>
+              </div>
+              <button
+                type="button"
+                disabled
+                title="پس از اتصال به بک‌اند فعال می‌شود"
+                className="shrink-0 rounded-md border border-line px-2 py-1 text-[11px] text-ink/40 transition-transform active:scale-[0.97] disabled:cursor-not-allowed dark:border-white/15 dark:text-paper/40"
+              >
+                {actionLabel}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function TodayChecklist() {
+  return (
+    <Card title="چک‌لیست امروز" className="mt-6">
+      <div className="mb-4 flex items-start gap-2 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
+        <AlertIcon size={14} className="mt-0.5 shrink-0" />
+        <span>
+          این بخش فعلاً با داده نمونه نمایش داده می‌شود. برای فعال‌سازی واقعی، ماژول‌های حضور و غیاب (برای کارمندان)،
+          مدارک دانش‌آموزان، و یادآوری‌های خودکار باید در فرانت‌اند وصل شوند.
+        </span>
+      </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <ChecklistSection
+          title="حضور و غیاب ثبت‌نشده"
+          icon={<AttendanceIcon size={16} />}
+          items={SAMPLE_ATTENDANCE_PENDING}
+          actionLabel="ثبت حضور"
+          emptyLabel="همه‌ی کلاس‌ها ثبت شده‌اند"
+        />
+        <ChecklistSection
+          title="مدارک ناقص"
+          icon={<AssignmentsIcon size={16} />}
+          items={SAMPLE_INCOMPLETE_DOCUMENTS}
+          actionLabel="پیگیری"
+          emptyLabel="مدرک ناقصی باقی نمانده است"
+        />
+        <ChecklistSection
+          title="یادآوری سررسید قسط"
+          icon={<CalendarIcon size={16} />}
+          items={SAMPLE_TUITION_REMINDERS}
+          actionLabel="ارسال یادآوری"
+          emptyLabel="سررسید نزدیکی وجود ندارد"
+        />
+      </div>
+    </Card>
   );
 }
 
