@@ -60,6 +60,10 @@ const navItems: NavItem[] = [
   // this static nav list can't express — those live in FounderSchoolLayout's
   // own in-page tab bar instead (see pages/founder/FounderSchoolLayout.tsx).
   { to: '/founder/overview', label: 'نمای کلی', icon: SchoolsIcon, roles: ['founder'] },
+  // Cross-school teacher directory (GET /founder/teachers) — unlike the
+  // per-school pages, this one doesn't carry a :schoolId so it can live
+  // in this static nav list.
+  { to: '/founder/teachers', label: 'معلمان', icon: StudentsIcon, roles: ['founder'] },
 ];
 
 const roleLabels: Record<string, string> = {

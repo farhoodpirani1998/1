@@ -14,6 +14,7 @@ import { StudentsService } from './students.service';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
+import { CreateStudentParentDto } from './dto/create-student-parent.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -78,6 +79,32 @@ export class StudentsController {
     @CurrentUser('schoolId') schoolId: string,
   ) {
     return this.studentProfileService.getForSchoolAdmin(id, schoolId);
+  }
+
+  // Creates (or reuses, for a sibling sharing a parent) a parent-portal
+  // login and links it to this student in one step — same role gate as
+  // create() above, since this is a variant of "add a family contact for
+  // a student", not a general user-management action (see
+  // StudentsService.addParent for the tenant/reuse rules).
+  @Post(':id/parent')
+  @Roles('school_admin', 'staff')
+  addParent(
+    @Param('id') id: string,
+    @Body() dto: CreateStudentParentDto,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    return this.studentsService.addParent(id, dto, schoolId);
+  }
+
+  // Every parent-portal login currently linked to this student — same
+  // role gate as addParent()/create() above.
+  @Get(':id/parents')
+  @Roles('school_admin', 'staff')
+  getParents(
+    @Param('id') id: string,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    return this.studentsService.getParents(id, schoolId);
   }
 
   @Patch(':id')

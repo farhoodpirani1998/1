@@ -12,6 +12,8 @@ import { InfoRow } from '../components/InfoRow';
 import { RecordPaymentModal, PayableInstallment } from '../components/RecordPaymentModal';
 import { VoidPaymentDialog } from '../components/VoidPaymentDialog';
 import { FormError } from '../components/FormError';
+import { Input } from '../components/Input';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { PersianDatePicker } from '../components/PersianDatePicker';
 import { formatToman, formatDate } from '../lib/format';
 import { useToast } from '../lib/toast';
@@ -20,7 +22,7 @@ import { hasPermission, Permission } from '../lib/permissions';
 import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
 import type { StudentStatus, Student, Grade } from '../types/student.types';
 import type { Payment } from '../types/payment.types';
-import { useStudent } from '../hooks/useStudent';
+import { useStudent, useStudentParents, useAddStudentParent, useRemoveStudentParent } from '../hooks/useStudent';
 import { useUpdateStudent, useGrades, useAcademicYears } from '../hooks/useStudents';
 import { useStudentStatement } from '../hooks/useReports';
 import { useCreateTuitionPlan, useGenerateInstallments } from '../hooks/useTuition';
@@ -250,6 +252,16 @@ export function StudentDetailPage() {
           )}
         </Card>
       </div>
+
+      {/* Parent-portal accounts linked to this student — separate from
+          the billing "guardian" card above (see StudentParentView on the
+          backend: a student can have a guardian, parent-portal logins,
+          both, or neither). */}
+      {student && (canEditStatus || user?.role === 'school_admin') && (
+        <div className="mb-6">
+          <StudentParentsSection studentId={student.id} canManage={canEditStatus} canDelete={user?.role === 'school_admin'} />
+        </div>
+      )}
 
       {/* Financial summary */}
       <SectionHeader title="خلاصه مالی" />
@@ -654,5 +666,157 @@ function EditProfileForm({
         <FormError error={error} />
       </div>
     </form>
+  );
+}
+
+// "والدین" section on StudentDetailPage: lists parent-portal logins
+// linked to this student (GET /students/:id/parents), a form to
+// create-or-link a new one (POST /students/:id/parent), and — for
+// school_admin only, matching the backend's @Roles('school_admin') on
+// DELETE /parent/link/:id — a button to remove a link.
+function StudentParentsSection({
+  studentId,
+  canManage,
+  canDelete,
+}: {
+  studentId: string;
+  canManage: boolean;
+  canDelete: boolean;
+}) {
+  const { showSuccess, showError } = useToast();
+  const parentsQuery = useStudentParents(studentId);
+  const addParent = useAddStudentParent();
+  const removeParent = useRemoveStudentParent(studentId);
+  const parents = parentsQuery.data ?? [];
+
+  const [showForm, setShowForm] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<ParsedApiError | null>(null);
+  // The password is only ever available right after creation — the
+  // backend never returns a passwordHash, and there is no "show
+  // password" endpoint later. Kept in local state only, cleared on
+  // navigation/unmount.
+  const [justCreated, setJustCreated] = useState<{ fullName: string; phone: string; password: string } | null>(null);
+  const [removingLinkId, setRemovingLinkId] = useState<string | null>(null);
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    addParent.mutate(
+      { studentId, dto: { fullName, phone, password } },
+      {
+        onSuccess: () => {
+          showSuccess('والد ثبت و به دانش‌آموز لینک شد');
+          setJustCreated({ fullName, phone, password });
+          setFullName('');
+          setPhone('');
+          setPassword('');
+          setShowForm(false);
+        },
+        onError: (err) => {
+          setError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
+      },
+    );
+  }
+
+  function handleConfirmRemove() {
+    if (!removingLinkId) return;
+    removeParent.mutate(removingLinkId, {
+      onSuccess: () => {
+        showSuccess('لینک والد حذف شد');
+        setRemovingLinkId(null);
+      },
+      onError: (err) => {
+        showError(getErrorMessage(err));
+        setRemovingLinkId(null);
+      },
+    });
+  }
+
+  return (
+    <Card
+      title="والدین (حساب پرتال)"
+      action={
+        canManage &&
+        !showForm && (
+          <Button variant="ghost" size="sm" onClick={() => setShowForm(true)}>
+            افزودن والد
+          </Button>
+        )
+      }
+    >
+      {justCreated && (
+        <div className="mb-4 rounded-lg border border-paid/30 bg-paid/10 px-3 py-2.5 text-sm text-ink dark:text-paper">
+          <div className="mb-1 font-medium">این رمز را به والد بدهید — بعد از این پیام دیگر قابل مشاهده نیست</div>
+          <div className="tabular">
+            {justCreated.fullName} — {justCreated.phone} — رمز عبور: <span className="font-bold">{justCreated.password}</span>
+          </div>
+        </div>
+      )}
+
+      {showForm && (
+        <form onSubmit={handleSubmit} className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Input label="نام و نام خانوادگی" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          <Input label="شماره تلفن" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxxx" />
+          <Input
+            label="رمز عبور"
+            required
+            minLength={8}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <div className="sm:col-span-3">
+            <FormError error={error} />
+            <div className="flex gap-2">
+              <Button type="submit" loading={addParent.isPending}>
+                ثبت والد
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+                انصراف
+              </Button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {parentsQuery.isLoading ? (
+        <SkeletonRows rows={2} cols={2} />
+      ) : parents.length === 0 ? (
+        <EmptyState message="هیچ والدی به این دانش‌آموز لینک نشده است." />
+      ) : (
+        <div className="divide-y divide-line dark:divide-white/10">
+          {parents.map((p) => (
+            <div key={p.linkId} className="flex items-center justify-between gap-3 py-2.5">
+              <div>
+                <div className="text-sm font-medium text-ink dark:text-paper">{p.fullName}</div>
+                <div className="tabular text-xs text-ink/60 dark:text-paper/60">{p.phone}</div>
+              </div>
+              {canDelete && (
+                <button
+                  onClick={() => setRemovingLinkId(p.linkId)}
+                  className="text-xs text-overdue hover:underline"
+                >
+                  حذف لینک
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!removingLinkId}
+        title="حذف لینک والد"
+        description="این والد دیگر به این دانش‌آموز دسترسی نخواهد داشت. حساب کاربری والد حذف نمی‌شود."
+        variant="danger"
+        loading={removeParent.isPending}
+        onConfirm={handleConfirmRemove}
+        onCancel={() => setRemovingLinkId(null)}
+      />
+    </Card>
   );
 }

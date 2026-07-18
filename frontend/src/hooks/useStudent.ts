@@ -1,8 +1,14 @@
 // Single-student detail query, kept separate from useStudents.ts per the
 // Phase 2 plan (list concerns vs. one-entity concerns).
 
-import { useQuery } from '@tanstack/react-query';
-import { getStudent } from '../api/students.api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  getStudent,
+  addStudentParent,
+  getStudentParents,
+  type AddStudentParentInput,
+} from '../api/students.api';
+import { unlinkParentStudent } from '../api/parent.api';
 import { queryKeys } from '../lib/queryKeys';
 
 export function useStudent(id: string | undefined) {
@@ -10,5 +16,40 @@ export function useStudent(id: string | undefined) {
     queryKey: queryKeys.students.detail(id ?? ''),
     queryFn: () => getStudent(id as string).then((res) => res.data),
     enabled: !!id,
+  });
+}
+
+// GET /students/:id/parents — the "والدین" section on StudentDetailPage.
+export function useStudentParents(studentId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.students.parents(studentId ?? ''),
+    queryFn: () => getStudentParents(studentId as string).then((res) => res.data),
+    enabled: !!studentId,
+  });
+}
+
+// POST /students/:id/parent — create-or-link. Invalidates just this
+// student's parents list; nothing else embeds parent-account data.
+export function useAddStudentParent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ studentId, dto }: { studentId: string; dto: AddStudentParentInput }) =>
+      addStudentParent(studentId, dto).then((res) => res.data),
+    onSuccess: (_data, { studentId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.students.parents(studentId) });
+    },
+  });
+}
+
+// DELETE /parent/link/:id — removes one linked parent from a student.
+export function useRemoveStudentParent(studentId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (linkId: string) => unlinkParentStudent(linkId),
+    onSuccess: () => {
+      if (studentId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.students.parents(studentId) });
+      }
+    },
   });
 }

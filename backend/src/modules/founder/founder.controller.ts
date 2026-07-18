@@ -74,6 +74,16 @@ export class FounderController {
     return this.founderService.getTeachers(founderId, schoolId);
   }
 
+  // Cross-school teacher directory — every teacher across every school
+  // this founder owns, each tagged with which school it belongs to. Read
+  // -only, scoped the same way findMySchools()/getOverview() already are
+  // (getOwnedSchoolIds(), no single :schoolId param to guess/enumerate).
+  @Get('teachers')
+  @Roles('founder')
+  getAllTeachers(@CurrentUser('id') founderId: string) {
+    return this.founderService.getAllTeachers(founderId);
+  }
+
   @Get('schools/:schoolId/staff')
   @Roles('founder')
   getStaff(@Param('schoolId') schoolId: string, @CurrentUser('id') founderId: string) {

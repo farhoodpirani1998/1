@@ -26,6 +26,8 @@ import {
 import {
   toFounderTeacherView,
   FounderTeacherView,
+  toFounderTeacherWithSchoolView,
+  FounderTeacherWithSchoolView,
 } from './dto/founder-teacher-view.dto';
 import { FounderOverviewView, FounderSchoolBreakdown } from './dto/founder-overview-view.dto';
 import { FounderTuitionOverview } from './dto/founder-tuition-view.dto';
@@ -164,6 +166,52 @@ export class FounderService {
           subjectId: a.subjectId,
           subjectTitle: a.subject?.title ?? '',
         })),
+      ),
+    );
+  }
+
+  // GET /founder/teachers — every teacher across every school this
+  // founder owns, tagged with schoolId/schoolName so the frontend can
+  // group by school. Same "one query for the users, one for their
+  // assignments, join in memory" shape as getTeachers() above, just
+  // widened from a single schoolId to In(schoolIds); no assertOwnsSchool
+  // call needed since getOwnedSchoolIds() already is the full set of
+  // schools this founder may see.
+  async getAllTeachers(founderId: string): Promise<FounderTeacherWithSchoolView[]> {
+    const schoolIds = await this.getOwnedSchoolIds(founderId);
+    if (schoolIds.length === 0) return [];
+
+    const schools = await this.schoolRepo.find({ where: { id: In(schoolIds) } });
+    const schoolNameById = new Map(schools.map((s) => [s.id, s.name]));
+
+    const teachers = await this.userRepo.find({
+      where: { schoolId: In(schoolIds), role: Role.TEACHER },
+      order: { fullName: 'ASC' },
+    });
+    if (teachers.length === 0) return [];
+
+    const assignments = await this.teacherAssignmentRepo.find({
+      where: { schoolId: In(schoolIds), teacherId: In(teachers.map((t) => t.id)) },
+      relations: ['grade', 'subject'],
+    });
+    const assignmentsByTeacher = new Map<string, typeof assignments>();
+    for (const a of assignments) {
+      const list = assignmentsByTeacher.get(a.teacherId) ?? [];
+      list.push(a);
+      assignmentsByTeacher.set(a.teacherId, list);
+    }
+
+    return teachers.map((teacher) =>
+      toFounderTeacherWithSchoolView(
+        teacher,
+        (assignmentsByTeacher.get(teacher.id) ?? []).map((a) => ({
+          gradeId: a.gradeId,
+          gradeTitle: a.grade?.title ?? '',
+          subjectId: a.subjectId,
+          subjectTitle: a.subject?.title ?? '',
+        })),
+        teacher.schoolId,
+        schoolNameById.get(teacher.schoolId) ?? '',
       ),
     );
   }

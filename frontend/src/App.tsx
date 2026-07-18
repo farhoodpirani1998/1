@@ -38,6 +38,7 @@ import { FounderSchoolLayout } from './pages/founder/FounderSchoolLayout';
 import { FounderSchoolDashboardPage } from './pages/founder/FounderSchoolDashboardPage';
 import { FounderStudentsPage } from './pages/founder/FounderStudentsPage';
 import { FounderTeachersPage } from './pages/founder/FounderTeachersPage';
+import { FounderAllTeachersPage } from './pages/founder/FounderAllTeachersPage';
 import { FounderStaffPage } from './pages/founder/FounderStaffPage';
 import { FounderTuitionPage } from './pages/founder/FounderTuitionPage';
 
@@ -177,6 +178,17 @@ export function App() {
                   element={
                     <RequireRole roles={['founder']}>
                       <FounderOverviewPage />
+                    </RequireRole>
+                  }
+                />
+                {/* Cross-school teacher directory — distinct from the
+                    per-school /founder/schools/:schoolId/teachers tab
+                    below, which stays nested under FounderSchoolLayout. */}
+                <Route
+                  path="/founder/teachers"
+                  element={
+                    <RequireRole roles={['founder']}>
+                      <FounderAllTeachersPage />
                     </RequireRole>
                   }
                 />

@@ -29,3 +29,26 @@ export function toFounderTeacherView(
     assignments,
   };
 }
+
+// GET /founder/teachers — the cross-school variant, one row per teacher
+// across every school the founder owns, tagged with which school it
+// belongs to so the frontend can group by school (unlike GET
+// /founder/schools/:schoolId/teachers, which is already scoped to a
+// single school and needs no such tag).
+export interface FounderTeacherWithSchoolView extends FounderTeacherView {
+  schoolId: string;
+  schoolName: string;
+}
+
+export function toFounderTeacherWithSchoolView(
+  user: User,
+  assignments: FounderTeacherAssignmentView[],
+  schoolId: string,
+  schoolName: string,
+): FounderTeacherWithSchoolView {
+  return {
+    ...toFounderTeacherView(user, assignments),
+    schoolId,
+    schoolName,
+  };
+}

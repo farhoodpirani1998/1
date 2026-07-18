@@ -3,24 +3,41 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import { Student } from './entities/student.entity';
 import { Guardian } from './entities/guardian.entity';
 import { Grade } from '../grades/entities/grade.entity';
 import { AcademicYear } from '../academic-years/entities/academic-year.entity';
+import { User } from '../users/entities/user.entity';
+import { ParentStudent } from '../parent/entities/parent-student.entity';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
+import { CreateStudentParentDto } from './dto/create-student-parent.dto';
+import {
+  StudentParentView,
+  toStudentParentView,
+  toStudentParentViewFromUser,
+} from './dto/student-parent-view.dto';
 import { GuardiansService } from './guardians.service';
 import { normalizePagination } from '../../common/utils/pagination';
+import { Role } from '../../common/authorization/roles.enum';
+
+const BCRYPT_ROUNDS = 12;
 
 @Injectable()
 export class StudentsService {
   constructor(
     @InjectRepository(Student)
     private readonly studentRepo: Repository<Student>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(ParentStudent)
+    private readonly parentStudentRepo: Repository<ParentStudent>,
     private readonly guardiansService: GuardiansService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
@@ -181,5 +198,84 @@ export class StudentsService {
   async softDelete(id: string, schoolId: string): Promise<void> {
     await this.findOne(id, schoolId); // ensures it exists and belongs to this school
     await this.studentRepo.softDelete(id);
+  }
+
+  /**
+   * POST /students/:id/parent — school_admin/staff: create (or, if the
+   * phone number already belongs to a parent-role account in this same
+   * school — e.g. a sibling's parent — reuse) a parent-portal login and
+   * link it to this student, in one step.
+   *
+   * Tenant enforcement: the student must belong to the caller's own
+   * school, same 404-on-cross-school shape as findOne(). schoolId for a
+   * freshly created parent account always comes from the authenticated
+   * caller's token (passed in here), never from the request body.
+   *
+   * The link itself is created with the same idempotent
+   * "find-or-create the (parentId, studentId) row" shape as
+   * ParentService.link() — duplicated here rather than imported (see
+   * students.module.ts for why importing ParentModule directly would
+   * create a circular module dependency).
+   */
+  async addParent(
+    studentId: string,
+    dto: CreateStudentParentDto,
+    schoolId: string,
+  ): Promise<StudentParentView> {
+    // Ensures the student exists and belongs to this school before any
+    // user/link is created.
+    await this.findOne(studentId, schoolId);
+
+    let parent = await this.userRepo.findOne({ where: { phone: dto.phone } });
+
+    if (parent) {
+      // A phone number is the login identifier for every role — reusing
+      // it here only makes sense if it's already a parent account in
+      // this same school (the sibling case). Anything else (a
+      // school_admin/staff/teacher login, or a parent from a different
+      // school) must not be silently taken over.
+      if (parent.role !== Role.PARENT || parent.schoolId !== schoolId) {
+        throw new ConflictException(
+          'این شماره تلفن قبلاً برای کاربر دیگری ثبت شده است',
+        );
+      }
+    } else {
+      const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+      parent = this.userRepo.create({
+        schoolId,
+        fullName: dto.fullName,
+        phone: dto.phone,
+        passwordHash,
+        role: Role.PARENT,
+        isActive: true,
+      });
+      parent = await this.userRepo.save(parent);
+    }
+
+    let link = await this.parentStudentRepo.findOne({
+      where: { parentId: parent.id, studentId },
+    });
+    if (!link) {
+      link = await this.parentStudentRepo.save(
+        this.parentStudentRepo.create({ parentId: parent.id, studentId }),
+      );
+    }
+
+    return toStudentParentViewFromUser(parent, link.id);
+  }
+
+  /**
+   * GET /students/:id/parents — school_admin/staff: every parent-portal
+   * login currently linked to this student, including the link row id
+   * (needed by the frontend to call the existing DELETE
+   * /parent/link/:id). Same tenant check as addParent()/findOne().
+   */
+  async getParents(studentId: string, schoolId: string): Promise<StudentParentView[]> {
+    await this.findOne(studentId, schoolId);
+    const links = await this.parentStudentRepo.find({
+      where: { studentId },
+      relations: ['parent'],
+    });
+    return links.map(toStudentParentView);
   }
 }

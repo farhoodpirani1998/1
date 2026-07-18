@@ -210,6 +210,14 @@ export interface FounderTeacher {
   assignments: FounderTeacherAssignment[];
 }
 
+// GET /founder/teachers — cross-school variant, tagged with which school
+// each teacher belongs to (unlike FounderTeacher above, which is already
+// scoped to one school via the :schoolId in its route).
+export interface FounderTeacherWithSchool extends FounderTeacher {
+  schoolId: string;
+  schoolName: string;
+}
+
 // GET /founder/schools/:schoolId/staff
 export type FounderStaffRole = 'school_admin' | 'accountant' | 'staff';
 

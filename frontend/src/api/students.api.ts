@@ -48,6 +48,32 @@ export function archiveStudent(id: string) {
   return api.delete(`/students/${id}`);
 }
 
+// Matches CreateStudentParentDto: fullName/phone/password. See
+// POST /students/:id/parent — creates (or, for a sibling sharing a
+// parent, reuses) a parent-portal login and links it to this student.
+export interface AddStudentParentInput {
+  fullName: string;
+  phone: string;
+  password: string;
+}
+
+// Matches StudentParentView on the backend.
+export interface StudentParentLink {
+  linkId: string;
+  id: string;
+  fullName: string;
+  phone: string;
+  isActive: boolean;
+}
+
+export function addStudentParent(studentId: string, dto: AddStudentParentInput) {
+  return api.post<StudentParentLink>(`/students/${studentId}/parent`, dto);
+}
+
+export function getStudentParents(studentId: string) {
+  return api.get<StudentParentLink[]>(`/students/${studentId}/parents`);
+}
+
 // NOT a real backend "restore" — there is no /students/:id/restore route
 // and no way to list/undo a soft-deleted row (findOne/findWithFilters
 // never pass `withDeleted`). This is the same status-flip workaround

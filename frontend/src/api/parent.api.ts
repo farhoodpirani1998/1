@@ -36,3 +36,11 @@ export function getStudentPaymentHistory(studentId: string) {
 export function getMyAnnouncements() {
   return api.get<ParentAnnouncementView[]>('/parent/announcements');
 }
+
+// DELETE /parent/link/:id — @Roles('school_admin'). Removes a
+// parent<->student link row (the id from StudentParentLink.linkId, not
+// the parent's own user id). Used by StudentDetailPage's "والدین"
+// section to remove a linked parent.
+export function unlinkParentStudent(linkId: string) {
+  return api.delete(`/parent/link/${linkId}`);
+}

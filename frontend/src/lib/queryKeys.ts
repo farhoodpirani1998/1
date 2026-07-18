@@ -26,6 +26,9 @@ export const queryKeys = {
     list: (params?: QueryStudentsParams) => [...queryKeys.students.lists(), params ?? {}] as const,
     details: () => [...queryKeys.students.all(), 'detail'] as const,
     detail: (id: string) => [...queryKeys.students.details(), id] as const,
+    // POST/GET /students/:id/parent(s) — parent-portal logins linked to
+    // one student, managed from StudentDetailPage's "والدین" section.
+    parents: (id: string) => [...queryKeys.students.all(), 'parents', id] as const,
   },
 
   grades: {
@@ -137,6 +140,9 @@ export const queryKeys = {
     students: (schoolId: string, params?: QueryFounderStudentsParams) =>
       [...queryKeys.founder.all(), 'students', schoolId, params ?? {}] as const,
     teachers: (schoolId: string) => [...queryKeys.founder.all(), 'teachers', schoolId] as const,
+    // GET /founder/teachers — cross-school teacher directory (all owned
+    // schools at once), distinct from teachers(schoolId) above.
+    allTeachers: () => [...queryKeys.founder.all(), 'teachers', 'all'] as const,
     staff: (schoolId: string) => [...queryKeys.founder.all(), 'staff', schoolId] as const,
     tuition: (schoolId: string) => [...queryKeys.founder.all(), 'tuition', schoolId] as const,
   },

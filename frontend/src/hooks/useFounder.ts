@@ -5,6 +5,7 @@ import {
   getFounderSchoolDashboard,
   getFounderSchoolStudents,
   getFounderSchoolTeachers,
+  getFounderTeachers,
   getFounderSchoolStaff,
   getFounderSchoolTuition,
   linkFounderToSchool,
@@ -59,6 +60,16 @@ export function useFounderSchoolTeachers(schoolId: string | undefined) {
     queryFn: () => getFounderSchoolTeachers(schoolId as string).then((res) => res.data),
     enabled: !!schoolId,
     retry: false,
+  });
+}
+
+// GET /founder/teachers — cross-school directory, not scoped to one
+// :schoolId so no `enabled`/`retry:false` gate is needed (unlike the
+// school-scoped queries above).
+export function useFounderTeachers() {
+  return useQuery({
+    queryKey: queryKeys.founder.allTeachers(),
+    queryFn: () => getFounderTeachers().then((res) => res.data),
   });
 }
 

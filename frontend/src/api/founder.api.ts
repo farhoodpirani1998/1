@@ -6,6 +6,7 @@ import type {
   FounderStudent,
   QueryFounderStudentsParams,
   FounderTeacher,
+  FounderTeacherWithSchool,
   FounderStaffMember,
   FounderTuitionSummary,
   FounderLink,
@@ -46,6 +47,13 @@ export function getFounderSchoolStudents(schoolId: string, params?: QueryFounder
 // GET /founder/schools/:schoolId/teachers — @Roles('founder').
 export function getFounderSchoolTeachers(schoolId: string) {
   return api.get<FounderTeacher[]>(`/founder/schools/${schoolId}/teachers`);
+}
+
+// GET /founder/teachers — @Roles('founder'). Cross-school teacher
+// directory across every school the founder owns, each row tagged with
+// schoolId/schoolName — distinct from getFounderSchoolTeachers above.
+export function getFounderTeachers() {
+  return api.get<FounderTeacherWithSchool[]>('/founder/teachers');
 }
 
 // GET /founder/schools/:schoolId/staff — @Roles('founder'). Non-teacher
