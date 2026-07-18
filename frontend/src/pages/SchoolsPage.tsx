@@ -209,7 +209,7 @@ export function SchoolsPage() {
           <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Input required label="نام مدرسه" value={name} onChange={(e) => setName(e.target.value)} placeholder="نام مدرسه" />
             <Input label="آدرس" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="آدرس (اختیاری)" />
-            <Input label="تلفن" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="تلفن (اختیاری)" />
+            <Input type="tel" inputMode="tel" label="تلفن" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="تلفن (اختیاری)" />
             <div className="col-span-full">
               <FormError error={error} />
               <Button type="submit" loading={createSchool.isPending}>

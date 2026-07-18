@@ -444,6 +444,8 @@ function CreateStudentForm({
 
         <Field label="شماره تلفن والد">
           <input
+            type="tel"
+            inputMode="tel"
             required
             value={guardianPhone}
             onChange={(e) => setGuardianPhone(e.target.value)}

@@ -878,7 +878,15 @@ function StudentParentsSection({
       {showForm && (
         <form onSubmit={handleSubmit} className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Input label="نام و نام خانوادگی" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
-          <Input label="شماره تلفن" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09xxxxxxxxx" />
+          <Input
+            type="tel"
+            inputMode="tel"
+            label="شماره تلفن"
+            required
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="09xxxxxxxxx"
+          />
           <Input
             label="رمز عبور"
             required

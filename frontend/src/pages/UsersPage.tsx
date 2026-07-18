@@ -342,7 +342,7 @@ function EditUserModal({
           value={fullName}
           onChange={(e) => setFullName(e.target.value)}
         />
-        <Input required label="شماره تلفن" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <Input type="tel" inputMode="tel" required label="شماره تلفن" value={phone} onChange={(e) => setPhone(e.target.value)} />
         <FormError error={error} />
         <div className="flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onClose}>
@@ -460,6 +460,8 @@ function CreateUserForm({
           placeholder="نام و نام خانوادگی"
         />
         <Input
+          type="tel"
+          inputMode="tel"
           required
           label="شماره تلفن"
           value={phone}

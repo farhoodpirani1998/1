@@ -179,7 +179,7 @@ function GuardianDetailModal({ guardianId, onClose }: { guardianId: string | nul
       ) : !guardian ? null : editing ? (
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input label="نام و نام خانوادگی" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
-          <Input label="شماره تماس" required value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <Input type="tel" inputMode="tel" label="شماره تماس" required value={phone} onChange={(e) => setPhone(e.target.value)} />
           <Input label="کد ملی" value={nationalId} onChange={(e) => setNationalId(e.target.value)} />
           <FormError error={error} />
           <div className="flex gap-2">
