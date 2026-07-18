@@ -16,11 +16,13 @@ export enum LedgerEntryType {
   DISCOUNT = 'DISCOUNT', // a discount reduced what's owed (negative to CHARGE)
   PAYMENT = 'PAYMENT', // money came in — reduces the balance
   VOID = 'VOID', // reverses a prior PAYMENT (payment was voided/deleted)
+  WRITE_OFF = 'WRITE_OFF', // school forgave a remaining balance — reduces what's owed, distinct from DISCOUNT (agreed up-front) and PAYMENT (cash received)
 }
 
 export enum LedgerReferenceType {
   TUITION_PLAN = 'tuition_plan',
   PAYMENT = 'payment',
+  INSTALLMENT = 'installment',
 }
 
 /**

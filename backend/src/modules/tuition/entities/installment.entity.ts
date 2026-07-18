@@ -18,6 +18,11 @@ export enum InstallmentStatus {
   CANCELLED = 'cancelled',
   DEFERRED = 'deferred',
   DISPUTED = 'disputed',
+  // Debt forgiven by the school (not paid, not simply cancelled — the
+  // distinction matters for financial reporting). Terminal, like
+  // CANCELLED: see InstallmentStateMachine for why nothing transitions
+  // out of it automatically.
+  WRITTEN_OFF = 'written_off',
 }
 
 @Entity('installments')

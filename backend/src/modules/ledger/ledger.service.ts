@@ -140,6 +140,40 @@ export class LedgerService {
     });
   }
 
+  /**
+   * Books a forgiven remaining balance on one installment. Distinct from
+   * recordDiscountAdjustment (a discount is agreed on the plan, before
+   * installments are generated or as a schedule-wide redistribution) —
+   * a write-off targets one specific installment's leftover amount and
+   * is referenced back to that installment, not the plan, so reporting
+   * can tell "we agreed a lower price" apart from "we gave up collecting
+   * what was owed".
+   */
+  async recordWriteOff(
+    manager: EntityManager,
+    params: {
+      schoolId: string;
+      studentId: string;
+      tuitionPlanId: string;
+      installmentId: string;
+      amount: number;
+      reason: string;
+      performedBy: string;
+    },
+  ): Promise<void> {
+    await manager.getRepository(LedgerEntry).insert({
+      schoolId: params.schoolId,
+      studentId: params.studentId,
+      tuitionPlanId: params.tuitionPlanId,
+      entryType: LedgerEntryType.WRITE_OFF,
+      amount: -params.amount, // forgiven → owes less, same sign as DISCOUNT/PAYMENT
+      referenceType: LedgerReferenceType.INSTALLMENT,
+      referenceId: params.installmentId,
+      performedById: params.performedBy,
+      reason: params.reason,
+    });
+  }
+
   /** Current outstanding balance for one student: sum of all ledger rows. */
   async studentBalance(manager: EntityManager, studentId: string): Promise<number> {
     const raw = await manager

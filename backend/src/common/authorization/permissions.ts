@@ -23,6 +23,14 @@ export enum Permission {
   PAYMENT_VOID = 'payment:void',
   DISCOUNT_UNLIMITED = 'discount:unlimited',
   INSTALLMENT_STATUS_OVERRIDE = 'installment:status-override',
+  // Forgiving a remaining balance outright — higher-stakes than a normal
+  // discount (which is agreed before any money is due) or a status
+  // override (which doesn't change what's owed).
+  INSTALLMENT_WRITE_OFF = 'installment:write-off',
+  // Adding/removing an installment, or rescheduling the unpaid remainder
+  // into a new set of installments, after a schedule already exists and
+  // the family has been told about it.
+  INSTALLMENT_SCHEDULE_EDIT = 'installment:schedule-edit',
 }
 
 // role -> permissions it holds. super_admin implicitly has everything
@@ -33,6 +41,8 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     Permission.PAYMENT_VOID,
     Permission.DISCOUNT_UNLIMITED,
     Permission.INSTALLMENT_STATUS_OVERRIDE,
+    Permission.INSTALLMENT_WRITE_OFF,
+    Permission.INSTALLMENT_SCHEDULE_EDIT,
   ],
   [Role.ACCOUNTANT]: [
     // accountants can record payments and normal discounts, but voiding

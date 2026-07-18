@@ -8,11 +8,13 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { TuitionPlan } from '../entities/tuition-plan.entity';
+import { Installment, InstallmentStatus } from '../entities/installment.entity';
 import { Student } from '../../students/entities/student.entity';
 import { AcademicYear } from '../../academic-years/entities/academic-year.entity';
 import { CreateTuitionPlanDto } from '../dto/create-tuition-plan.dto';
 import { UpdateTuitionPlanDto } from '../dto/update-tuition-plan.dto';
 import { LedgerService } from '../../ledger/ledger.service';
+import { splitAmount } from '../utils/split-amount';
 import {
   DISCOUNT_CEILING_RATIO,
   Permission,
@@ -22,6 +24,7 @@ import {
   DOMAIN_EVENTS,
   TuitionPlanCreatedEvent,
   TuitionPlanUpdatedEvent,
+  InstallmentUpdatedEvent,
 } from '../../../common/events/domain-events';
 
 @Injectable()
@@ -167,7 +170,7 @@ export class TuitionPlansService {
   async update(
     id: string,
     dto: UpdateTuitionPlanDto,
-    actingUser: { id: string },
+    actingUser: { id: string; role?: string },
     schoolId: string,
   ): Promise<TuitionPlan> {
     const result = await this.dataSource.transaction(async (manager) => {
@@ -189,10 +192,20 @@ export class TuitionPlansService {
         throw new ForbiddenException('این برنامه شهریه متعلق به مدرسه دیگری است');
       }
 
-      if (plan.installments?.length) {
-        throw new BadRequestException(
-          'پس از ساخته‌شدن اقساط، امکان ویرایش تخفیف وجود ندارد',
-        );
+      const discountChanging =
+        dto.discountAmount !== undefined && dto.discountAmount !== plan.discountAmount;
+
+      // Editing a discount after the family already has a schedule in
+      // front of them is a bigger deal than editing it up-front — no
+      // per-role ceiling exception here (unlike create()), only
+      // DISCOUNT_UNLIMITED (school_admin) can do it at all, regardless of
+      // how small the change is.
+      if (plan.installments?.length && discountChanging) {
+        if (!actingUser.role || !roleHasPermission(actingUser.role, Permission.DISCOUNT_UNLIMITED)) {
+          throw new ForbiddenException(
+            'ویرایش تخفیف پس از ساخته‌شدن اقساط فقط توسط مدیر مدرسه مجاز است',
+          );
+        }
       }
 
       // Snapshot before mutation — this is what TuitionPlanUpdatedEvent
@@ -202,21 +215,74 @@ export class TuitionPlansService {
         discountReason: plan.discountReason,
       };
       let changed = false;
+      const installmentUpdates: { installment: Installment; before: { amount: number } }[] = [];
 
-      if (dto.discountAmount !== undefined && dto.discountAmount !== plan.discountAmount) {
-        if (dto.discountAmount > plan.baseAmount) {
+      if (discountChanging) {
+        if (dto.discountAmount! > plan.baseAmount) {
           throw new BadRequestException(
             'مبلغ تخفیف نمی‌تواند از شهریه پایه بیشتر باشد',
           );
         }
+
         // The original CHARGE/DISCOUNT ledger entries from create() are
         // never edited (append-only) — instead we book the *delta* as a
         // new DISCOUNT entry, so the ledger's running sum still matches
         // plan.finalAmount exactly.
-        const delta = dto.discountAmount - plan.discountAmount;
+        const delta = dto.discountAmount! - plan.discountAmount;
+        const newFinalAmount = plan.baseAmount - dto.discountAmount!;
+
+        if (plan.installments?.length) {
+          // Re-fetch with a row lock rather than trusting the relation
+          // loaded above: a concurrent payment (PaymentsService.create
+          // takes its own pessimistic_write on the installment) could
+          // move an installment from PENDING to PARTIAL between that
+          // load and this write, and we must not redistribute over a
+          // status that's already stale.
+          const lockedInstallments = await manager
+            .createQueryBuilder(Installment, 'installment')
+            .where('installment.tuitionPlanId = :tuitionPlanId', { tuitionPlanId: plan.id })
+            .setLock('pessimistic_write')
+            .getMany();
+
+          // Still-adjustable installments (PENDING/OVERDUE — these
+          // always have paidAmount 0, see InstallmentStateMachine).
+          // PAID/PARTIAL/CANCELLED/DEFERRED/DISPUTED/WRITTEN_OFF keep
+          // their existing amount untouched — money already moved, or a
+          // human already made a manual call on them.
+          const adjustable = lockedInstallments.filter(
+            (i) => i.status === InstallmentStatus.PENDING || i.status === InstallmentStatus.OVERDUE,
+          );
+          const lockedSum = lockedInstallments
+            .filter((i) => !adjustable.includes(i))
+            .reduce((acc, i) => acc + Number(i.amount), 0);
+          const remainingToDistribute = newFinalAmount - lockedSum;
+
+          if (remainingToDistribute < 0) {
+            throw new BadRequestException(
+              'این تخفیف باعث می‌شود مبلغ نهایی از جمع اقساط پرداخت‌شده/قطعی کمتر شود',
+            );
+          }
+          if (adjustable.length === 0 && remainingToDistribute !== 0) {
+            throw new BadRequestException(
+              'قسط قابل‌تعدیلی (pending/overdue) برای اعمال این تغییر باقی نمانده است',
+            );
+          }
+
+          const shares = splitAmount(remainingToDistribute, adjustable.length);
+          adjustable.forEach((installment, idx) => {
+            const oldAmount = Number(installment.amount);
+            const newAmount = shares[idx];
+            if (newAmount !== oldAmount) {
+              installmentUpdates.push({ installment, before: { amount: oldAmount } });
+              installment.amount = newAmount;
+            }
+          });
+          if (installmentUpdates.length) {
+            await manager.save(installmentUpdates.map((u) => u.installment));
+          }
+        }
+
         if (delta !== 0) {
-          // `owner` was already fetched and tenant-checked above — no need
-          // to re-fetch it here.
           await this.ledger.recordDiscountAdjustment(manager, {
             schoolId: owner.schoolId,
             studentId: plan.studentId,
@@ -225,8 +291,8 @@ export class TuitionPlansService {
             performedBy: actingUser.id,
           });
         }
-        plan.discountAmount = dto.discountAmount;
-        plan.finalAmount = plan.baseAmount - dto.discountAmount;
+        plan.discountAmount = dto.discountAmount!;
+        plan.finalAmount = newFinalAmount;
         changed = true;
       }
       if (dto.discountReason !== undefined && dto.discountReason !== plan.discountReason) {
@@ -235,7 +301,7 @@ export class TuitionPlansService {
       }
 
       const saved = await manager.save(plan);
-      return { saved, before, changed };
+      return { saved, before, changed, installmentUpdates };
     });
 
     if (result.changed) {
@@ -253,6 +319,19 @@ export class TuitionPlansService {
           actingUser.id,
         ),
       );
+      for (const u of result.installmentUpdates) {
+        this.events.emit(
+          DOMAIN_EVENTS.INSTALLMENT_UPDATED,
+          new InstallmentUpdatedEvent(
+            schoolId,
+            result.saved.studentId,
+            u.installment.id,
+            { dueDate: u.installment.dueDate, amount: u.before.amount },
+            { dueDate: u.installment.dueDate, amount: Number(u.installment.amount) },
+            actingUser.id,
+          ),
+        );
+      }
     }
 
     return result.saved;

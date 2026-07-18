@@ -3,10 +3,12 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
   UseGuards,
+  HttpCode,
 } from '@nestjs/common';
 import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { InstallmentsService } from './installments.service';
@@ -14,6 +16,10 @@ import { GenerateInstallmentsDto } from '../dto/generate-installments.dto';
 import { QueryInstallmentsDto } from '../dto/query-installments.dto';
 import { UpdateInstallmentDto } from '../dto/update-installment.dto';
 import { OverrideInstallmentStatusDto } from '../dto/override-installment-status.dto';
+import { WriteOffInstallmentDto } from '../dto/write-off-installment.dto';
+import { AddInstallmentDto } from '../dto/add-installment.dto';
+import { RemoveInstallmentDto } from '../dto/remove-installment.dto';
+import { RenegotiateInstallmentsDto } from '../dto/renegotiate-installments.dto';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
@@ -34,6 +40,36 @@ export class InstallmentsController {
     @CurrentUser('schoolId') schoolId: string,
   ) {
     return this.installmentsService.generate(tuitionPlanId, dto, schoolId);
+  }
+
+  // Appends one installment to an already-generated schedule. Same
+  // sensitivity class as renegotiate/remove — changing the shape of a
+  // schedule the family has already seen — so it's school_admin-only and
+  // gated by the dedicated permission rather than the broader
+  // school_admin/accountant split used for ordinary generation.
+  @Post('tuition-plans/:id/installments')
+  @Roles('school_admin')
+  @RequirePermission(Permission.INSTALLMENT_SCHEDULE_EDIT)
+  addInstallment(
+    @Param('id') tuitionPlanId: string,
+    @Body() dto: AddInstallmentDto,
+    @CurrentUser() user: { id: string; schoolId: string },
+  ) {
+    return this.installmentsService.addInstallment(tuitionPlanId, dto, user.schoolId, user.id);
+  }
+
+  // Rebuilds the unpaid remainder of a plan's schedule into a new set of
+  // installments — everything already paid/cancelled/deferred/disputed/
+  // written-off is left untouched. See InstallmentsService.renegotiate().
+  @Post('tuition-plans/:id/installments/renegotiate')
+  @Roles('school_admin')
+  @RequirePermission(Permission.INSTALLMENT_SCHEDULE_EDIT)
+  renegotiate(
+    @Param('id') tuitionPlanId: string,
+    @Body() dto: RenegotiateInstallmentsDto,
+    @CurrentUser() user: { id: string; schoolId: string },
+  ) {
+    return this.installmentsService.renegotiate(tuitionPlanId, dto, user.schoolId, user.id);
   }
 
   // Installment amounts/due dates/payment status are financial history —
@@ -80,5 +116,33 @@ export class InstallmentsController {
     @CurrentUser() user: { id: string; schoolId: string },
   ) {
     return this.installmentsService.overrideStatus(id, dto, user.schoolId, user.id);
+  }
+
+  // Forgives whatever remains owed on this installment. school_admin-only
+  // — see InstallmentsService.writeOff() for why this is kept apart from
+  // overrideStatus's plain 'cancelled' transition.
+  @Patch('installments/:id/write-off')
+  @Roles('school_admin')
+  @RequirePermission(Permission.INSTALLMENT_WRITE_OFF)
+  writeOff(
+    @Param('id') id: string,
+    @Body() dto: WriteOffInstallmentDto,
+    @CurrentUser() user: { id: string; schoolId: string },
+  ) {
+    return this.installmentsService.writeOff(id, dto, user.schoolId, user.id);
+  }
+
+  // Only a PENDING installment can be removed outright — see
+  // InstallmentsService.removeInstallment() for the reasoning.
+  @Delete('installments/:id')
+  @Roles('school_admin')
+  @RequirePermission(Permission.INSTALLMENT_SCHEDULE_EDIT)
+  @HttpCode(200)
+  removeInstallment(
+    @Param('id') id: string,
+    @Body() dto: RemoveInstallmentDto,
+    @CurrentUser() user: { id: string; schoolId: string },
+  ) {
+    return this.installmentsService.removeInstallment(id, dto, user.schoolId, user.id);
   }
 }

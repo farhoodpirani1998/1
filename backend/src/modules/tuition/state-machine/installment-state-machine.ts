@@ -30,6 +30,7 @@ const TRANSITIONS: Record<InstallmentStatus, InstallmentStatus[]> = {
     InstallmentStatus.CANCELLED,
     InstallmentStatus.DEFERRED,
     InstallmentStatus.DISPUTED,
+    InstallmentStatus.WRITTEN_OFF,
   ],
   [InstallmentStatus.OVERDUE]: [
     InstallmentStatus.PARTIAL,
@@ -37,6 +38,7 @@ const TRANSITIONS: Record<InstallmentStatus, InstallmentStatus[]> = {
     InstallmentStatus.CANCELLED,
     InstallmentStatus.DEFERRED,
     InstallmentStatus.DISPUTED,
+    InstallmentStatus.WRITTEN_OFF,
   ],
   [InstallmentStatus.PARTIAL]: [
     InstallmentStatus.PAID,
@@ -44,6 +46,7 @@ const TRANSITIONS: Record<InstallmentStatus, InstallmentStatus[]> = {
     InstallmentStatus.CANCELLED,
     InstallmentStatus.DEFERRED,
     InstallmentStatus.DISPUTED,
+    InstallmentStatus.WRITTEN_OFF,
   ],
   [InstallmentStatus.DEFERRED]: [
     InstallmentStatus.PENDING,
@@ -64,6 +67,7 @@ const TRANSITIONS: Record<InstallmentStatus, InstallmentStatus[]> = {
     InstallmentStatus.PENDING,
   ],
   [InstallmentStatus.CANCELLED]: [], // terminal
+  [InstallmentStatus.WRITTEN_OFF]: [], // terminal — see entity enum doc
 };
 
 export class InstallmentStateMachine {

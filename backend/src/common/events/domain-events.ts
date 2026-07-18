@@ -25,6 +25,10 @@ export const DOMAIN_EVENTS = {
   PAYMENT_RECORDED: 'payment.recorded',
   PAYMENT_VOIDED: 'payment.voided',
   INSTALLMENT_STATUS_CHANGED: 'installment.status-changed',
+  INSTALLMENT_WRITTEN_OFF: 'installment.written-off',
+  INSTALLMENT_ADDED: 'installment.added',
+  INSTALLMENT_REMOVED: 'installment.removed',
+  INSTALLMENTS_RENEGOTIATED: 'installments.renegotiated',
 } as const;
 
 export class TuitionPlanCreatedEvent {
@@ -116,5 +120,64 @@ export class InstallmentStatusChangedEvent {
     public readonly fromStatus: string,
     public readonly toStatus: string,
     public readonly performedBy: string | null, // null when the scheduler/cron did it
+  ) {}
+}
+
+/**
+ * Emitted by InstallmentsService.writeOff() in addition to
+ * INSTALLMENT_STATUS_CHANGED — carries the forgiven amount and reason,
+ * which the generic status-changed event doesn't have room for and which
+ * notifications/reporting listeners specifically care about here.
+ */
+export class InstallmentWrittenOffEvent {
+  constructor(
+    public readonly schoolId: string,
+    public readonly studentId: string,
+    public readonly tuitionPlanId: string,
+    public readonly installmentId: string,
+    public readonly amountWrittenOff: number,
+    public readonly reason: string,
+    public readonly performedBy: string,
+  ) {}
+}
+
+export class InstallmentAddedEvent {
+  constructor(
+    public readonly schoolId: string,
+    public readonly studentId: string,
+    public readonly tuitionPlanId: string,
+    public readonly installmentId: string,
+    public readonly amount: number,
+    public readonly dueDate: string,
+    public readonly performedBy: string,
+  ) {}
+}
+
+export class InstallmentRemovedEvent {
+  constructor(
+    public readonly schoolId: string,
+    public readonly studentId: string,
+    public readonly tuitionPlanId: string,
+    public readonly installmentId: string,
+    public readonly amount: number,
+    public readonly reason: string,
+    public readonly performedBy: string,
+  ) {}
+}
+
+/**
+ * Emitted once per renegotiate() call — cancelledInstallmentIds are the
+ * unpaid installments that were replaced, newInstallmentIds are what
+ * replaced them. Both ids lists so a listener can reconcile the swap
+ * without re-querying.
+ */
+export class InstallmentsRenegotiatedEvent {
+  constructor(
+    public readonly schoolId: string,
+    public readonly studentId: string,
+    public readonly tuitionPlanId: string,
+    public readonly cancelledInstallmentIds: string[],
+    public readonly newInstallmentIds: string[],
+    public readonly performedBy: string,
   ) {}
 }

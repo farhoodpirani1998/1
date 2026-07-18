@@ -55,7 +55,7 @@ export class TuitionPlansController {
   update(
     @Param('id') id: string,
     @Body() dto: UpdateTuitionPlanDto,
-    @CurrentUser() user: { id: string; schoolId: string },
+    @CurrentUser() user: { id: string; schoolId: string; role: string },
   ) {
     return this.tuitionPlansService.update(id, dto, user, user.schoolId);
   }
