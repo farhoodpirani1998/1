@@ -13,6 +13,7 @@ import { RecordPaymentModal, PayableInstallment } from '../components/RecordPaym
 import { VoidPaymentDialog } from '../components/VoidPaymentDialog';
 import { FormError } from '../components/FormError';
 import { Input } from '../components/Input';
+import { AmountInput } from '../components/AmountInput';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { PersianDatePicker } from '../components/PersianDatePicker';
 import { formatToman, formatDate } from '../lib/format';
@@ -462,7 +463,7 @@ function TuitionPlanDiscountCard({
   const { showSuccess, showError } = useToast();
   const updatePlan = useUpdateTuitionPlan();
   const [showForm, setShowForm] = useState(false);
-  const [discountAmount, setDiscountAmount] = useState(plan.discountAmount);
+  const [discountAmount, setDiscountAmount] = useState<number | ''>(plan.discountAmount);
   const [discountReason, setDiscountReason] = useState(plan.discountReason ?? '');
   const [error, setError] = useState<ParsedApiError | null>(null);
 
@@ -470,7 +471,11 @@ function TuitionPlanDiscountCard({
     e.preventDefault();
     setError(null);
     updatePlan.mutate(
-      { planId: plan.id, studentId, dto: { discountAmount, discountReason: discountReason || undefined } },
+      {
+        planId: plan.id,
+        studentId,
+        dto: { discountAmount: discountAmount === '' ? 0 : discountAmount, discountReason: discountReason || undefined },
+      },
       {
         onSuccess: () => {
           showSuccess('برنامه شهریه به‌روزرسانی شد');
@@ -513,13 +518,12 @@ function TuitionPlanDiscountCard({
             disabled
             containerClassName="opacity-70"
           />
-          <Input
+          <AmountInput
             label="مبلغ تخفیف (تومان)"
-            type="number"
             min={0}
             max={plan.baseAmount}
             value={discountAmount}
-            onChange={(e) => setDiscountAmount(Number(e.target.value))}
+            onChange={setDiscountAmount}
           />
           <Input label="دلیل تخفیف" value={discountReason} onChange={(e) => setDiscountReason(e.target.value)} />
           <div className="sm:col-span-3">
@@ -606,26 +610,17 @@ function CreateTuitionPlanForm({ studentId }: { studentId: string }) {
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink">شهریه پایه (تومان)</label>
-          <input
-            type="number"
+          <AmountInput
             required
             min={0}
             value={baseAmount}
-            onChange={(e) => setBaseAmount(e.target.value ? Number(e.target.value) : '')}
-            placeholder="مثلاً ۵۰۰۰۰۰۰"
-            className="input tabular"
+            onChange={setBaseAmount}
+            placeholder="مثلاً ۵٬۰۰۰٬۰۰۰"
           />
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink">مبلغ تخفیف (تومان، اختیاری)</label>
-          <input
-            type="number"
-            min={0}
-            value={discountAmount}
-            onChange={(e) => setDiscountAmount(e.target.value ? Number(e.target.value) : '')}
-            placeholder="بدون تخفیف"
-            className="input tabular"
-          />
+          <AmountInput min={0} value={discountAmount} onChange={setDiscountAmount} placeholder="بدون تخفیف" />
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink">دلیل / توضیح تخفیف (اختیاری)</label>
@@ -656,14 +651,15 @@ function GenerateInstallmentsForm({
 }) {
   const { showSuccess, showError } = useToast();
   const generateInstallments = useGenerateInstallments();
-  const [count, setCount] = useState(10);
+  const [count, setCount] = useState<number | ''>('');
   const [startDate, setStartDate] = useState('');
-  const [intervalDays, setIntervalDays] = useState(30);
+  const [intervalDays, setIntervalDays] = useState<number | ''>('');
   const [error, setError] = useState<ParsedApiError | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    if (count === '' || intervalDays === '') return;
     generateInstallments.mutate(
       { planId, dto: { count, startDate, intervalDays } },
       {
@@ -688,7 +684,8 @@ function GenerateInstallmentsForm({
             min={1}
             max={24}
             value={count}
-            onChange={(e) => setCount(Number(e.target.value))}
+            onChange={(e) => setCount(e.target.value ? Number(e.target.value) : '')}
+            placeholder="مثلاً ۱۰"
             className="input tabular"
           />
         </div>
@@ -703,7 +700,8 @@ function GenerateInstallmentsForm({
             required
             min={1}
             value={intervalDays}
-            onChange={(e) => setIntervalDays(Number(e.target.value))}
+            onChange={(e) => setIntervalDays(e.target.value ? Number(e.target.value) : '')}
+            placeholder="مثلاً ۳۰"
             className="input tabular"
           />
         </div>

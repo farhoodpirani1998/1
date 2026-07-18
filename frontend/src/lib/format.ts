@@ -6,8 +6,15 @@ export function toPersianDigits(input: string | number): string {
   return String(input).replace(/[0-9]/g, (d) => persianDigits[Number(d)]);
 }
 
+// Inverse of toPersianDigits — needed because a Persian keyboard types
+// ۰-۹ directly, so any input we parse back into a number (AmountInput)
+// has to accept both digit sets.
+export function toEnglishDigits(input: string): string {
+  return input.replace(/[۰-۹]/g, (d) => String(persianDigits.indexOf(d)));
+}
+
 export function formatToman(amount: number): string {
-  const grouped = Math.round(amount).toLocaleString('en-US');
+  const grouped = Math.round(amount).toLocaleString('en-US').replace(/,/g, '٬');
   return toPersianDigits(grouped) + ' تومان';
 }
 

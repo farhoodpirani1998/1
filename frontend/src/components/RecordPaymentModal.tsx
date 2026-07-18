@@ -5,6 +5,7 @@ import { useToast } from '../lib/toast';
 import { useCreatePayment } from '../hooks/usePayments';
 import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
 import { FormError } from './FormError';
+import { AmountInput } from './AmountInput';
 
 export interface PayableInstallment {
   id: string;
@@ -56,7 +57,7 @@ export function RecordPaymentModal({
   const navigate = useNavigate();
   const createPayment = useCreatePayment();
   const remaining = installment.amount - installment.paidAmount;
-  const [amount, setAmount] = useState(remaining);
+  const [amount, setAmount] = useState<number | ''>(remaining);
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card_to_card' | 'cheque'>('card_to_card');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [error, setError] = useState<ParsedApiError | null>(null);
@@ -74,6 +75,7 @@ export function RecordPaymentModal({
 
   function handleSubmit() {
     setError(null);
+    if (amount === '') return;
     createPayment.mutate(
       {
         installmentId: installment.id,
@@ -121,14 +123,13 @@ export function RecordPaymentModal({
             </h3>
             <p className="mb-4 text-sm text-ink/60">باقیمانده: {formatToman(remaining)}</p>
 
-            <label className="mb-1.5 block text-sm font-medium text-ink">مبلغ پرداختی (تومان)</label>
-            <input
-              type="number"
+            <AmountInput
+              label="مبلغ پرداختی (تومان)"
               value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
+              onChange={setAmount}
               max={remaining}
               min={1}
-              className="input mb-4 tabular"
+              containerClassName="mb-4"
             />
 
             <label className="mb-1.5 block text-sm font-medium text-ink">روش پرداخت</label>
