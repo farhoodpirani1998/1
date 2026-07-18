@@ -250,6 +250,7 @@ export function InstallmentsPage() {
         </FilterBar>
 
         <Table
+          stickyHeader
           columns={columns}
           data={pageItems}
           rowKey={(inst) => inst.id}

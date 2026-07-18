@@ -11,11 +11,20 @@ import {
   Tooltip,
 } from 'recharts';
 import { Card } from '../../components/Card';
+import { EmptyState } from '../../components/EmptyState';
 import { SectionHeader } from '../../components/SectionHeader';
 import { StatCard } from '../../components/StatCard';
 import { KPICard } from '../../components/KPICard';
 import { Table, type TableColumn } from '../../components/Table';
 import { SkeletonCards, SkeletonRows } from '../../components/Skeleton';
+import {
+  TuitionIcon,
+  CheckIcon,
+  AlertIcon,
+  StudentsIcon,
+  AttendanceIcon,
+  ScoreIcon,
+} from '../../components/icons/StatIcons';
 import { formatToman, formatDate, toPersianDigits, paymentMethodLabels } from '../../lib/format';
 import { useFounderSchoolDashboard } from '../../hooks/useFounder';
 import type {
@@ -152,7 +161,7 @@ export function FounderSchoolDashboardPage() {
           {loading ? (
             <SkeletonRows rows={3} cols={4} />
           ) : paymentTrendPoints.length === 0 ? (
-            <p className="py-6 text-center text-sm text-ink/50 dark:text-paper/50">داده‌ای برای نمایش وجود ندارد.</p>
+            <EmptyState message="داده‌ای برای نمایش وجود ندارد." />
           ) : (
             <div dir="ltr" className="h-56">
               <ResponsiveContainer width="100%" height="100%">
@@ -172,7 +181,7 @@ export function FounderSchoolDashboardPage() {
           {loading ? (
             <SkeletonRows rows={3} cols={4} />
           ) : registrationPoints.length === 0 ? (
-            <p className="py-6 text-center text-sm text-ink/50 dark:text-paper/50">داده‌ای برای نمایش وجود ندارد.</p>
+            <EmptyState message="داده‌ای برای نمایش وجود ندارد." />
           ) : (
             <div dir="ltr" className="h-56">
               <ResponsiveContainer width="100%" height="100%">
@@ -262,55 +271,4 @@ export function FounderSchoolDashboardPage() {
   );
 }
 
-function TuitionIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="6" width="18" height="13" rx="2" />
-      <path d="M3 10h18M8 15h3" />
-    </svg>
-  );
-}
 
-function CheckIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="m5 13 4 4L19 7" />
-    </svg>
-  );
-}
-
-function AlertIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 8v5M12 16h.01" />
-    </svg>
-  );
-}
-
-function StudentsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="8" r="3.2" />
-      <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
-    </svg>
-  );
-}
-
-function AttendanceIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="4" width="18" height="17" rx="2" />
-      <path d="M3 9h18M8 2v4M16 2v4m-8 7 2 2 4-4" />
-    </svg>
-  );
-}
-
-function ScoreIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M12 2 2 7l10 5 10-5-10-5Z" />
-      <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
-    </svg>
-  );
-}

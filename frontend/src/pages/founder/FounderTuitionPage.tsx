@@ -34,11 +34,20 @@ export function FounderTuitionPage() {
       {loading ? (
         <SkeletonCards count={4} />
       ) : (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard label="کل شهریه" value={formatToman(data?.totalTuition ?? 0)} icon={<TuitionIcon />} />
-          <StatCard label="دریافت‌شده" value={formatToman(data?.totalPaid ?? 0)} accent="paid" icon={<CheckIcon />} />
-          <StatCard label="باقی‌مانده" value={formatToman(data?.totalUnpaid ?? 0)} accent="warning" icon={<ListIcon />} />
-          <StatCard label="مبلغ معوق" value={formatToman(data?.overdue.totalOverdueAmount ?? 0)} accent="overdue" icon={<AlertIcon />} />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <StatCard
+            size="lg"
+            label="باقی‌مانده کل"
+            value={formatToman(data?.totalUnpaid ?? 0)}
+            accent="warning"
+            icon={<ListIcon />}
+            className="lg:col-span-1"
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:col-span-2">
+            <StatCard label="کل شهریه" value={formatToman(data?.totalTuition ?? 0)} icon={<TuitionIcon />} />
+            <StatCard label="دریافت‌شده" value={formatToman(data?.totalPaid ?? 0)} accent="paid" icon={<CheckIcon />} />
+            <StatCard label="مبلغ معوق" value={formatToman(data?.overdue.totalOverdueAmount ?? 0)} accent="overdue" icon={<AlertIcon />} />
+          </div>
         </div>
       )}
 

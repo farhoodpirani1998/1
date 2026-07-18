@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { SkeletonRows } from '../components/Skeleton';
+import { EmptyState } from '../components/EmptyState';
 import { useToast } from '../lib/toast';
 import { getErrorMessage } from '../lib/error-handler';
 import { useStudents, useRestoreStudent } from '../hooks/useStudents';
@@ -42,7 +43,7 @@ export function ArchivedStudentsPage() {
         {loading ? (
           <SkeletonRows rows={4} cols={4} />
         ) : students.length === 0 ? (
-          <div className="py-8 text-center text-sm text-ink/50">دانش‌آموز غیرفعالی وجود ندارد.</div>
+          <EmptyState message="دانش‌آموز غیرفعالی وجود ندارد." />
         ) : (
           <table className="w-full text-sm">
             <thead>

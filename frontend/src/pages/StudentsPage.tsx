@@ -17,8 +17,10 @@ import { FormError } from '../components/FormError';
 import { exportToExcel } from '../lib/exportExcel';
 import type { Student, Grade, AcademicYear } from '../types/student.types';
 import { useStudents, useCreateStudent, useGrades, useAcademicYears } from '../hooks/useStudents';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 
 const PAGE_SIZE = 10;
+const SEARCH_DEBOUNCE_MS = 300;
 
 const statusLabels: Record<Student['status'], string> = {
   active: 'فعال',
@@ -68,18 +70,18 @@ export function StudentsPage() {
     () => Boolean((location.state as { openCreateForm?: boolean } | null)?.openCreateForm),
   );
   const [search, setSearch] = useState('');
-  // Search is submit-triggered (not live-as-you-type) — matches the
-  // original behavior exactly. This is the value actually sent to the
-  // API / used in the query key; `search` above is just the input's
-  // live text.
-  const [submittedSearch, setSubmittedSearch] = useState('');
+  // Search is live-as-you-type, debounced by SEARCH_DEBOUNCE_MS so it
+  // doesn't refetch on every keystroke. `debouncedSearch` is the value
+  // actually sent to the API / used in the query key; `search` above is
+  // just the input's live text.
+  const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
   const [gradeId, setGradeId] = useState('');
   const [academicYearId, setAcademicYearId] = useState('');
   const [page, setPage] = useState(1);
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
 
   const studentsQuery = useStudents({
-    ...(submittedSearch ? { search: submittedSearch } : {}),
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(gradeId ? { gradeId } : {}),
     ...(academicYearId ? { academicYearId } : {}),
   });
@@ -92,23 +94,12 @@ export function StudentsPage() {
   const academicYears = academicYearsQuery.data ?? [];
   const loading = studentsQuery.isLoading;
 
-  function runSearch() {
-    setPage(1);
-    setSubmittedSearch(search);
-  }
-
-  function handleSearch(e: FormEvent) {
-    e.preventDefault();
-    runSearch();
-  }
-
-  // Grade/AcademicYear selects apply immediately (unlike search, which is
-  // submit-triggered) — reset to page 1 whenever either changes so
-  // pagination can't be left pointing at a page that no longer exists
-  // under the narrower result set.
+  // Reset to page 1 whenever any filter narrows/widens the result set —
+  // search (debounced), grade, or academic year — so pagination can't be
+  // left pointing at a page that no longer exists under the new results.
   useEffect(() => {
     setPage(1);
-  }, [gradeId, academicYearId]);
+  }, [debouncedSearch, gradeId, academicYearId]);
 
   function handleExport() {
     exportToExcel(
@@ -123,6 +114,11 @@ export function StudentsPage() {
       })),
     );
   }
+
+  // Distinguishes "the roster is genuinely empty" (show an inviting
+  // add-student CTA) from "a search/filter just happens to match nothing"
+  // (show a plain no-results message instead).
+  const isFiltered = Boolean(debouncedSearch || gradeId || academicYearId);
 
   const pageCount = Math.max(1, Math.ceil(students.length / PAGE_SIZE));
   const pageItems = useMemo(() => paginate(students, page, PAGE_SIZE), [students, page]);
@@ -261,18 +257,13 @@ export function StudentsPage() {
             </>
           }
         >
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <SearchInput
-              value={search}
-              onChange={setSearch}
-              onSubmit={runSearch}
-              placeholder="جستجو با نام..."
-              containerClassName="w-56 sm:w-64"
-            />
-            <Button type="submit" variant="secondary">
-              جستجو
-            </Button>
-          </form>
+          <SearchInput
+            value={search}
+            onChange={setSearch}
+            onClear={() => setSearch('')}
+            placeholder="جستجو با نام..."
+            containerClassName="w-56 sm:w-64"
+          />
           <Select
             value={gradeId}
             onChange={(e) => setGradeId(e.target.value)}
@@ -294,13 +285,24 @@ export function StudentsPage() {
         </FilterBar>
 
         <Table
+          stickyHeader
           columns={columns}
           data={pageItems}
           rowKey={(s) => s.id}
           loading={loading}
           skeletonRows={6}
-          emptyMessage="هنوز دانش‌آموزی ثبت نشده است."
-          emptyDescription={submittedSearch ? 'برای این جستجو نتیجه‌ای یافت نشد.' : undefined}
+          emptyMessage={isFiltered ? 'دانش‌آموزی با این مشخصات یافت نشد.' : 'هنوز دانش‌آموزی ثبت نشده است.'}
+          emptyDescription={
+            isFiltered ? 'جستجو یا فیلترها را تغییر دهید.' : 'برای شروع، اولین دانش‌آموز مدرسه را ثبت کنید.'
+          }
+          emptyIcon={isFiltered ? undefined : <StudentsEmptyIcon />}
+          emptyAction={
+            isFiltered ? undefined : (
+              <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
+                + همین حالا اضافه کنید
+              </Button>
+            )
+          }
         />
 
         {!loading && students.length > 0 && <Pagination page={page} pageCount={pageCount} onChange={setPage} />}
@@ -337,6 +339,18 @@ function AlertIcon() {
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <circle cx="12" cy="12" r="9" />
       <path d="M12 8v5M12 16h.01" />
+    </svg>
+  );
+}
+
+function StudentsEmptyIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M2.5 20.5c0-3.5 3-6.2 6.5-6.2s6.5 2.7 6.5 6.2" />
+      <circle cx="18" cy="8.5" r="2.4" />
+      <path d="M17.5 14.5c2.8.4 5 2.7 5 5.6" />
+      <path d="M9 8v.01M9 3v1M9 12v1" opacity="0.5" />
     </svg>
   );
 }

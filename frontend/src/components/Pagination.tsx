@@ -1,26 +1,86 @@
 import type { ReactNode } from 'react';
 import { toPersianDigits } from '../lib/format';
 
-// Client-side pagination — the backend list endpoints used here
+interface PaginationProps {
+  page: number;
+  onChange: (page: number) => void;
+  /** Total page count — used for the numbered mode (client-side slicing
+   *  over an already-fetched array, e.g. StudentsPage/ReportsPage). */
+  pageCount?: number;
+  /** For server-paginated lists where the backend returns a plain array
+   *  with no total count (e.g. FounderStudentsPage's /founder/schools/:id/students) —
+   *  pass whether the current page came back full, and this renders a
+   *  simple prev/"صفحه N"/next control instead of numbered buttons, sharing
+   *  the same PageButton styling so both modes look like one component. */
+  hasNextPage?: boolean;
+}
+
+// Client-side pagination by default — the backend list endpoints used here
 // (`/students`, `/installments`) don't support page/limit query params
 // today, so this slices an already-fetched array rather than requesting
-// pages from the server. Swap for server-side paging later without
-// touching callers if the backend adds it.
-export function Pagination({
-  page,
-  pageCount,
-  onChange,
-}: {
-  page: number;
-  pageCount: number;
-  onChange: (page: number) => void;
-}) {
-  if (pageCount <= 1) return null;
+// pages from the server. Pass `hasNextPage` instead of `pageCount` for
+// server-paginated lists that don't expose a total (see FounderStudentsPage).
+export function Pagination({ page, pageCount, hasNextPage, onChange }: PaginationProps) {
+  if (pageCount !== undefined) {
+    if (pageCount <= 1) return null;
 
-  const pageNumbers = getPageWindow(page, pageCount);
+    const pageNumbers = getPageWindow(page, pageCount);
+
+    return (
+      <div className="mt-4 flex items-center justify-center gap-1.5">
+        <PageButton
+          label="قبلی"
+          disabled={page <= 1}
+          onClick={() => onChange(page - 1)}
+          icon={
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="m15 6-6 6 6 6" />
+            </svg>
+          }
+        />
+
+        <div className="flex items-center gap-1">
+          {pageNumbers.map((p, i) =>
+            p === 'ellipsis' ? (
+              <span key={`e-${i}`} className="px-1.5 text-sm text-ink/35 dark:text-paper/35">
+                …
+              </span>
+            ) : (
+              <button
+                key={p}
+                onClick={() => onChange(p)}
+                aria-current={p === page ? 'page' : undefined}
+                className={`tabular h-8 min-w-[2rem] rounded-lg px-2 text-sm font-medium transition-colors ${
+                  p === page
+                    ? 'bg-action text-white shadow-[0_1px_2px_rgba(37,99,235,0.35)]'
+                    : 'text-ink/60 hover:bg-paper dark:text-paper/60 dark:hover:bg-white/10'
+                }`}
+              >
+                {toPersianDigits(p)}
+              </button>
+            ),
+          )}
+        </div>
+
+        <PageButton
+          label="بعدی"
+          disabled={page >= pageCount}
+          onClick={() => onChange(page + 1)}
+          icon={
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="m9 6 6 6-6 6" />
+            </svg>
+          }
+        />
+      </div>
+    );
+  }
+
+  // Simple mode: no known total, just prev/next driven by hasNextPage.
+  if (page <= 1 && !hasNextPage) return null;
 
   return (
-    <div className="mt-4 flex items-center justify-center gap-1.5">
+    <div className="mt-4 flex items-center justify-center gap-3">
       <PageButton
         label="قبلی"
         disabled={page <= 1}
@@ -31,33 +91,10 @@ export function Pagination({
           </svg>
         }
       />
-
-      <div className="flex items-center gap-1">
-        {pageNumbers.map((p, i) =>
-          p === 'ellipsis' ? (
-            <span key={`e-${i}`} className="px-1.5 text-sm text-ink/35 dark:text-paper/35">
-              …
-            </span>
-          ) : (
-            <button
-              key={p}
-              onClick={() => onChange(p)}
-              aria-current={p === page ? 'page' : undefined}
-              className={`tabular h-8 min-w-[2rem] rounded-lg px-2 text-sm font-medium transition-colors ${
-                p === page
-                  ? 'bg-action text-white shadow-[0_1px_2px_rgba(37,99,235,0.35)]'
-                  : 'text-ink/60 hover:bg-paper dark:text-paper/60 dark:hover:bg-white/10'
-              }`}
-            >
-              {toPersianDigits(p)}
-            </button>
-          ),
-        )}
-      </div>
-
+      <span className="tabular text-sm text-ink/60 dark:text-paper/60">صفحه {toPersianDigits(page)}</span>
       <PageButton
         label="بعدی"
-        disabled={page >= pageCount}
+        disabled={!hasNextPage}
         onClick={() => onChange(page + 1)}
         icon={
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

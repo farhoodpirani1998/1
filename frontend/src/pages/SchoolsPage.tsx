@@ -249,6 +249,7 @@ export function SchoolsPage() {
         </FilterBar>
 
         <Table
+          stickyHeader
           columns={columns}
           data={filteredSchools}
           rowKey={(s) => s.id}

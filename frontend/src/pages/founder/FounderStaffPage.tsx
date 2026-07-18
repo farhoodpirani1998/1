@@ -37,6 +37,7 @@ export function FounderStaffPage() {
   return (
     <Card>
       <Table
+          stickyHeader
         columns={columns}
         data={staff}
         rowKey={(u) => u.id}

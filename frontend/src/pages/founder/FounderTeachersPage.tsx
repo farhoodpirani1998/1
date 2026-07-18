@@ -60,6 +60,7 @@ export function FounderTeachersPage() {
   return (
     <Card>
       <Table
+          stickyHeader
         columns={columns}
         data={teachers}
         rowKey={(t) => t.id}

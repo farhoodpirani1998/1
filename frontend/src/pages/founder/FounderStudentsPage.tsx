@@ -1,14 +1,17 @@
-import { useEffect, useState, FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card } from '../../components/Card';
 import { SearchInput } from '../../components/SearchInput';
 import { Select } from '../../components/Select';
 import { FilterBar } from '../../components/FilterBar';
 import { Table, type TableColumn } from '../../components/Table';
+import { Pagination } from '../../components/Pagination';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import { useFounderSchoolStudents } from '../../hooks/useFounder';
 import type { FounderStudent, FounderStudentStatus } from '../../types/founder.types';
 
 const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 300;
 
 const statusLabels: Record<FounderStudentStatus, string> = {
   active: 'فعال',
@@ -31,6 +34,17 @@ function StudentStatusBadge({ status }: { status: FounderStudentStatus }) {
   );
 }
 
+function StudentsEmptyIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M2.5 20.5c0-3.5 3-6.2 6.5-6.2s6.5 2.7 6.5 6.2" />
+      <circle cx="18" cy="8.5" r="2.4" />
+      <path d="M17.5 14.5c2.8.4 5 2.7 5 5.6" />
+    </svg>
+  );
+}
+
 const STATUS_OPTIONS = [
   { value: '', label: 'همه وضعیت‌ها' },
   { value: 'active', label: statusLabels.active },
@@ -39,37 +53,34 @@ const STATUS_OPTIONS = [
 ];
 
 // Only /founder/schools/:schoolId/students supports server-side page/limit
-// (see founder-frontend-prompt.md §4) — search is submit-triggered (same
-// convention as the school_admin StudentsPage), status filter applies
-// immediately. The backend returns a plain array with no total count, so
-// "next page" is inferred from a full page coming back (see hasNextPage
-// below) rather than a real page count.
+// (see founder-frontend-prompt.md §4). Search is live-as-you-type: `search`
+// is the input's raw value, `debouncedSearch` (via useDebouncedValue, 300ms)
+// is what's actually sent to the API/query key, so fast typing doesn't fire
+// a request per keystroke. Status filter still applies immediately. The
+// backend returns a plain array with no total count, so "next page" is
+// inferred from a full page coming back (see hasNextPage below) rather than
+// a real page count.
 export function FounderStudentsPage() {
   const { schoolId } = useParams<{ schoolId: string }>();
   const [search, setSearch] = useState('');
-  const [submittedSearch, setSubmittedSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
   const [status, setStatus] = useState<FounderStudentStatus | ''>('');
   const [page, setPage] = useState(1);
 
   useEffect(() => {
     setPage(1);
-  }, [status, submittedSearch]);
+  }, [status, debouncedSearch]);
 
   const studentsQuery = useFounderSchoolStudents(schoolId, {
     page,
     limit: PAGE_SIZE,
     ...(status ? { status } : {}),
-    ...(submittedSearch ? { search: submittedSearch } : {}),
+    ...(debouncedSearch ? { search: debouncedSearch } : {}),
   });
 
   const students = studentsQuery.data ?? [];
   const loading = studentsQuery.isLoading;
   const hasNextPage = students.length === PAGE_SIZE;
-
-  function runSearch(e: FormEvent) {
-    e.preventDefault();
-    setSubmittedSearch(search);
-  }
 
   const columns: TableColumn<FounderStudent>[] = [
     {
@@ -85,45 +96,36 @@ export function FounderStudentsPage() {
 
   return (
     <Card>
-      <form onSubmit={runSearch}>
-        <FilterBar>
-          <SearchInput value={search} onChange={setSearch} onSubmit={() => setSubmittedSearch(search)} placeholder="جستجوی نام دانش‌آموز..." containerClassName="w-56 sm:w-64" />
-          <Select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as FounderStudentStatus | '')}
-            options={STATUS_OPTIONS}
-            containerClassName="w-40"
-          />
-        </FilterBar>
-      </form>
+      <FilterBar>
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          onClear={() => setSearch('')}
+          placeholder="جستجوی نام دانش‌آموز..."
+          containerClassName="w-56 sm:w-64"
+        />
+        <Select
+          value={status}
+          onChange={(e) => setStatus(e.target.value as FounderStudentStatus | '')}
+          options={STATUS_OPTIONS}
+          containerClassName="w-40"
+        />
+      </FilterBar>
 
       <Table
+        stickyHeader
         columns={columns}
         data={students}
         rowKey={(s) => s.id}
         loading={loading}
         skeletonRows={8}
-        emptyMessage="دانش‌آموزی یافت نشد."
+        emptyMessage={debouncedSearch || status ? 'دانش‌آموزی با این مشخصات یافت نشد.' : 'هنوز دانش‌آموزی در این مدرسه ثبت نشده است.'}
+        emptyDescription={debouncedSearch ? 'برای این جستجو نتیجه‌ای پیدا نشد؛ املا را بررسی کنید.' : undefined}
+        emptyIcon={debouncedSearch || status ? undefined : <StudentsEmptyIcon />}
       />
 
-      {!loading && (page > 1 || hasNextPage) && (
-        <div className="mt-4 flex items-center justify-center gap-3">
-          <button
-            disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink/70 transition-colors hover:bg-paper disabled:pointer-events-none disabled:opacity-35 dark:border-white/15 dark:text-paper/70 dark:hover:bg-white/10"
-          >
-            قبلی
-          </button>
-          <span className="tabular text-sm text-ink/60 dark:text-paper/60">صفحه {page.toLocaleString('fa-IR')}</span>
-          <button
-            disabled={!hasNextPage}
-            onClick={() => setPage((p) => p + 1)}
-            className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink/70 transition-colors hover:bg-paper disabled:pointer-events-none disabled:opacity-35 dark:border-white/15 dark:text-paper/70 dark:hover:bg-white/10"
-          >
-            بعدی
-          </button>
-        </div>
+      {!loading && (
+        <Pagination page={page} hasNextPage={hasNextPage} onChange={(p) => setPage(Math.max(1, p))} />
       )}
     </Card>
   );

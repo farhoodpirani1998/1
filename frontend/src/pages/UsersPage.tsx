@@ -258,6 +258,7 @@ export function UsersPage() {
         </FilterBar>
 
         <Table
+          stickyHeader
           columns={columns}
           data={filteredUsers}
           rowKey={(u) => u.id}

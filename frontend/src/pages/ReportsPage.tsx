@@ -9,7 +9,7 @@ import { Table, type TableColumn } from '../components/Table';
 import { Pagination, paginate } from '../components/Pagination';
 import { Button } from '../components/Button';
 import { SkeletonRows } from '../components/Skeleton';
-import { formatToman, toPersianDigits } from '../lib/format';
+import { formatToman, toPersianDigits, splitCurrencyValue } from '../lib/format';
 import { exportToExcel } from '../lib/exportExcel';
 import type { InstallmentStatus } from '../types/tuition.types';
 import type { DebtorStudent } from '../types/report.types';
@@ -276,10 +276,14 @@ function DebtorStudentsPanel() {
 }
 
 function StatBox({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+  const { amount, unit } = splitCurrencyValue(value);
   return (
     <div className="rounded-xl border border-line bg-white p-5 shadow-card">
       <div className="text-sm text-ink/60">{label}</div>
-      <div className={`tabular mt-2 text-xl font-bold ${accent ? 'text-overdue' : 'text-ink'}`}>{value}</div>
+      <div className={`tabular mt-2 text-xl font-bold ${accent ? 'text-overdue' : 'text-ink'}`}>
+        {amount}
+        {unit && <span className="mr-1 text-[0.5em] font-normal text-ink/40">{unit}</span>}
+      </div>
     </div>
   );
 }

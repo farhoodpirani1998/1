@@ -160,7 +160,7 @@ export function FounderOverviewPage() {
           </div>
 
           <Card title="مدرسه‌ها" className="mt-6">
-            <Table columns={columns} data={schools} rowKey={(s) => s.schoolId} />
+            <Table stickyHeader columns={columns} data={schools} rowKey={(s) => s.schoolId} />
           </Card>
         </>
       )}

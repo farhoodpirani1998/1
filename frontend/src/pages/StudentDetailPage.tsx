@@ -19,6 +19,7 @@ import { useAuth } from '../lib/auth';
 import { hasPermission, Permission } from '../lib/permissions';
 import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
 import type { StudentStatus, Student, Grade } from '../types/student.types';
+import type { Payment } from '../types/payment.types';
 import { useStudent } from '../hooks/useStudent';
 import { useUpdateStudent, useGrades, useAcademicYears } from '../hooks/useStudents';
 import { useStudentStatement } from '../hooks/useReports';
@@ -101,7 +102,7 @@ export function StudentDetailPage() {
   const voidPayment = useVoidPayment();
 
   const [payingInstallment, setPayingInstallment] = useState<PayableInstallment | null>(null);
-  const [voidingPaymentId, setVoidingPaymentId] = useState<string | null>(null);
+  const [voidingPayment, setVoidingPayment] = useState<Payment | null>(null);
   const [voidError, setVoidError] = useState<ParsedApiError | null>(null);
   const [expandedInstallment, setExpandedInstallment] = useState<string | null>(null);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -110,14 +111,14 @@ export function StudentDetailPage() {
   const student = studentQuery.data ?? null;
 
   function handleVoidPayment(reason: string) {
-    if (!voidingPaymentId || !id) return;
+    if (!voidingPayment || !id) return;
     setVoidError(null);
     voidPayment.mutate(
-      { paymentId: voidingPaymentId, reason, studentId: id },
+      { paymentId: voidingPayment.id, reason, studentId: id },
       {
         onSuccess: () => {
           showSuccess('پرداخت لغو شد');
-          setVoidingPaymentId(null);
+          setVoidingPayment(null);
         },
         onError: (err) => {
           setVoidError(parseApiError(err));
@@ -366,7 +367,7 @@ export function StudentDetailPage() {
                                       </button>
                                       {canVoidPayments && (
                                         <button
-                                          onClick={() => setVoidingPaymentId(p.id)}
+                                          onClick={() => setVoidingPayment(p)}
                                           className="text-overdue hover:underline"
                                         >
                                           لغو پرداخت
@@ -399,12 +400,15 @@ export function StudentDetailPage() {
         />
       )}
 
-      {voidingPaymentId && (
+      {voidingPayment && (
         <VoidPaymentDialog
+          amount={voidingPayment.amount}
+          paidAt={voidingPayment.paidAt}
+          studentName={statement?.student.fullName ?? ''}
           error={voidError}
           onConfirm={handleVoidPayment}
           onCancel={() => {
-            setVoidingPaymentId(null);
+            setVoidingPayment(null);
             setVoidError(null);
           }}
         />
