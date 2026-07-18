@@ -19,6 +19,7 @@ import type { Student, Grade, AcademicYear } from '../types/student.types';
 import { useStudents, useCreateStudent, useGrades, useAcademicYears } from '../hooks/useStudents';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { UsersIcon, CheckIcon, AlertIcon, CalendarIcon } from '../components/icons/SchoolIcons';
+import { BulkImportStudentsPanel } from '../components/BulkImportStudentsPanel';
 
 const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -70,6 +71,7 @@ export function StudentsPage() {
   const [showForm, setShowForm] = useState(
     () => Boolean((location.state as { openCreateForm?: boolean } | null)?.openCreateForm),
   );
+  const [showBulkImport, setShowBulkImport] = useState(false);
   const [search, setSearch] = useState('');
   // Search is live-as-you-type, debounced by SEARCH_DEBOUNCE_MS so it
   // doesn't refetch on every keystroke. `debouncedSearch` is the value
@@ -189,9 +191,26 @@ export function StudentsPage() {
         title="دانش‌آموزان"
         description="مدیریت اطلاعات، وضعیت ثبت‌نام و صورت‌حساب دانش‌آموزان"
         actions={
-          <Button variant={showForm ? 'secondary' : 'primary'} onClick={() => setShowForm((v) => !v)}>
-            {showForm ? 'انصراف' : '+ دانش‌آموز جدید'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant={showBulkImport ? 'secondary' : 'ghost'}
+              onClick={() => {
+                setShowBulkImport((v) => !v);
+                setShowForm(false);
+              }}
+            >
+              {showBulkImport ? 'انصراف' : 'آپلود اکسل'}
+            </Button>
+            <Button
+              variant={showForm ? 'secondary' : 'primary'}
+              onClick={() => {
+                setShowForm((v) => !v);
+                setShowBulkImport(false);
+              }}
+            >
+              {showForm ? 'انصراف' : '+ دانش‌آموز جدید'}
+            </Button>
+          </div>
         }
       />
 
@@ -243,6 +262,10 @@ export function StudentsPage() {
             });
           }}
         />
+      )}
+
+      {showBulkImport && (
+        <BulkImportStudentsPanel grades={grades} academicYears={academicYears} onClose={() => setShowBulkImport(false)} />
       )}
 
       <Card className="mt-6">

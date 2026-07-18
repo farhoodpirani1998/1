@@ -15,6 +15,7 @@ import {
   updateStudent,
   archiveStudent,
   restoreStudent,
+  bulkImportStudents,
   type QueryStudentsParams,
   type CreateStudentInput,
   type UpdateStudentInput,
@@ -89,6 +90,20 @@ export function useRestoreStudent() {
     onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.students.lists() });
       queryClient.invalidateQueries({ queryKey: queryKeys.students.detail(id) });
+    },
+  });
+}
+
+// POST /students/bulk-import — see BulkImportStudentsPanel.tsx. Any
+// number of rows may have actually been created even when the mutation
+// "succeeds" as a whole (per-row results, never all-or-nothing), so the
+// students lists are invalidated the same way useCreateStudent does.
+export function useBulkImportStudents() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (rows: CreateStudentInput[]) => bulkImportStudents(rows).then((res) => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.students.lists() });
     },
   });
 }

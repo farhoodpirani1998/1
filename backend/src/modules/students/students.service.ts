@@ -26,6 +26,7 @@ import {
 import { GuardiansService } from './guardians.service';
 import { normalizePagination } from '../../common/utils/pagination';
 import { Role } from '../../common/authorization/roles.enum';
+import type { BulkImportRowResult, BulkImportStudentsResult } from './dto/bulk-import-result.dto';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -117,6 +118,46 @@ export class StudentsService {
 
       return manager.getRepository(Student).save(student);
     });
+  }
+
+  // Sprint 1 (Bulk Import): row-by-row wrapper around create() above —
+  // deliberately not one big transaction. A single bad row (duplicate
+  // nationalId, unknown gradeId, etc.) must not roll back or block every
+  // other valid row in the same file, since the caller is importing a
+  // whole spreadsheet at once and wants to know exactly which rows
+  // succeeded. Each row still gets its own transaction via create(), so
+  // a row is either fully created (student + guardian) or not created
+  // at all — never half-written.
+  async bulkImport(dtos: CreateStudentDto[], schoolId: string): Promise<BulkImportStudentsResult> {
+    const results: BulkImportRowResult[] = [];
+
+    for (let index = 0; index < dtos.length; index++) {
+      try {
+        const student = await this.create(dtos[index], schoolId);
+        results.push({ index, success: true, studentId: student.id, fullName: student.fullName });
+      } catch (err) {
+        const message =
+          err instanceof BadRequestException ||
+          err instanceof NotFoundException ||
+          err instanceof ForbiddenException
+            ? (err.getResponse() as { message?: string })?.message ?? err.message
+            : 'خطای غیرمنتظره در ثبت این ردیف';
+        results.push({
+          index,
+          success: false,
+          fullName: dtos[index]?.fullName,
+          error: typeof message === 'string' ? message : String(message),
+        });
+      }
+    }
+
+    const successCount = results.filter((r) => r.success).length;
+    return {
+      totalRows: dtos.length,
+      successCount,
+      failureCount: dtos.length - successCount,
+      results,
+    };
   }
 
   async findWithFilters(

@@ -15,6 +15,7 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
 import { CreateStudentParentDto } from './dto/create-student-parent.dto';
+import { BulkImportStudentsDto } from './dto/bulk-import-students.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -37,6 +38,21 @@ export class StudentsController {
     @CurrentUser('schoolId') schoolId: string,
   ) {
     return this.studentsService.create(dto, schoolId);
+  }
+
+  // Sprint 1 (Bulk Import): registers many students from one request
+  // (frontend parses an uploaded spreadsheet client-side and posts the
+  // parsed rows here). Same role gate as create() — this is a variant
+  // of "register a student", not a separate capability. Literal
+  // 'bulk-import' segment, so it never collides with GET/PATCH/DELETE
+  // ':id' below (different path shape, not a route-ordering concern).
+  @Post('bulk-import')
+  @Roles('school_admin', 'staff')
+  bulkImport(
+    @Body() dto: BulkImportStudentsDto,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    return this.studentsService.bulkImport(dto.students, schoolId);
   }
 
   // Full student roster — same sensitivity class as tuition-plans below.

@@ -48,6 +48,26 @@ export function archiveStudent(id: string) {
   return api.delete(`/students/${id}`);
 }
 
+// Sprint 1 (Bulk Import): POST /students/bulk-import — same row shape as
+// CreateStudentInput above, sent as an array. Response is per-row
+// (never all-or-nothing); see BulkImportRowResult below.
+export interface BulkImportRowResult {
+  index: number;
+  success: boolean;
+  studentId?: string;
+  fullName?: string;
+  error?: string;
+}
+export interface BulkImportStudentsResult {
+  totalRows: number;
+  successCount: number;
+  failureCount: number;
+  results: BulkImportRowResult[];
+}
+export function bulkImportStudents(rows: CreateStudentInput[]) {
+  return api.post<BulkImportStudentsResult>('/students/bulk-import', { students: rows });
+}
+
 // Matches CreateStudentParentDto: fullName/phone/password. See
 // POST /students/:id/parent — creates (or, for a sibling sharing a
 // parent, reuses) a parent-portal login and links it to this student.
