@@ -210,8 +210,8 @@ export class FounderService {
           subjectId: a.subjectId,
           subjectTitle: a.subject?.title ?? '',
         })),
-        teacher.schoolId,
-        schoolNameById.get(teacher.schoolId) ?? '',
+        teacher.schoolId!,
+        schoolNameById.get(teacher.schoolId!) ?? '',
       ),
     );
   }
