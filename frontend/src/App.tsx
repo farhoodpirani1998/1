@@ -15,6 +15,9 @@ import { SettingsPage } from './pages/SettingsPage';
 import { SchoolsPage } from './pages/SchoolsPage';
 import { UsersPage } from './pages/UsersPage';
 import { TeacherAssignmentsPage } from './pages/TeacherAssignmentsPage';
+import { GuardiansPage } from './pages/GuardiansPage';
+import { TimetablePage } from './pages/TimetablePage';
+import { AttendancePage } from './pages/AttendancePage';
 import { PrintReceiptPage } from './pages/PrintReceiptPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { HomeRedirect } from './components/HomeRedirect';
@@ -160,6 +163,34 @@ export function App() {
                   element={
                     <RequireRole roles={['school_admin']}>
                       <TeacherAssignmentsPage />
+                    </RequireRole>
+                  }
+                />
+
+                {/* Sprint 2 (Educational Operations): admin-side weekly
+                    class schedule, whole-school attendance-by-date, and
+                    guardian file management. */}
+                <Route
+                  path="/timetable"
+                  element={
+                    <RequireRole roles={['school_admin']}>
+                      <TimetablePage />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/attendance"
+                  element={
+                    <RequireRole roles={['school_admin', 'accountant', 'staff']}>
+                      <AttendancePage />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/guardians"
+                  element={
+                    <RequireRole roles={['school_admin', 'accountant', 'staff']}>
+                      <GuardiansPage />
                     </RequireRole>
                   }
                 />

@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Student } from './entities/student.entity';
 import { Guardian } from './entities/guardian.entity';
 import { StudentsController } from './students.controller';
+import { GuardiansController } from './guardians.controller';
 import { StudentsService } from './students.service';
 import { GuardiansService } from './guardians.service';
 // Phase 5D: GET /students/:id/profile is served by StudentProfileService.
@@ -23,7 +24,7 @@ import { ParentStudent } from '../parent/entities/parent-student.entity';
     TypeOrmModule.forFeature([Student, Guardian, User, ParentStudent]),
     StudentProfileModule,
   ],
-  controllers: [StudentsController],
+  controllers: [StudentsController, GuardiansController],
   providers: [StudentsService, GuardiansService],
   exports: [StudentsService, GuardiansService],
 })

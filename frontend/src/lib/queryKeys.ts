@@ -18,6 +18,9 @@ import type { QueryStudentsParams } from '../api/students.api';
 import type { QueryInstallmentsParams } from '../api/tuition.api';
 import type { FounderSchoolDashboardParams } from '../api/founder.api';
 import type { QueryFounderStudentsParams } from '../types/founder.types';
+import type { QueryGuardiansParams } from '../api/guardians.api';
+import type { QueryTimetableParams } from '../api/timetable.api';
+import type { QueryAttendanceByDateParams } from '../api/attendance.api';
 
 export const queryKeys = {
   students: {
@@ -33,6 +36,29 @@ export const queryKeys = {
     // — uploaded document references shown in StudentDetailPage's
     // "مدارک" section.
     documents: (id: string) => [...queryKeys.students.all(), 'documents', id] as const,
+  },
+
+  guardians: {
+    all: () => ['guardians'] as const,
+    lists: () => [...queryKeys.guardians.all(), 'list'] as const,
+    list: (params?: QueryGuardiansParams) => [...queryKeys.guardians.lists(), params ?? {}] as const,
+    detail: (id: string) => [...queryKeys.guardians.all(), 'detail', id] as const,
+  },
+
+  // Sprint 2 (Educational Operations): school_admin-side weekly class
+  // schedule management. Distinct from queryKeys.teacher.timetable()
+  // above (the signed-in teacher's own read-only view).
+  adminTimetable: {
+    all: () => ['adminTimetable'] as const,
+    list: (params?: QueryTimetableParams) => [...queryKeys.adminTimetable.all(), 'list', params ?? {}] as const,
+  },
+
+  // Sprint 2 (Educational Operations): school_admin-side whole-school
+  // attendance-by-date roster.
+  adminAttendance: {
+    all: () => ['adminAttendance'] as const,
+    byDate: (date: string, params?: QueryAttendanceByDateParams) =>
+      [...queryKeys.adminAttendance.all(), 'byDate', date, params ?? {}] as const,
   },
 
   grades: {

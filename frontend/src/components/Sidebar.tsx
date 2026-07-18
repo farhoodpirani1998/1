@@ -13,6 +13,8 @@ import {
   PaymentsIcon,
   AssignmentsIcon,
   UsersIcon,
+  CalendarIcon,
+  AttendanceIcon,
   type IconProps,
 } from './icons/SchoolIcons';
 
@@ -31,6 +33,12 @@ const navItems: NavItem[] = [
   { to: '/settings', label: 'تنظیمات', icon: SettingsIcon, roles: ['school_admin'] },
   // Sprint 2A: Teacher Assignments admin page (school_admin-only).
   { to: '/teacher-assignments', label: 'تخصیص معلمان', icon: AssignmentsIcon, roles: ['school_admin'] },
+  // Sprint 2 (Educational Operations): admin-side weekly class
+  // schedule, whole-school attendance-by-date, and guardian file
+  // management.
+  { to: '/timetable', label: 'برنامه هفتگی', icon: CalendarIcon, roles: ['school_admin'] },
+  { to: '/attendance', label: 'حضور و غیاب', icon: AttendanceIcon, roles: ['school_admin', 'accountant', 'staff'] },
+  { to: '/guardians', label: 'پرونده والدین', icon: UsersIcon, roles: ['school_admin', 'accountant', 'staff'] },
   { to: '/schools', label: 'مدارس', icon: SchoolsIcon, roles: ['super_admin'] },
   { to: '/users', label: 'کاربران', icon: UsersIcon, roles: ['super_admin'] },
 
