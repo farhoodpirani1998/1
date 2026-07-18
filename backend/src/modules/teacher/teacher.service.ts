@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, IsNull } from 'typeorm';
 import { TeacherAssignment } from './entities/teacher-assignment.entity';
 import { User } from '../users/entities/user.entity';
 import { Student } from '../students/entities/student.entity';
@@ -80,16 +80,26 @@ export class TeacherService {
       throw new ForbiddenException('این پایه متعلق به مدرسه دیگری است');
     }
 
-    const subject = await this.subjectRepo.findOne({ where: { id: dto.subjectId } });
-    if (!subject) {
-      throw new NotFoundException('درس یافت نشد');
-    }
-    if (subject.schoolId !== schoolId) {
-      throw new ForbiddenException('این درس متعلق به مدرسه دیگری است');
+    // subjectId is optional -- see CreateTeacherAssignmentDto. Left out,
+    // it means this teacher covers every subject for the grade (the
+    // elementary-grade case), so there's no subject row to resolve or
+    // tenant-check against.
+    if (dto.subjectId) {
+      const subject = await this.subjectRepo.findOne({ where: { id: dto.subjectId } });
+      if (!subject) {
+        throw new NotFoundException('درس یافت نشد');
+      }
+      if (subject.schoolId !== schoolId) {
+        throw new ForbiddenException('این درس متعلق به مدرسه دیگری است');
+      }
     }
 
     const existing = await this.assignmentRepo.findOne({
-      where: { teacherId: dto.teacherId, gradeId: dto.gradeId, subjectId: dto.subjectId },
+      where: {
+        teacherId: dto.teacherId,
+        gradeId: dto.gradeId,
+        subjectId: dto.subjectId ?? IsNull(),
+      },
       relations: ASSIGNMENT_RELATIONS,
     });
     if (existing) {
@@ -100,7 +110,7 @@ export class TeacherService {
       schoolId,
       teacherId: dto.teacherId,
       gradeId: dto.gradeId,
-      subjectId: dto.subjectId,
+      subjectId: dto.subjectId ?? null,
     });
     const saved = await this.assignmentRepo.save(assignment);
     // save() only returns the columns TypeORM just wrote, not the
@@ -202,7 +212,7 @@ export class TeacherService {
     const seen = new Set<string>();
     const subjects: Subject[] = [];
     for (const a of assignments) {
-      if (!seen.has(a.subjectId)) {
+      if (a.subjectId && a.subject && !seen.has(a.subjectId)) {
         seen.add(a.subjectId);
         subjects.push(a.subject);
       }
@@ -294,8 +304,15 @@ export class TeacherService {
       throw new NotFoundException('دانش‌آموز یافت نشد');
     }
 
+    // A matching row with subjectId === dto.subjectId covers the normal
+    // case; a row with subjectId IS NULL means the teacher was assigned
+    // "all subjects" for this grade (elementary), which covers any
+    // subject too.
     const assignment = await this.assignmentRepo.findOne({
-      where: { teacherId, schoolId, gradeId: student.gradeId, subjectId: dto.subjectId },
+      where: [
+        { teacherId, schoolId, gradeId: student.gradeId, subjectId: dto.subjectId },
+        { teacherId, schoolId, gradeId: student.gradeId, subjectId: IsNull() },
+      ],
     });
     if (!assignment) {
       throw new ForbiddenException('شما برای این کلاس و درس تخصیص ندارید');

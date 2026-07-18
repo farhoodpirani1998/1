@@ -5,7 +5,6 @@ import {
   ManyToOne,
   JoinColumn,
   CreateDateColumn,
-  Unique,
 } from 'typeorm';
 import { School } from '../../schools/entities/school.entity';
 import { User } from '../../users/entities/user.entity';
@@ -19,8 +18,12 @@ import { Subject } from '../../student-assessments/entities/subject.entity';
 // /teacher/* read or write is scoped to only the rows that belong to the
 // caller (see TeacherService), the same way ParentStudent scopes
 // /parent/* to only a parent's own linked children.
+// No @Unique() decorator here: enforcement is via the two partial unique
+// indexes created in TeacherAssignmentSubjectOptional1737800000000
+// (uq_teacher_assignment_subject / uq_teacher_assignment_no_subject) --
+// a single column-list UNIQUE can't express "unique only when subject_id
+// IS NULL" vs "...IS NOT NULL" the way a partial index can.
 @Entity('teacher_assignments')
-@Unique('uq_teacher_assignment', ['teacherId', 'gradeId', 'subjectId'])
 export class TeacherAssignment {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -46,12 +49,16 @@ export class TeacherAssignment {
   @Column({ name: 'grade_id' })
   gradeId: string;
 
-  @ManyToOne(() => Subject, { nullable: false })
+  // Nullable: see migration TeacherAssignmentSubjectOptional1737800000000.
+  // A NULL subject means the teacher covers every subject for this grade
+  // -- the shape elementary grades (پایه ابتدایی) need, since they don't
+  // split instruction by subject the way older grades do.
+  @ManyToOne(() => Subject, { nullable: true })
   @JoinColumn({ name: 'subject_id' })
-  subject: Subject;
+  subject: Subject | null;
 
-  @Column({ name: 'subject_id' })
-  subjectId: string;
+  @Column({ name: 'subject_id', nullable: true })
+  subjectId: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

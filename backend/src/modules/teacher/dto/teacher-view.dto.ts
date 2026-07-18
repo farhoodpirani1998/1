@@ -15,7 +15,7 @@ export interface TeacherProfileView {
     id: string;
     gradeId: string;
     gradeTitle?: string;
-    subjectId: string;
+    subjectId: string | null;
     subjectTitle?: string;
   }>;
 }
@@ -57,7 +57,7 @@ export interface TeacherAssignmentView {
   teacherName?: string;
   gradeId: string;
   gradeTitle?: string;
-  subjectId: string;
+  subjectId: string | null;
   subjectTitle?: string;
   createdAt: Date;
 }
@@ -70,7 +70,10 @@ export function toTeacherAssignmentView(assignment: TeacherAssignment): TeacherA
     gradeId: assignment.gradeId,
     gradeTitle: assignment.grade?.title,
     subjectId: assignment.subjectId,
-    subjectTitle: assignment.subject?.title,
+    // A NULL subjectId means "all subjects" (see TeacherService.assign) --
+    // give the frontend table a real label instead of leaving it to fall
+    // back to the raw id/undefined.
+    subjectTitle: assignment.subjectId ? assignment.subject?.title : 'همه دروس',
     createdAt: assignment.createdAt,
   };
 }

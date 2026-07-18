@@ -6,7 +6,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Not, Repository } from 'typeorm';
+import { Not, Repository, IsNull } from 'typeorm';
 import { TimetableEntry } from './entities/timetable-entry.entity';
 import { AcademicYear } from '../academic-years/entities/academic-year.entity';
 import { Grade } from '../grades/entities/grade.entity';
@@ -287,8 +287,14 @@ export class TimetableService {
     subjectId: string,
     schoolId: string,
   ): Promise<void> {
+    // A matching row with subjectId === subjectId covers the normal case;
+    // a row with subjectId IS NULL means the teacher was assigned "all
+    // subjects" for this grade (elementary), which covers any subject too.
     const assignment = await this.assignmentRepo.findOne({
-      where: { teacherId, gradeId, subjectId, schoolId },
+      where: [
+        { teacherId, gradeId, subjectId, schoolId },
+        { teacherId, gradeId, subjectId: IsNull(), schoolId },
+      ],
     });
     if (!assignment) {
       throw new ForbiddenException('این معلم برای این پایه و درس تخصیص ندارد');

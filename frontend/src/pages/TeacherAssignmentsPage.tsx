@@ -80,16 +80,19 @@ export function TeacherAssignmentsPage() {
 
   function handleCreate(dto: { teacherId: string; gradeId: string; subjectId: string }) {
     setCreateError(null);
-    createAssignment.mutate(dto, {
-      onSuccess: () => {
-        setShowForm(false);
-        showSuccess('تخصیص با موفقیت ثبت شد');
+    createAssignment.mutate(
+      { ...dto, subjectId: dto.subjectId || undefined },
+      {
+        onSuccess: () => {
+          setShowForm(false);
+          showSuccess('تخصیص با موفقیت ثبت شد');
+        },
+        onError: (err) => {
+          setCreateError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
       },
-      onError: (err) => {
-        setCreateError(parseApiError(err));
-        showError(getErrorMessage(err));
-      },
-    });
+    );
   }
 
   function confirmDelete() {
@@ -120,7 +123,8 @@ export function TeacherAssignmentsPage() {
     {
       key: 'subjectId',
       header: 'درس',
-      render: (a) => a.subjectTitle ?? subjectTitleById.get(a.subjectId) ?? a.subjectId,
+      render: (a) =>
+        a.subjectTitle ?? (a.subjectId ? subjectTitleById.get(a.subjectId) ?? a.subjectId : 'همه دروس'),
     },
     {
       key: 'createdAt',
@@ -246,13 +250,16 @@ function CreateAssignmentForm({
           options={grades.map((g) => ({ value: g.id, label: g.title }))}
         />
         <Select
-          required
           label="درس"
           value={subjectId}
           onChange={(e) => setSubjectId(e.target.value)}
           placeholder="انتخاب درس"
           options={subjects.map((s) => ({ value: s.id, label: s.title }))}
-          helperText={subjects.length === 0 ? 'هیچ درسی ثبت نشده است.' : undefined}
+          helperText={
+            subjects.length === 0
+              ? 'هیچ درسی ثبت نشده است.'
+              : 'برای پایه‌های ابتدایی که معلم تمام دروس را تدریس می‌کند، این فیلد را خالی بگذارید.'
+          }
         />
 
         <div className="col-span-full">

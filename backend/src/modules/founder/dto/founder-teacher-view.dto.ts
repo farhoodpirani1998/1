@@ -3,7 +3,7 @@ import { User } from '../../users/entities/user.entity';
 export interface FounderTeacherAssignmentView {
   gradeId: string;
   gradeTitle: string;
-  subjectId: string;
+  subjectId: string | null;
   subjectTitle: string;
 }
 

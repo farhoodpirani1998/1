@@ -164,7 +164,7 @@ export class FounderService {
           gradeId: a.gradeId,
           gradeTitle: a.grade?.title ?? '',
           subjectId: a.subjectId,
-          subjectTitle: a.subject?.title ?? '',
+          subjectTitle: a.subjectId ? a.subject?.title ?? '' : 'همه دروس',
         })),
       ),
     );
@@ -208,7 +208,7 @@ export class FounderService {
           gradeId: a.gradeId,
           gradeTitle: a.grade?.title ?? '',
           subjectId: a.subjectId,
-          subjectTitle: a.subject?.title ?? '',
+          subjectTitle: a.subjectId ? a.subject?.title ?? '' : 'همه دروس',
         })),
         teacher.schoolId!,
         schoolNameById.get(teacher.schoolId!) ?? '',

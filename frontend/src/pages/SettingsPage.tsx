@@ -17,19 +17,22 @@ import {
   useGrades,
   useCreateGrade,
 } from '../hooks/useStudents';
+import { useSubjects, useCreateSubject } from '../hooks/useSubjects';
 import type { AcademicYear, Grade } from '../types/student.types';
+import type { Subject } from '../types/teacher.types';
 
 // NOTE: "کلاس‌ها" و "انواع تخفیف" از این صفحه حذف شدند — بک‌اند فعلی هیچ
-// ماژول Class یا DiscountType ندارد (فقط Grade + AcademicYear، و تخفیف
-// به‌صورت مبلغ/دلیل آزاد روی هر TuitionPlan). اگر این مفاهیم لازم شوند،
-// باید ابتدا در بک‌اند اضافه شوند.
+// ماژول Class یا DiscountType ندارد (فقط Grade + AcademicYear + Subject،
+// و تخفیف به‌صورت مبلغ/دلیل آزاد روی هر TuitionPlan). اگر این مفاهیم لازم
+// شوند، باید ابتدا در بک‌اند اضافه شوند.
 export function SettingsPage() {
   return (
     <div className="fade-in">
-      <PageHeader title="تنظیمات مدرسه" description="مدیریت سال‌های تحصیلی و پایه‌های تحصیلی مدرسه" />
+      <PageHeader title="تنظیمات مدرسه" description="مدیریت سال‌های تحصیلی، پایه‌ها و دروس مدرسه" />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <AcademicYearsPanel />
         <GradesPanel />
+        <SubjectsPanel />
       </div>
     </div>
   );
@@ -223,6 +226,84 @@ function GradesPanel() {
         rowKey={(g) => g.id}
         loading={gradesQuery.isLoading}
         emptyMessage="هنوز پایه‌ای ثبت نشده است."
+      />
+    </Card>
+  );
+}
+
+// Sprint 2B follow-up: SubjectsController/createSubject already existed
+// on the backend (added for TeacherAssignmentsPage's subject picker) but
+// had no admin UI anywhere to actually create one — same "افزودن پایه
+// جدید" pattern as GradesPanel above, since Subject has the exact same
+// { id, title } shape and role gate (school_admin manages the list) as
+// Grade.
+function SubjectsPanel() {
+  const subjectsQuery = useSubjects();
+  const createSubject = useCreateSubject();
+  const subjects = subjectsQuery.data ?? [];
+
+  const [title, setTitle] = useState('');
+  const [error, setError] = useState<ParsedApiError | null>(null);
+  const { showError } = useToast();
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    createSubject.mutate(
+      { title },
+      {
+        onSuccess: () => setTitle(''),
+        onError: (err) => {
+          setError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
+      },
+    );
+  }
+
+  const columns: TableColumn<Subject>[] = [
+    {
+      key: 'index',
+      header: '#',
+      cellClassName: 'text-ink/45 dark:text-paper/45',
+      render: (s) => toPersianDigits(subjects.findIndex((x) => x.id === s.id) + 1),
+    },
+    {
+      key: 'title',
+      header: 'عنوان درس',
+      render: (s) => <span className="font-medium text-ink dark:text-paper">{s.title}</span>,
+    },
+  ];
+
+  return (
+    <Card title="دروس">
+      <SectionHeader title="افزودن درس جدید" className="mb-4" />
+      <form
+        onSubmit={handleSubmit}
+        className="mb-6 flex flex-col gap-3 rounded-lg bg-paper/60 p-4 dark:bg-white/[0.03] sm:flex-row sm:items-end"
+      >
+        <Input
+          required
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="عنوان درس — مثلاً ریاضی"
+          label="عنوان درس"
+          containerClassName="flex-1"
+        />
+        <Button type="submit" loading={createSubject.isPending} className="shrink-0">
+          افزودن
+        </Button>
+      </form>
+
+      <FormError error={error} />
+
+      <SectionHeader title="فهرست دروس" className="mb-3" />
+      <Table
+        columns={columns}
+        data={subjects}
+        rowKey={(s) => s.id}
+        loading={subjectsQuery.isLoading}
+        emptyMessage="هنوز درسی ثبت نشده است."
       />
     </Card>
   );

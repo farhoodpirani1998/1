@@ -64,15 +64,18 @@ export interface TeacherAssignmentView {
   teacherName?: string;
   gradeId: string;
   gradeTitle?: string;
-  subjectId: string;
+  subjectId: string | null;
   subjectTitle?: string;
   createdAt: string;
 }
 
+// subjectId is optional — leaving it out means the teacher covers every
+// subject for the grade (the elementary-grade case, where one teacher
+// teaches all subjects to their class rather than one subject each).
 export interface CreateTeacherAssignmentInput {
   teacherId: string;
   gradeId: string;
-  subjectId: string;
+  subjectId?: string;
 }
 
 // POST /teacher/assignments — @Roles('school_admin'). Idempotent on the
