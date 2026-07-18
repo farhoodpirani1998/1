@@ -8,6 +8,7 @@ import { StatCard } from '../components/StatCard';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Select } from '../components/Select';
+import { Modal } from '../components/Modal';
 import { SkeletonCards } from '../components/Skeleton';
 import { useToast } from '../lib/toast';
 import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
@@ -15,7 +16,7 @@ import { FormError } from '../components/FormError';
 import type { ManagedUser } from '../types/user.types';
 import type { School } from '../types/school.types';
 import type { UserRole } from '../types/auth.types';
-import { useUsers, useCreateUser, useUpdateUser } from '../hooks/useUsers';
+import { useUsers, useCreateUser, useUpdateUser, useResetUserPassword } from '../hooks/useUsers';
 import { useSchools } from '../hooks/useSchools';
 import { UsersIcon, CheckIcon, AlertIcon } from '../components/icons/SchoolIcons';
 
@@ -84,6 +85,7 @@ export function UsersPage() {
   const schoolsQuery = useSchools();
   const createUser = useCreateUser();
   const updateUser = useUpdateUser();
+  const resetPassword = useResetUserPassword();
 
   const users = usersQuery.data ?? [];
   const schools = schoolsQuery.data ?? [];
@@ -91,6 +93,10 @@ export function UsersPage() {
 
   const [showForm, setShowForm] = useState(false);
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
+  const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+  const [editError, setEditError] = useState<ParsedApiError | null>(null);
+  const [resettingUser, setResettingUser] = useState<ManagedUser | null>(null);
+  const [resetError, setResetError] = useState<ParsedApiError | null>(null);
 
   // Search/role/status filters run entirely client-side over the
   // already-fetched `users` list — GET /users has no query params on the
@@ -156,9 +162,17 @@ export function UsersPage() {
       header: '',
       align: 'left',
       render: (u) => (
-        <Button variant={u.isActive ? 'secondary' : 'primary'} size="sm" onClick={() => toggleActive(u)}>
-          {u.isActive ? 'غیرفعال کردن' : 'فعال کردن'}
-        </Button>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setEditingUser(u)}>
+            ویرایش
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setResettingUser(u)}>
+            تنظیم رمز جدید
+          </Button>
+          <Button variant={u.isActive ? 'secondary' : 'primary'} size="sm" onClick={() => toggleActive(u)}>
+            {u.isActive ? 'غیرفعال کردن' : 'فعال کردن'}
+          </Button>
+        </div>
       ),
     },
   ];
@@ -241,7 +255,169 @@ export function UsersPage() {
           emptyDescription={hasActiveFilters ? 'برای این جستجو/فیلتر نتیجه‌ای یافت نشد.' : undefined}
         />
       </Card>
+
+      {editingUser && (
+        <EditUserModal
+          user={editingUser}
+          saving={updateUser.isPending}
+          error={editError}
+          onClose={() => {
+            setEditingUser(null);
+            setEditError(null);
+          }}
+          onSubmit={(dto) => {
+            setEditError(null);
+            updateUser.mutate(
+              { id: editingUser.id, ...dto },
+              {
+                onSuccess: () => {
+                  setEditingUser(null);
+                  showSuccess('اطلاعات کاربر بروزرسانی شد');
+                },
+                onError: (err) => {
+                  setEditError(parseApiError(err));
+                  showError(getErrorMessage(err));
+                },
+              },
+            );
+          }}
+        />
+      )}
+
+      {resettingUser && (
+        <ResetPasswordModal
+          user={resettingUser}
+          saving={resetPassword.isPending}
+          error={resetError}
+          onClose={() => {
+            setResettingUser(null);
+            setResetError(null);
+          }}
+          onSubmit={(newPassword, onSuccess) => {
+            setResetError(null);
+            resetPassword.mutate(
+              { id: resettingUser.id, newPassword },
+              {
+                onSuccess: () => onSuccess(),
+                onError: (err) => {
+                  setResetError(parseApiError(err));
+                  showError(getErrorMessage(err));
+                },
+              },
+            );
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function EditUserModal({
+  user,
+  saving,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  user: ManagedUser;
+  saving: boolean;
+  error: ParsedApiError | null;
+  onClose: () => void;
+  onSubmit: (dto: { fullName: string; phone: string }) => void;
+}) {
+  const [fullName, setFullName] = useState(user.fullName);
+  const [phone, setPhone] = useState(user.phone);
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    onSubmit({ fullName, phone });
+  }
+
+  return (
+    <Modal open title="ویرایش کاربر" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
+        <Input
+          required
+          label="نام و نام خانوادگی"
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+        />
+        <Input required label="شماره تلفن" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <FormError error={error} />
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            انصراف
+          </Button>
+          <Button type="submit" loading={saving}>
+            {saving ? 'در حال ذخیره...' : 'ذخیره'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function ResetPasswordModal({
+  user,
+  saving,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  user: ManagedUser;
+  saving: boolean;
+  error: ParsedApiError | null;
+  onClose: () => void;
+  onSubmit: (newPassword: string, onSuccess: () => void) => void;
+}) {
+  const [newPassword, setNewPassword] = useState('');
+  const [submittedPassword, setSubmittedPassword] = useState<string | null>(null);
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    onSubmit(newPassword, () => setSubmittedPassword(newPassword));
+  }
+
+  if (submittedPassword) {
+    return (
+      <Modal open title="رمز جدید تنظیم شد" onClose={onClose}>
+        <p className="mb-3 text-sm text-ink/70 dark:text-paper/70">
+          رمز عبور جدید برای «{user.fullName}» تنظیم شد. این رمز را به کاربر اطلاع دهید — پس از بستن این پیام دیگر
+          قابل مشاهده نیست:
+        </p>
+        <div className="rounded-lg border border-line bg-paper px-4 py-3 text-center font-mono text-lg tracking-wide dark:bg-white/5">
+          {submittedPassword}
+        </div>
+        <div className="mt-5 flex justify-end">
+          <Button onClick={onClose}>بستن</Button>
+        </div>
+      </Modal>
+    );
+  }
+
+  return (
+    <Modal open title={`تنظیم رمز جدید برای ${user.fullName}`} onClose={onClose}>
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
+        <Input
+          required
+          type="password"
+          label="رمز عبور جدید"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          placeholder="حداقل ۸ کاراکتر"
+          minLength={8}
+        />
+        <FormError error={error} />
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={onClose}>
+            انصراف
+          </Button>
+          <Button type="submit" loading={saving}>
+            {saving ? 'در حال ذخیره...' : 'تنظیم رمز'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -307,6 +483,7 @@ function CreateUserForm({
             { value: 'accountant', label: roleLabels.accountant },
             { value: 'staff', label: roleLabels.staff },
             { value: 'teacher', label: roleLabels.teacher },
+            { value: 'parent', label: roleLabels.parent },
             { value: 'super_admin', label: roleLabels.super_admin },
             { value: 'founder', label: roleLabels.founder },
           ]}

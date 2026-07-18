@@ -79,10 +79,38 @@ export function App() {
               <Route path="/print/receipt" element={<PrintReceiptPage />} />
 
               <Route element={<AppLayout />}>
+                {/* "/" itself isn't wrapped in RequireRole: HomeRedirect already
+                    redirects super_admin -> /schools and founder -> /founder/overview
+                    before rendering DashboardPage, so those roles never see an
+                    empty/confusing dashboard here. Wrapping it in
+                    RequireRole roles={['school_admin','accountant','staff']} would
+                    break that redirect (super_admin/founder would hit "access
+                    restricted" instead of being sent to their real home). */}
                 <Route path="/" element={<HomeRedirect />} />
-                <Route path="/students" element={<StudentsPage />} />
-                <Route path="/students/archived" element={<ArchivedStudentsPage />} />
-                <Route path="/students/:id" element={<StudentDetailPage />} />
+                <Route
+                  path="/students"
+                  element={
+                    <RequireRole roles={['school_admin', 'accountant', 'staff']}>
+                      <StudentsPage />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/students/archived"
+                  element={
+                    <RequireRole roles={['school_admin', 'accountant', 'staff']}>
+                      <ArchivedStudentsPage />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/students/:id"
+                  element={
+                    <RequireRole roles={['school_admin', 'accountant', 'staff']}>
+                      <StudentDetailPage />
+                    </RequireRole>
+                  }
+                />
                 <Route
                   path="/installments"
                   element={

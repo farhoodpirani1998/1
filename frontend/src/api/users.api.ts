@@ -15,8 +15,20 @@ export function createUser(dto: RegisterUserInput) {
   return register(dto);
 }
 
-// UsersController's PATCH /:id only ever accepts { isActive } — it is
-// not a general-purpose update endpoint.
-export function updateUser(id: string, isActive: boolean) {
-  return api.patch<ManagedUser>(`/users/${id}`, { isActive });
+export interface UpdateUserInput {
+  isActive?: boolean;
+  fullName?: string;
+  phone?: string;
+}
+
+// UsersController's PATCH /:id now accepts any combination of
+// isActive/fullName/phone (see backend UpdateUserDto) — role/schoolId are
+// never sent from here since the backend doesn't accept them on this
+// route (changing either requires deleting and recreating the user).
+export function updateUser(id: string, dto: UpdateUserInput) {
+  return api.patch<ManagedUser>(`/users/${id}`, dto);
+}
+
+export function resetUserPassword(id: string, newPassword: string) {
+  return api.patch<ManagedUser>(`/users/${id}/reset-password`, { newPassword });
 }

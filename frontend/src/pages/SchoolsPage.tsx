@@ -152,6 +152,18 @@ export function SchoolsPage() {
       render: (s) => s.phone ?? '—',
     },
     {
+      key: 'studentCount',
+      header: 'تعداد دانش‌آموز',
+      cellClassName: 'tabular text-ink/70 dark:text-paper/70',
+      render: (s) => s.studentCount ?? '—',
+    },
+    {
+      key: 'userCount',
+      header: 'تعداد کاربر',
+      cellClassName: 'tabular text-ink/70 dark:text-paper/70',
+      render: (s) => s.userCount ?? '—',
+    },
+    {
       key: 'status',
       header: 'وضعیت',
       render: (s) => <SchoolStatusBadge isActive={s.isActive} />,

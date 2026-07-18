@@ -8,4 +8,9 @@ export interface School {
   address: string | null;
   phone: string | null;
   isActive: boolean;
+  // Only present on GET /schools (list) responses — SchoolsService.findAll
+  // computes these via an aggregate query. Not returned by
+  // findOne/create/update, hence optional.
+  studentCount?: number;
+  userCount?: number;
 }
