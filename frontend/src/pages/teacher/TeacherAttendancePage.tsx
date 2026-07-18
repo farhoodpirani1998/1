@@ -22,6 +22,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { FilterBar } from '../../components/FilterBar';
 import { Select } from '../../components/Select';
 import { Input } from '../../components/Input';
+import { PersianDatePicker } from '../../components/PersianDatePicker';
 import { Table, type TableColumn } from '../../components/Table';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
@@ -243,12 +244,7 @@ export function TeacherAttendancePage() {
           options={classes.map((c) => ({ value: c.id, label: c.title }))}
           containerClassName="min-w-[200px]"
         />
-        <Input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          containerClassName="min-w-[160px]"
-        />
+        <PersianDatePicker value={date} onChange={setDate} containerClassName="min-w-[160px]" />
       </FilterBar>
 
       <Card>

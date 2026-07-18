@@ -4,6 +4,7 @@ import { PageHeader } from '../components/PageHeader';
 import { SectionHeader } from '../components/SectionHeader';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
+import { PersianDatePicker } from '../components/PersianDatePicker';
 import { Table, type TableColumn } from '../components/Table';
 import { toPersianDigits, formatDate } from '../lib/format';
 import { useToast } from '../lib/toast';
@@ -125,13 +126,8 @@ function AcademicYearsPanel() {
           label="عنوان سال تحصیلی"
         />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            label="تاریخ شروع"
-          />
-          <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} label="تاریخ پایان" />
+          <PersianDatePicker value={startDate} onChange={setStartDate} label="تاریخ شروع" />
+          <PersianDatePicker value={endDate} onChange={setEndDate} label="تاریخ پایان" />
         </div>
         <label className="flex items-center gap-2 text-sm text-ink/70 dark:text-paper/70">
           <input

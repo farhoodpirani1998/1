@@ -37,6 +37,7 @@ import { PageHeader } from '../../components/PageHeader';
 import { FilterBar } from '../../components/FilterBar';
 import { Select } from '../../components/Select';
 import { Input } from '../../components/Input';
+import { PersianDatePicker } from '../../components/PersianDatePicker';
 import { Field } from '../../components/Field';
 import { Table, type TableColumn } from '../../components/Table';
 import { Button } from '../../components/Button';
@@ -529,12 +530,11 @@ function HomeworkFormModal({
           />
         ) : null}
 
-        <Input
+        <PersianDatePicker
           required
-          type="date"
           label="مهلت انجام"
           value={form.dueDate}
-          onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
+          onChange={(v) => setForm((f) => ({ ...f, dueDate: v }))}
         />
 
         <Input

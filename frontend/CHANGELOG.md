@@ -1,6 +1,42 @@
 # Changelog — Integration Build
 
-## Sprint: Founder Dashboard (this change)
+## Bugfix pass (this change)
+
+Three small fixes reported after the Founder Dashboard sprint:
+
+1. **Native date pickers showed the Gregorian calendar.** Every
+   `<input type="date">` in the app (StudentsPage, StudentDetailPage,
+   SettingsPage, TeacherHomeworkPage, TeacherAttendancePage) opened the
+   browser's own Gregorian-only calendar popup, even though the app
+   already *displayed* saved dates correctly in Jalali via `formatDate()`
+   — only the picker UI itself was wrong. Added `lib/jalali.ts`
+   (Gregorian↔Jalali conversion, built on `Intl`'s built-in Persian
+   calendar rather than a hand-rolled leap-year algorithm — verified
+   against ~750 date combinations) and `components/PersianDatePicker.tsx`
+   (a Jalali calendar-grid picker), and swapped in every native date
+   input for it. The stored value is still a plain ISO `'YYYY-MM-DD'`
+   string, so nothing downstream (API payloads, `formatDate()`) changed.
+   Note: since this is a button-based widget, not a native form control,
+   `required` no longer blocks submission with an in-browser bubble the
+   way `<input required>` did — it's now enforced by each mutation's
+   normal backend validation instead.
+2. **No way to register a teacher account.** `UsersPage`'s create-user
+   role Select and `ROLE_FILTER_OPTIONS` deliberately excluded `'teacher'`
+   as of the Sprint 1 Teacher Portal work — but `POST /auth/register`
+   already accepts `role: 'teacher'` the same as any other role. Added
+   it to both.
+3. **Tuition base-amount field always showed a `0`.** `CreateTuitionPlanForm`
+   (StudentDetailPage) initialized `baseAmount` to `0` instead of empty,
+   so the field looked pre-filled. Changed it to the same `number | ''`
+   pattern already used by the discount field, with a placeholder
+   (`مثلاً ۵۰۰۰۰۰۰`) shown when empty; added a placeholder to the discount
+   field too for consistency.
+
+**New files:** `frontend/src/lib/jalali.ts`,
+`frontend/src/components/PersianDatePicker.tsx`
+
+## Sprint: Founder Dashboard
+
 
 Read-only, multi-school portal for the new `founder` role (see
 `founder-frontend-prompt.md`). A founder owns one or more schools and can

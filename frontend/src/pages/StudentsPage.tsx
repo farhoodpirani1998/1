@@ -9,6 +9,7 @@ import { Table, type TableColumn } from '../components/Table';
 import { Pagination, paginate } from '../components/Pagination';
 import { StatCard } from '../components/StatCard';
 import { Button } from '../components/Button';
+import { PersianDatePicker } from '../components/PersianDatePicker';
 import { SkeletonCards } from '../components/Skeleton';
 import { useToast } from '../lib/toast';
 import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
@@ -433,12 +434,7 @@ function CreateStudentForm({
         </Field>
 
         <Field label="تاریخ ثبت‌نام (اختیاری)">
-          <input
-            type="date"
-            value={enrollmentDate}
-            onChange={(e) => setEnrollmentDate(e.target.value)}
-            className="input"
-          />
+          <PersianDatePicker value={enrollmentDate} onChange={setEnrollmentDate} />
         </Field>
 
         <Field label="نام والد">

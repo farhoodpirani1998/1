@@ -24,18 +24,15 @@ const roleLabels: Record<UserRole, string> = {
   accountant: 'حسابدار',
   staff: 'کارمند',
   parent: 'والد',
-  // Sprint 1 (Teacher Portal Foundation): teacher accounts aren't created
-  // from this page (same as 'parent' above — neither appears in
-  // ROLE_FILTER_OPTIONS or the create-role Select below), but this map is
-  // typed Record<UserRole, string>, so every role needs an entry here to
-  // label a teacher row correctly if/when one shows up in the users list.
+  // Teacher accounts are now created from this page too (role added to
+  // ROLE_FILTER_OPTIONS and the create-role Select below) — the earlier
+  // Sprint 1 restriction wasn't a backend limitation (POST /auth/register
+  // accepts any UserRole, including 'teacher', the same way it does for
+  // school_admin/accountant/staff), just a gap in this page's form.
   teacher: 'معلم',
   // Founder Dashboard sprint: founder accounts own one or more schools
-  // (schoolId is always null, like super_admin) and aren't created from
-  // the default role Select below (see CreateUserForm) any more than
-  // 'parent'/'teacher' are — but this map is Record<UserRole, string>, so
-  // every role still needs a label to show a founder row correctly if/
-  // when the create-role Select below is extended to offer it.
+  // (schoolId is always null, like super_admin — see CreateUserForm's
+  // schoolId condition) and are created from this page's role Select too.
   founder: 'مؤسس',
 };
 
@@ -45,6 +42,7 @@ const ROLE_FILTER_OPTIONS: { value: UserRole | 'all'; label: string }[] = [
   { value: 'school_admin', label: roleLabels.school_admin },
   { value: 'accountant', label: roleLabels.accountant },
   { value: 'staff', label: roleLabels.staff },
+  { value: 'teacher', label: roleLabels.teacher },
   { value: 'founder', label: roleLabels.founder },
 ];
 
@@ -334,6 +332,7 @@ function CreateUserForm({
             { value: 'school_admin', label: roleLabels.school_admin },
             { value: 'accountant', label: roleLabels.accountant },
             { value: 'staff', label: roleLabels.staff },
+            { value: 'teacher', label: roleLabels.teacher },
             { value: 'super_admin', label: roleLabels.super_admin },
             { value: 'founder', label: roleLabels.founder },
           ]}

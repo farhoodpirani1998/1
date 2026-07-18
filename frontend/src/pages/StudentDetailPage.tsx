@@ -12,6 +12,7 @@ import { InfoRow } from '../components/InfoRow';
 import { RecordPaymentModal, PayableInstallment } from '../components/RecordPaymentModal';
 import { VoidPaymentDialog } from '../components/VoidPaymentDialog';
 import { FormError } from '../components/FormError';
+import { PersianDatePicker } from '../components/PersianDatePicker';
 import { formatToman, formatDate } from '../lib/format';
 import { useToast } from '../lib/toast';
 import { useAuth } from '../lib/auth';
@@ -419,7 +420,7 @@ function CreateTuitionPlanForm({ studentId }: { studentId: string }) {
   const academicYears = academicYearsQuery.data ?? [];
 
   const [academicYearId, setAcademicYearId] = useState(() => academicYears.find((y) => y.isCurrent)?.id ?? '');
-  const [baseAmount, setBaseAmount] = useState<number>(0);
+  const [baseAmount, setBaseAmount] = useState<number | ''>('');
   const [discountAmount, setDiscountAmount] = useState<number | ''>('');
   const [discountReason, setDiscountReason] = useState('');
   const [error, setError] = useState<ParsedApiError | null>(null);
@@ -440,7 +441,7 @@ function CreateTuitionPlanForm({ studentId }: { studentId: string }) {
       {
         studentId,
         academicYearId,
-        baseAmount,
+        baseAmount: baseAmount === '' ? 0 : baseAmount,
         discountAmount: discountAmount === '' ? undefined : discountAmount,
         discountReason: discountReason || undefined,
       },
@@ -475,7 +476,8 @@ function CreateTuitionPlanForm({ studentId }: { studentId: string }) {
             required
             min={0}
             value={baseAmount}
-            onChange={(e) => setBaseAmount(Number(e.target.value))}
+            onChange={(e) => setBaseAmount(e.target.value ? Number(e.target.value) : '')}
+            placeholder="مثلاً ۵۰۰۰۰۰۰"
             className="input tabular"
           />
         </div>
@@ -486,6 +488,7 @@ function CreateTuitionPlanForm({ studentId }: { studentId: string }) {
             min={0}
             value={discountAmount}
             onChange={(e) => setDiscountAmount(e.target.value ? Number(e.target.value) : '')}
+            placeholder="بدون تخفیف"
             className="input tabular"
           />
         </div>
@@ -556,7 +559,7 @@ function GenerateInstallmentsForm({
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink">تاریخ شروع</label>
-          <input type="date" required value={startDate} onChange={(e) => setStartDate(e.target.value)} className="input" />
+          <PersianDatePicker required value={startDate} onChange={setStartDate} />
         </div>
         <div>
           <label className="mb-1.5 block text-sm font-medium text-ink">فاصله (روز)</label>
