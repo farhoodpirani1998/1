@@ -42,6 +42,15 @@ export class User {
   @Column({ name: 'token_version', type: 'int', default: 0 })
   tokenVersion: number;
 
+  // Forgot-password flow (see PasswordReset migration + AuthService).
+  // Both null when no reset is in progress; set together on request,
+  // cleared together on successful confirm.
+  @Column({ name: 'reset_code_hash', type: 'varchar', length: 255, nullable: true })
+  resetCodeHash: string | null;
+
+  @Column({ name: 'reset_code_expires_at', type: 'timestamp', nullable: true })
+  resetCodeExpiresAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

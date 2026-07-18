@@ -17,6 +17,10 @@ export function ParentAuthShell({ icon, title, subtitle, children }: ParentAuthS
     <div className="flex min-h-screen items-center justify-center bg-navy px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center text-white">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+            <img src="/logo-icon.png" alt="ندای حقیقت" className="h-11 w-11 object-contain" />
+          </div>
+          <div className="mb-4 text-sm font-bold text-white/70">ندای حقیقت</div>
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-action shadow-[0_2px_8px_rgba(37,99,235,0.45)]">
             {icon}
           </div>

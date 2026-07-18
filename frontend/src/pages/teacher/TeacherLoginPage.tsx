@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../lib/auth';
 import { getErrorMessage } from '../../lib/error-handler';
 import { Input } from '../../components/Input';
@@ -106,6 +106,13 @@ export function TeacherLoginPage() {
         <Button type="submit" variant="primary" fullWidth loading={loading}>
           ورود
         </Button>
+
+        <Link
+          to="/teacher/forgot-password"
+          className="mt-4 block text-center text-xs font-medium text-action hover:underline"
+        >
+          رمز عبور را فراموش کرده‌اید؟
+        </Link>
       </form>
     </ParentAuthShell>
   );

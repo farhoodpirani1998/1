@@ -94,23 +94,19 @@ export function Sidebar() {
   return (
     <aside className="flex h-screen w-64 flex-col border-l border-white/[0.06] bg-navy text-white">
       <div className="flex items-center gap-3 px-6 py-6">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-action shadow-[0_2px_8px_rgba(37,99,235,0.45)]">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-            <path d="M3 21h18M4 21V9l8-5 8 5v12M9 21v-6h6v6" />
-          </svg>
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white shadow-[0_2px_8px_rgba(0,0,0,0.25)]">
+          <img src="/logo-icon.png" alt="ندای حقیقت" className="h-8 w-8 object-contain" />
         </div>
         <div>
-          <div className="text-[15px] font-bold leading-tight">
-            {isParent ? 'پنل والدین' : isTeacher ? 'پنل معلمان' : isFounder ? 'پنل مؤسسان' : 'دفتر مدرسه'}
-          </div>
+          <div className="text-[15px] font-bold leading-tight">ندای حقیقت</div>
           <div className="mt-0.5 text-[11px] text-white/45">
             {isParent
-              ? 'وضعیت شهریه فرزندان'
+              ? 'پنل والدین'
               : isTeacher
-                ? 'مدیریت کلاس‌های درسی'
+                ? 'پنل معلمان'
                 : isFounder
-                  ? 'نمای کلی چند مدرسه'
-                  : 'پنل مدیریت مالی'}
+                  ? 'پنل مؤسسان'
+                  : 'مجتمع آموزشی'}
           </div>
         </div>
       </div>

@@ -18,6 +18,6 @@ import { PaymentEventsListener } from './payment-events.listener';
     SmsProviderService,
     PaymentEventsListener,
   ],
-  exports: [NotificationsService],
+  exports: [NotificationsService, SmsProviderService],
 })
 export class NotificationsModule {}

@@ -6,6 +6,7 @@ import { ThemeProvider } from './lib/theme';
 import { AppLayout } from './components/AppLayout';
 import { RequireRole } from './components/RequireRole';
 import { LoginPage } from './pages/LoginPage';
+import { AdminForgotPasswordPage } from './pages/AdminForgotPasswordPage';
 import { StudentsPage } from './pages/StudentsPage';
 import { StudentDetailPage } from './pages/StudentDetailPage';
 import { ArchivedStudentsPage } from './pages/ArchivedStudentsPage';
@@ -29,6 +30,7 @@ import { ParentInstallmentsPage } from './pages/parent/ParentInstallmentsPage';
 import { ParentPaymentsPage } from './pages/parent/ParentPaymentsPage';
 import { ParentStudentProvider } from './lib/parentStudent';
 import { TeacherLoginPage } from './pages/teacher/TeacherLoginPage';
+import { TeacherForgotPasswordPage } from './pages/teacher/TeacherForgotPasswordPage';
 import { TeacherDashboardPage } from './pages/teacher/TeacherDashboardPage';
 import { TeacherStudentsPage } from './pages/teacher/TeacherStudentsPage';
 import { TeacherAttendancePage } from './pages/teacher/TeacherAttendancePage';
@@ -77,9 +79,11 @@ export function App() {
           <AuthProvider>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/forgot-password" element={<AdminForgotPasswordPage />} />
               <Route path="/parent/login" element={<ParentLoginPage />} />
               <Route path="/parent/forgot-password" element={<ParentForgotPasswordPage />} />
               <Route path="/teacher/login" element={<TeacherLoginPage />} />
+              <Route path="/teacher/forgot-password" element={<TeacherForgotPasswordPage />} />
               <Route path="/print/receipt/:paymentId" element={<PrintReceiptPage />} />
 
               <Route element={<AppLayout />}>

@@ -14,10 +14,19 @@ import { School } from '../schools/entities/school.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { Role } from '../../common/authorization/roles.enum';
+import { SmsProviderService } from '../notifications/sms/sms-provider.service';
 
 const BCRYPT_ROUNDS = 12;
+const RESET_CODE_TTL_MINUTES = 10;
+// Generic response for every forgot-password request, regardless of
+// whether the phone number is registered — same "don't confirm which
+// phone numbers exist" rule login() follows for bad credentials.
+const RESET_REQUESTED_MESSAGE =
+  'در صورتی که این شماره در سامانه ثبت شده باشد، کد بازیابی رمز عبور برای آن پیامک می‌شود.';
 
 @Injectable()
 export class AuthService {
@@ -27,6 +36,7 @@ export class AuthService {
     @InjectRepository(School)
     private readonly schoolRepo: Repository<School>,
     private readonly jwtService: JwtService,
+    private readonly smsProviderService: SmsProviderService,
   ) {}
 
   async register(dto: RegisterDto): Promise<Omit<User, 'passwordHash'>> {
@@ -118,6 +128,60 @@ export class AuthService {
     // from any other still-logged-in session fails tokenVersion
     // verification in JwtStrategy and must log in again with the new
     // password.
+    user.tokenVersion += 1;
+    await this.userRepo.save(user);
+    return { success: true };
+  }
+
+  // Step 1 of the forgot-password flow — works the same for every
+  // portal (admin/staff, teacher, parent), since they all share this one
+  // `users` table and POST /auth/login. Always resolves with the same
+  // message whether or not the phone is registered (see
+  // RESET_REQUESTED_MESSAGE) so this endpoint can't be used to enumerate
+  // accounts; the controller also throttles it like login.
+  async requestPasswordReset(dto: ForgotPasswordDto): Promise<{ success: true; message: string }> {
+    const user = await this.userRepo.findOne({ where: { phone: dto.phone } });
+
+    if (user && user.isActive) {
+      const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digits
+      user.resetCodeHash = await bcrypt.hash(code, BCRYPT_ROUNDS);
+      user.resetCodeExpiresAt = new Date(Date.now() + RESET_CODE_TTL_MINUTES * 60 * 1000);
+      await this.userRepo.save(user);
+
+      await this.smsProviderService.send({
+        to: user.phone,
+        text: `کد بازیابی رمز عبور شما: ${code}\nاین کد تا ${RESET_CODE_TTL_MINUTES} دقیقه معتبر است.`,
+      });
+    }
+
+    return { success: true, message: RESET_REQUESTED_MESSAGE };
+  }
+
+  // Step 2 — confirms the code texted in step 1 and sets the new
+  // password. One generic error for "no such phone", "no code
+  // requested", "wrong code", and "expired code" alike — same
+  // don't-leak-details rule as login().
+  async resetPassword(dto: ResetPasswordDto): Promise<{ success: true }> {
+    const invalidCodeError = new BadRequestException('کد نامعتبر یا منقضی شده است');
+
+    const user = await this.userRepo.findOne({ where: { phone: dto.phone } });
+    if (!user || !user.resetCodeHash || !user.resetCodeExpiresAt) {
+      throw invalidCodeError;
+    }
+    if (user.resetCodeExpiresAt.getTime() < Date.now()) {
+      throw invalidCodeError;
+    }
+
+    const codeMatches = await bcrypt.compare(dto.code, user.resetCodeHash);
+    if (!codeMatches) {
+      throw invalidCodeError;
+    }
+
+    user.passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
+    user.resetCodeHash = null;
+    user.resetCodeExpiresAt = null;
+    // Same as changePassword() — signs the user out of every other
+    // session that was open with the old password.
     user.tokenVersion += 1;
     await this.userRepo.save(user);
     return { success: true };

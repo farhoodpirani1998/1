@@ -67,6 +67,7 @@ export function PrintReceiptPage() {
 
       <div className="w-full max-w-md rounded-xl border border-line bg-white p-8 shadow-card print:w-full print:max-w-none print:border-0 print:shadow-none">
         <div className="mb-6 text-center">
+          <img src="/logo-icon.png" alt="ندای حقیقت" className="mx-auto mb-2 h-12 w-12 object-contain" />
           <div className="text-lg font-bold text-ink">{data.school.name}</div>
           {data.school.address && <div className="mt-0.5 text-[11px] text-ink/40">{data.school.address}</div>}
           {data.school.phone && <div className="text-[11px] text-ink/40">{data.school.phone}</div>}

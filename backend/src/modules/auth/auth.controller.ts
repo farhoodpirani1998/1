@@ -4,6 +4,8 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -39,5 +41,25 @@ export class AuthController {
   @HttpCode(200)
   changePassword(@Body() dto: ChangePasswordDto, @CurrentUser('id') userId: string) {
     return this.authService.changePassword(userId, dto);
+  }
+
+  // Forgot-password step 1 — same tight rate limit as login, since this
+  // is the other endpoint an attacker could hammer (to spam a phone with
+  // SMS, or to try to enumerate registered numbers).
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('forgot-password')
+  @HttpCode(200)
+  forgotPassword(@Body() dto: ForgotPasswordDto) {
+    return this.authService.requestPasswordReset(dto);
+  }
+
+  // Forgot-password step 2 — confirms the SMS code and sets the new
+  // password. Same rate limit as login, since this is a second
+  // credential-guessing surface (the 6-digit code).
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('reset-password')
+  @HttpCode(200)
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 }

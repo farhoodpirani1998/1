@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { getErrorMessage } from '../lib/error-handler';
 
@@ -29,7 +29,10 @@ export function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-navy px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center text-white">
-          <div className="text-2xl font-bold">دفتر مدرسه</div>
+          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
+            <img src="/logo-icon.png" alt="ندای حقیقت" className="h-14 w-14 object-contain" />
+          </div>
+          <div className="text-2xl font-bold">ندای حقیقت</div>
           <div className="mt-1 text-sm text-white/60">ورود به پنل مدیریت</div>
         </div>
 
@@ -62,6 +65,13 @@ export function LoginPage() {
           >
             {loading ? 'در حال ورود...' : 'ورود'}
           </button>
+
+          <Link
+            to="/forgot-password"
+            className="mt-4 block text-center text-xs font-medium text-action hover:underline"
+          >
+            رمز عبور را فراموش کرده‌اید؟
+          </Link>
         </form>
       </div>
     </div>

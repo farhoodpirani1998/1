@@ -9,10 +9,12 @@ import { School } from '../schools/entities/school.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, School]),
+    NotificationsModule,
     PassportModule,
     JwtModule.registerAsync({
       // Loaded from ConfigService rather than process.env directly, so the
