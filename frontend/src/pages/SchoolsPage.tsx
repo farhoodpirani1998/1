@@ -16,6 +16,7 @@ import type { School } from '../types/school.types';
 import { useSchools, useCreateSchool, useUpdateSchool, useDeactivateSchool } from '../hooks/useSchools';
 import { useUsers } from '../hooks/useUsers';
 import { useLinkFounderToSchool, useUnlinkFounderFromSchool } from '../hooks/useFounder';
+import { SchoolIcon, CheckIcon, AlertIcon } from '../components/icons/SchoolIcons';
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'all', label: 'همه وضعیت‌ها' },
@@ -46,31 +47,6 @@ function SchoolAvatar({ name }: { name: string }) {
 
 function toPersianCount(n: number): string {
   return n.toLocaleString('fa-IR');
-}
-
-function SchoolIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M3 21h18M5 21V9l7-4 7 4v12M9 21v-5h6v5" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="m5 13 4 4L19 7" />
-    </svg>
-  );
-}
-
-function AlertIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 8v5M12 16h.01" />
-    </svg>
-  );
 }
 
 export function SchoolsPage() {

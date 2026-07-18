@@ -8,6 +8,7 @@ import { SkeletonCards } from '../../components/Skeleton';
 import { formatToman, toPersianDigits } from '../../lib/format';
 import { useFounderOverview } from '../../hooks/useFounder';
 import type { FounderOverviewSchool } from '../../types/founder.types';
+import { SchoolIcon, StudentsIcon, UsersIcon, AlertIcon } from '../../components/icons/SchoolIcons';
 
 // Presentation-only badge, same visual language as the shared
 // <StatusBadge/> (which is typed for InstallmentStatus, not a school's
@@ -168,39 +169,4 @@ export function FounderOverviewPage() {
   );
 }
 
-function SchoolIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M3 21h18M4 21V9l8-5 8 5v12M9 21v-6h6v6" />
-    </svg>
-  );
-}
 
-function StudentsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="8" r="3.2" />
-      <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
-    </svg>
-  );
-}
-
-function UsersIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="9" cy="8" r="3" />
-      <path d="M2 20c0-3 3-5.5 7-5.5s7 2.5 7 5.5" />
-      <circle cx="17" cy="8" r="2.5" />
-      <path d="M17 14c2.5.3 4.5 2.3 4.5 4.8" />
-    </svg>
-  );
-}
-
-function AlertIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 8v5M12 16h.01" />
-    </svg>
-  );
-}

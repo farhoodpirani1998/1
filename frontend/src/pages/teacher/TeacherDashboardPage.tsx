@@ -7,6 +7,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { Button } from '../../components/Button';
 import { SkeletonCards, SkeletonRows } from '../../components/Skeleton';
 import { useTeacherProfile, useTeacherClasses, useTeacherSubjects } from '../../hooks/useTeacher';
+import { TeacherIcon, ClassIcon, SubjectIcon } from '../../components/icons/SchoolIcons';
 
 // Sprint 1 scope only: profile + assigned classes + assigned subjects,
 // no charts, no attendance/homework/assessment data (those are separate
@@ -145,29 +146,4 @@ export function TeacherDashboardPage() {
   );
 }
 
-function TeacherIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="8" r="3.2" />
-      <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
-    </svg>
-  );
-}
 
-function ClassIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M4 6.5 12 3l8 3.5-8 3.5-8-3.5Z" />
-      <path d="M7 9.5V15c0 1.5 2.5 3 5 3s5-1.5 5-3V9.5" />
-    </svg>
-  );
-}
-
-function SubjectIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M4 19.5V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v13.5" />
-      <path d="M6 21h13M6 21a2 2 0 0 1 0-4h13" />
-    </svg>
-  );
-}

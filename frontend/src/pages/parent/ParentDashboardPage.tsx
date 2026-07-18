@@ -13,6 +13,14 @@ import { formatToman, formatDate, paymentMethodLabels } from '../../lib/format';
 import { useParentStudent } from '../../lib/parentStudent';
 import { useStudentTuition, useStudentInstallments, useStudentPayments, useMyAnnouncements } from '../../hooks/useParent';
 import type { ParentPaymentView, ParentInstallmentView } from '../../types/parent.types';
+import {
+  StudentIcon,
+  SchoolIcon,
+  TuitionIcon,
+  PaidIcon,
+  BalanceIcon,
+  InstallmentsIcon,
+} from '../../components/icons/SchoolIcons';
 
 // Installment states that still owe money — used to pick the "next
 // installment" card (earliest upcoming due date among these statuses).
@@ -237,54 +245,4 @@ function QuickAction({ to, label, icon }: { to: string; label: string; icon: Rea
   );
 }
 
-function StudentIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="8" r="3.2" />
-      <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
-    </svg>
-  );
-}
 
-function SchoolIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M3 21h18M4 21V9l8-5 8 5v12M9 21v-6h6v6" />
-    </svg>
-  );
-}
-
-function TuitionIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v10M9.5 9.5c0-1.4 1.2-2.2 2.5-2.2s2.5.8 2.5 2c0 1.4-1.2 1.8-2.5 2.2-1.3.4-2.5.8-2.5 2.2 0 1.2 1.2 2 2.5 2s2.5-.8 2.5-2.2" />
-    </svg>
-  );
-}
-
-function PaidIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="m5 13 4 4L19 7" />
-    </svg>
-  );
-}
-
-function BalanceIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-      <path d="M3 10h18M7 15h4" />
-    </svg>
-  );
-}
-
-function InstallmentsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M3 9h18M8 14h3" />
-    </svg>
-  );
-}

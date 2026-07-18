@@ -1,11 +1,25 @@
+import type { ReactElement } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import type { UserRole } from '../types/auth.types';
+import {
+  DashboardIcon,
+  StudentsIcon,
+  InstallmentsIcon,
+  ReportsIcon,
+  SettingsIcon,
+  SchoolsIcon,
+  TuitionIcon,
+  PaymentsIcon,
+  AssignmentsIcon,
+  UsersIcon,
+  type IconProps,
+} from './icons/SchoolIcons';
 
 interface NavItem {
   to: string;
   label: string;
-  icon: () => JSX.Element;
+  icon: (props: IconProps) => ReactElement;
   roles: UserRole[];
 }
 
@@ -133,94 +147,3 @@ export function Sidebar() {
   );
 }
 
-function DashboardIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="3" width="7" height="9" rx="1.5" />
-      <rect x="14" y="3" width="7" height="5" rx="1.5" />
-      <rect x="14" y="12" width="7" height="9" rx="1.5" />
-      <rect x="3" y="16" width="7" height="5" rx="1.5" />
-    </svg>
-  );
-}
-
-function StudentsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="8" r="3.2" />
-      <path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
-    </svg>
-  );
-}
-
-function InstallmentsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="4" width="18" height="16" rx="2" />
-      <path d="M3 9h18M8 14h3" />
-    </svg>
-  );
-}
-
-function ReportsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M4 20V10M12 20V4M20 20v-7" />
-    </svg>
-  );
-}
-
-function SettingsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 13a7.97 7.97 0 0 0 0-2l2-1.5-2-3.5-2.4 1a8 8 0 0 0-1.7-1L15 3h-4l-.3 2.5a8 8 0 0 0-1.7 1l-2.4-1-2 3.5L6.6 11a7.97 7.97 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a8 8 0 0 0 1.7 1L11 21h4l.3-2.5a8 8 0 0 0 1.7-1l2.4 1 2-3.5-2-1.5Z" />
-    </svg>
-  );
-}
-
-function SchoolsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <path d="M3 21h18M4 21V9l8-5 8 5v12M9 21v-6h6v6" />
-    </svg>
-  );
-}
-
-function TuitionIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v10M9.5 9.5c0-1.4 1.2-2.2 2.5-2.2s2.5.8 2.5 2c0 1.4-1.2 1.8-2.5 2.2-1.3.4-2.5.8-2.5 2.2 0 1.2 1.2 2 2.5 2s2.5-.8 2.5-2.2" />
-    </svg>
-  );
-}
-
-function PaymentsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="5" width="18" height="14" rx="2" />
-      <path d="M3 10h18M7 15h4" />
-    </svg>
-  );
-}
-
-function AssignmentsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="4" y="4" width="16" height="16" rx="2" />
-      <path d="M9 9h6M9 13h6M9 17h3" />
-    </svg>
-  );
-}
-
-function UsersIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <circle cx="9" cy="8" r="3" />
-      <path d="M2 20c0-3 3-5.5 7-5.5s7 2.5 7 5.5" />
-      <circle cx="17" cy="8" r="2.5" />
-      <path d="M17 14c2.5.3 4.5 2.3 4.5 4.8" />
-    </svg>
-  );
-}

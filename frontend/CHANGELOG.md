@@ -1,6 +1,63 @@
 # Changelog — Integration Build
 
-## Bugfix pass (this change)
+## Custom icon set integration (this change)
+
+Replaced the app's ad-hoc, repeatedly-duplicated generic icon set with the
+new custom-designed set (`SchoolIcons.tsx` — geometric outline style with
+a shared "chamfered corner" signature detail). Previously, near-identical
+icon functions (`TuitionIcon`, `UsersIcon`, `CheckIcon`, `AlertIcon`,
+`SchoolIcon`, etc.) were copy-pasted locally in ~12 different files, each
+a hand-rolled generic feather-style SVG — exactly the situation
+`components/icons/StatIcons.tsx`'s own comment flagged as a stopgap
+awaiting real design direction.
+
+**New file:** `frontend/src/components/icons/SchoolIcons.tsx` — the full
+custom set (25 icons), viewBox `0 0 24 24`, `currentColor` stroke,
+parametric `size`/`strokeWidth` (defaults 20 / 1.75).
+
+**Removed file:** `frontend/src/components/icons/StatIcons.tsx` (fully
+superseded — its two importers now point at `SchoolIcons.tsx`).
+
+**Modified files** — local duplicate icon functions removed, replaced
+with imports from `SchoolIcons.tsx`:
+```
+frontend/src/components/Sidebar.tsx           — 10 nav icons
+frontend/src/components/EmptyState.tsx        — DefaultIcon (size=28)
+frontend/src/components/FormError.tsx         — ErrorIcon (size=14)
+frontend/src/components/PersianDatePicker.tsx — CalendarIcon (size=16)
+frontend/src/pages/DashboardPage.tsx
+frontend/src/pages/founder/FounderSchoolDashboardPage.tsx
+frontend/src/pages/founder/FounderOverviewPage.tsx
+frontend/src/pages/founder/FounderTuitionPage.tsx
+frontend/src/pages/parent/ParentDashboardPage.tsx
+frontend/src/pages/teacher/TeacherDashboardPage.tsx
+frontend/src/pages/UsersPage.tsx
+frontend/src/pages/SchoolsPage.tsx
+frontend/src/pages/StudentsPage.tsx
+```
+
+**Left untouched, intentionally:** the two bespoke 28px empty-state
+illustrations (`StudentsEmptyIcon` in `StudentsPage.tsx` and
+`FounderStudentsPage.tsx`) and `PersianDatePicker`'s `ChevronRight`/
+`ChevronLeft` — none of these are part of the named shared set.
+
+**Sizing note:** call sites that didn't previously pass an explicit size
+now render at the new set's 20px default (up from the old ad-hoc 18px) —
+consistent across every stat card and nav icon. The three inline-context
+icons (`ErrorIcon`, `CalendarIcon` in the date picker, `DefaultIcon`)
+explicitly pass their original size (14 / 16 / 28) so nothing there
+shifts visually.
+
+**Verification in this offline sandbox:** every import resolves to a real
+export in `SchoolIcons.tsx` (checked all 25 exported names against every
+import site); every imported icon is referenced at its call site (no
+`noUnusedLocals` violations); brace/paren balance checked on all 13
+touched files. No `node_modules` in this sandbox, so a local `npm run
+build` / `tsc -b` is still recommended as the final gate before commit,
+consistent with every prior sprint's own audit note.
+
+## Bugfix pass
+
 
 Three small fixes reported after the Founder Dashboard sprint:
 

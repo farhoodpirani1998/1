@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { DefaultIcon } from './icons/SchoolIcons';
 
 interface EmptyStateProps {
   message: string;
@@ -6,15 +7,6 @@ interface EmptyStateProps {
   icon?: ReactNode;
   action?: ReactNode;
   className?: string;
-}
-
-function DefaultIcon() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <rect x="3" y="7" width="18" height="13" rx="2" />
-      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 12h18" />
-    </svg>
-  );
 }
 
 // Consistent "no data" placeholder. Visually replaces the ad-hoc
@@ -26,7 +18,7 @@ export function EmptyState({ message, description, icon, action, className = '' 
   return (
     <div className={`flex flex-col items-center justify-center gap-3 py-10 text-center ${className}`}>
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-paper text-ink/30 dark:bg-white/5 dark:text-paper/30">
-        {icon ?? <DefaultIcon />}
+        {icon ?? <DefaultIcon size={28} />}
       </div>
       <div>
         <p className="text-sm font-medium text-ink/60 dark:text-paper/60">{message}</p>

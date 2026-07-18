@@ -10,6 +10,7 @@ import {
   type JalaliDate,
 } from '../lib/jalali';
 import { toPersianDigits } from '../lib/format';
+import { CalendarIcon } from './icons/SchoolIcons';
 
 interface PersianDatePickerProps {
   /** ISO 'YYYY-MM-DD', or '' for no selection — same value shape as the
@@ -28,15 +29,6 @@ interface PersianDatePickerProps {
   disabled?: boolean;
   containerClassName?: string;
   className?: string;
-}
-
-function CalendarIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="3" y="5" width="18" height="16" rx="2" />
-      <path d="M8 3v4M16 3v4M3 10h18" />
-    </svg>
-  );
 }
 
 function ChevronRight() {
@@ -189,7 +181,7 @@ export function PersianDatePicker({
             {selected ? formatJalaliDisplay(selected) : placeholder}
           </span>
           <span className="shrink-0 text-ink/35 dark:text-paper/35">
-            <CalendarIcon />
+            <CalendarIcon size={16} />
           </span>
         </button>
 

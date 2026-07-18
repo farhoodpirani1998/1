@@ -24,7 +24,7 @@ import {
   StudentsIcon,
   AttendanceIcon,
   ScoreIcon,
-} from '../../components/icons/StatIcons';
+} from '../../components/icons/SchoolIcons';
 import { formatToman, formatDate, toPersianDigits, paymentMethodLabels } from '../../lib/format';
 import { useFounderSchoolDashboard } from '../../hooks/useFounder';
 import type {

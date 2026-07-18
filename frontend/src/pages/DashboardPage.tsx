@@ -26,7 +26,7 @@ import {
   ListIcon,
   UsersIcon,
   TargetIcon,
-} from '../components/icons/StatIcons';
+} from '../components/icons/SchoolIcons';
 import { formatToman, formatDate, toPersianDigits, paymentMethodLabels } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { useOverdueSummary, useDebtorStudents, useMonthlyIncome, useMonthlyIncomeTrend } from '../hooks/useReports';
