@@ -33,6 +33,13 @@ import { TeacherAssessmentsPage } from './pages/teacher/TeacherAssessmentsPage';
 import { TeacherHomeworkPage } from './pages/teacher/TeacherHomeworkPage';
 import { TeacherTimetablePage } from './pages/teacher/TeacherTimetablePage';
 import { TeacherComingSoonPage } from './pages/teacher/TeacherComingSoonPage';
+import { FounderOverviewPage } from './pages/founder/FounderOverviewPage';
+import { FounderSchoolLayout } from './pages/founder/FounderSchoolLayout';
+import { FounderSchoolDashboardPage } from './pages/founder/FounderSchoolDashboardPage';
+import { FounderStudentsPage } from './pages/founder/FounderStudentsPage';
+import { FounderTeachersPage } from './pages/founder/FounderTeachersPage';
+import { FounderStaffPage } from './pages/founder/FounderStaffPage';
+import { FounderTuitionPage } from './pages/founder/FounderTuitionPage';
 
 // This is a school back-office / accounting tool, not a realtime feed:
 // refetch-on-focus would just add flicker when switching tabs, and
@@ -127,6 +134,38 @@ export function App() {
                     </RequireRole>
                   }
                 />
+
+                {/* Founder Dashboard — read-only, multi-school portal (see
+                    founder-frontend-prompt.md). Shares the staff /login
+                    (HomeRedirect sends role:'founder' to /founder/overview
+                    after sign-in) rather than a dedicated login route, since
+                    the backend's login flow doesn't distinguish it — same
+                    reasoning as super_admin above. The school-scoped pages
+                    all nest under FounderSchoolLayout, which resolves
+                    :schoolId against GET /founder/schools and renders the
+                    shared breadcrumb/switcher/tab chrome. */}
+                <Route
+                  path="/founder/overview"
+                  element={
+                    <RequireRole roles={['founder']}>
+                      <FounderOverviewPage />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/founder/schools/:schoolId"
+                  element={
+                    <RequireRole roles={['founder']}>
+                      <FounderSchoolLayout />
+                    </RequireRole>
+                  }
+                >
+                  <Route index element={<FounderSchoolDashboardPage />} />
+                  <Route path="students" element={<FounderStudentsPage />} />
+                  <Route path="teachers" element={<FounderTeachersPage />} />
+                  <Route path="staff" element={<FounderStaffPage />} />
+                  <Route path="tuition" element={<FounderTuitionPage />} />
+                </Route>
               </Route>
 
               <Route element={<AppLayout loginPath="/parent/login" />}>

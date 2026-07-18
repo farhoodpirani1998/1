@@ -9,5 +9,9 @@ export function HomeRedirect() {
     return <Navigate to="/schools" replace />;
   }
 
+  if (user?.role === 'founder') {
+    return <Navigate to="/founder/overview" replace />;
+  }
+
   return <DashboardPage />;
 }

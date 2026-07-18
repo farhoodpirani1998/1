@@ -8,6 +8,7 @@ const roleLabels: Record<string, string> = {
   staff: 'کارمند',
   parent: 'والد',
   teacher: 'معلم',
+  founder: 'مؤسس',
 };
 
 export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {

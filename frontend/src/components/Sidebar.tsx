@@ -38,6 +38,14 @@ const navItems: NavItem[] = [
   { to: '/teacher/homework', label: 'تکالیف', icon: ReportsIcon, roles: ['teacher'] },
   { to: '/teacher/timetable', label: 'برنامه هفتگی', icon: PaymentsIcon, roles: ['teacher'] },
   { to: '/teacher/announcements', label: 'اطلاعیه‌ها', icon: SettingsIcon, roles: ['teacher'] },
+
+  // Founder portal — only ever visible to a signed-in founder. Unlike the
+  // parent/teacher item lists above, the per-school pages
+  // (dashboard/students/teachers/staff/tuition) aren't listed here since
+  // their routes carry a :schoolId (/founder/schools/:schoolId/...) that
+  // this static nav list can't express — those live in FounderSchoolLayout's
+  // own in-page tab bar instead (see pages/founder/FounderSchoolLayout.tsx).
+  { to: '/founder/overview', label: 'نمای کلی', icon: SchoolsIcon, roles: ['founder'] },
 ];
 
 const roleLabels: Record<string, string> = {
@@ -47,6 +55,7 @@ const roleLabels: Record<string, string> = {
   staff: 'کارمند',
   parent: 'والد',
   teacher: 'معلم',
+  founder: 'مؤسس',
 };
 
 export function Sidebar() {
@@ -54,6 +63,7 @@ export function Sidebar() {
   const visibleItems = navItems.filter((item) => user && item.roles.includes(user.role));
   const isParent = user?.role === 'parent';
   const isTeacher = user?.role === 'teacher';
+  const isFounder = user?.role === 'founder';
 
   return (
     <aside className="flex h-screen w-64 flex-col border-l border-white/[0.06] bg-navy text-white">
@@ -65,10 +75,16 @@ export function Sidebar() {
         </div>
         <div>
           <div className="text-[15px] font-bold leading-tight">
-            {isParent ? 'پنل والدین' : isTeacher ? 'پنل معلمان' : 'دفتر مدرسه'}
+            {isParent ? 'پنل والدین' : isTeacher ? 'پنل معلمان' : isFounder ? 'پنل مؤسسان' : 'دفتر مدرسه'}
           </div>
           <div className="mt-0.5 text-[11px] text-white/45">
-            {isParent ? 'وضعیت شهریه فرزندان' : isTeacher ? 'مدیریت کلاس‌های درسی' : 'پنل مدیریت مالی'}
+            {isParent
+              ? 'وضعیت شهریه فرزندان'
+              : isTeacher
+                ? 'مدیریت کلاس‌های درسی'
+                : isFounder
+                  ? 'نمای کلی چند مدرسه'
+                  : 'پنل مدیریت مالی'}
           </div>
         </div>
       </div>

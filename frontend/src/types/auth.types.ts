@@ -9,7 +9,12 @@ import type { ManagedUser } from './user.types';
 // on the backend (common/authorization/roles.enum.ts), same isolation
 // shape as 'parent' (never granted on staff-facing endpoints, only on its
 // own dedicated /teacher/* route group — see App.tsx).
-export type UserRole = 'super_admin' | 'school_admin' | 'accountant' | 'staff' | 'parent' | 'teacher';
+//
+// 'founder' — Founder Dashboard sprint. Owns one or more schools and gets
+// read-only access to aggregated + per-school data under /founder/*
+// (see founder-frontend-prompt.md). schoolId is always null for this
+// role, same as super_admin (a founder isn't scoped to one school).
+export type UserRole = 'super_admin' | 'school_admin' | 'accountant' | 'staff' | 'parent' | 'teacher' | 'founder';
 
 export interface AuthUser {
   id: string;

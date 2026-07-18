@@ -14,6 +14,8 @@ import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-han
 import { FormError } from '../components/FormError';
 import type { School } from '../types/school.types';
 import { useSchools, useCreateSchool, useUpdateSchool, useDeactivateSchool } from '../hooks/useSchools';
+import { useUsers } from '../hooks/useUsers';
+import { useLinkFounderToSchool, useUnlinkFounderFromSchool } from '../hooks/useFounder';
 
 const STATUS_FILTER_OPTIONS = [
   { value: 'all', label: 'همه وضعیت‌ها' },
@@ -256,6 +258,117 @@ export function SchoolsPage() {
           emptyDescription={hasActiveFilters ? 'برای این جستجو/فیلتر نتیجه‌ای یافت نشد.' : undefined}
         />
       </Card>
+
+      <FounderLinkManager schools={schools} />
     </div>
+  );
+}
+
+// Manages founder <-> school ownership (POST /founder/link, DELETE
+// /founder/link/:id — see founder-frontend-prompt.md §3). The backend
+// doesn't expose a GET to list a founder's existing links, so this can
+// only track links created in the current browser session (kept in
+// `createdLinks` below) — it can add a new link and remove one it just
+// created, but can't show or remove links made earlier or from another
+// session/device. Good enough for the common "just registered this
+// founder, now attach their schools" flow; anything beyond that needs a
+// backend listing endpoint.
+function FounderLinkManager({ schools }: { schools: School[] }) {
+  const { showSuccess, showError } = useToast();
+  const usersQuery = useUsers();
+  const founders = (usersQuery.data ?? []).filter((u) => u.role === 'founder');
+
+  const [founderId, setFounderId] = useState('');
+  const [schoolId, setSchoolId] = useState('');
+  const [createdLinks, setCreatedLinks] = useState<{ id: string; founderId: string; schoolId: string }[]>([]);
+
+  const linkMutation = useLinkFounderToSchool();
+  const unlinkMutation = useUnlinkFounderFromSchool();
+
+  function handleLink(e: FormEvent) {
+    e.preventDefault();
+    if (!founderId || !schoolId) return;
+    linkMutation.mutate(
+      { founderId, schoolId },
+      {
+        onSuccess: (link) => {
+          setCreatedLinks((prev) => [...prev, { id: link.id, founderId, schoolId }]);
+          showSuccess('مدرسه به حساب مؤسس متصل شد');
+        },
+        onError: (err) => showError(getErrorMessage(err)),
+      },
+    );
+  }
+
+  function handleUnlink(linkId: string) {
+    unlinkMutation.mutate(linkId, {
+      onSuccess: () => {
+        setCreatedLinks((prev) => prev.filter((l) => l.id !== linkId));
+        showSuccess('اتصال حذف شد');
+      },
+      onError: (err) => showError(getErrorMessage(err)),
+    });
+  }
+
+  if (founders.length === 0) {
+    return null;
+  }
+
+  return (
+    <Card title="اتصال مدرسه به حساب مؤسس" className="mt-6">
+      <p className="mb-4 text-xs text-ink/45 dark:text-paper/45">
+        یک مؤسس می‌تواند مالک چند مدرسه باشد. از اینجا مدرسه‌ای را به حساب یک مؤسس متصل کنید.
+      </p>
+      <form onSubmit={handleLink} className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Select
+          required
+          label="حساب مؤسس"
+          value={founderId}
+          onChange={(e) => setFounderId(e.target.value)}
+          placeholder="انتخاب مؤسس"
+          options={founders.map((f) => ({ value: f.id, label: f.fullName }))}
+        />
+        <Select
+          required
+          label="مدرسه"
+          value={schoolId}
+          onChange={(e) => setSchoolId(e.target.value)}
+          placeholder="انتخاب مدرسه"
+          options={schools.map((s) => ({ value: s.id, label: s.name }))}
+        />
+        <div className="flex items-end">
+          <Button type="submit" loading={linkMutation.isPending} fullWidth>
+            {linkMutation.isPending ? 'در حال اتصال...' : '+ اتصال مدرسه'}
+          </Button>
+        </div>
+      </form>
+
+      {createdLinks.length > 0 && (
+        <div className="mt-5 space-y-2">
+          {createdLinks.map((link) => {
+            const founder = founders.find((f) => f.id === link.founderId);
+            const school = schools.find((s) => s.id === link.schoolId);
+            return (
+              <div
+                key={link.id}
+                className="flex items-center justify-between gap-3 rounded-lg bg-paper px-3 py-2.5 text-sm dark:bg-white/5"
+              >
+                <span className="text-ink/80 dark:text-paper/80">
+                  {founder?.fullName ?? '—'} ← {school?.name ?? '—'}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  loading={unlinkMutation.isPending}
+                  onClick={() => handleUnlink(link.id)}
+                >
+                  حذف اتصال
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Card>
   );
 }

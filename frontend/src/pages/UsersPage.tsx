@@ -30,6 +30,13 @@ const roleLabels: Record<UserRole, string> = {
   // typed Record<UserRole, string>, so every role needs an entry here to
   // label a teacher row correctly if/when one shows up in the users list.
   teacher: 'معلم',
+  // Founder Dashboard sprint: founder accounts own one or more schools
+  // (schoolId is always null, like super_admin) and aren't created from
+  // the default role Select below (see CreateUserForm) any more than
+  // 'parent'/'teacher' are — but this map is Record<UserRole, string>, so
+  // every role still needs a label to show a founder row correctly if/
+  // when the create-role Select below is extended to offer it.
+  founder: 'مؤسس',
 };
 
 const ROLE_FILTER_OPTIONS: { value: UserRole | 'all'; label: string }[] = [
@@ -38,6 +45,7 @@ const ROLE_FILTER_OPTIONS: { value: UserRole | 'all'; label: string }[] = [
   { value: 'school_admin', label: roleLabels.school_admin },
   { value: 'accountant', label: roleLabels.accountant },
   { value: 'staff', label: roleLabels.staff },
+  { value: 'founder', label: roleLabels.founder },
 ];
 
 const STATUS_FILTER_OPTIONS = [
@@ -289,7 +297,7 @@ function CreateUserForm({
       phone,
       password,
       role,
-      schoolId: role === 'super_admin' ? undefined : schoolId,
+      schoolId: role === 'super_admin' || role === 'founder' ? undefined : schoolId,
     });
   }
 
@@ -327,10 +335,11 @@ function CreateUserForm({
             { value: 'accountant', label: roleLabels.accountant },
             { value: 'staff', label: roleLabels.staff },
             { value: 'super_admin', label: roleLabels.super_admin },
+            { value: 'founder', label: roleLabels.founder },
           ]}
         />
 
-        {role !== 'super_admin' && (
+        {role !== 'super_admin' && role !== 'founder' && (
           <Select
             required
             label="مدرسه"
@@ -340,6 +349,12 @@ function CreateUserForm({
             options={schools.map((s) => ({ value: s.id, label: s.name }))}
             containerClassName="col-span-full"
           />
+        )}
+
+        {role === 'founder' && (
+          <p className="col-span-full text-xs text-ink/50 dark:text-paper/50">
+            یک مؤسس به هیچ مدرسه‌ی خاصی محدود نیست. پس از ثبت این حساب، مالکیت مدرسه‌ها را از صفحه‌ی «مدارس» به آن متصل کنید.
+          </p>
         )}
 
         <div className="col-span-full">

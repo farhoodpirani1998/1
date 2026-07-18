@@ -1,5 +1,52 @@
 # Changelog — Integration Build
 
+## Sprint: Founder Dashboard (this change)
+
+Read-only, multi-school portal for the new `founder` role (see
+`founder-frontend-prompt.md`). A founder owns one or more schools and can
+view — but never edit — aggregated and per-school data under `/founder/*`.
+
+**New files**
+```
+frontend/src/types/founder.types.ts
+frontend/src/api/founder.api.ts
+frontend/src/hooks/useFounder.ts
+frontend/src/components/founder/FounderSchoolSwitcher.tsx
+frontend/src/pages/founder/FounderOverviewPage.tsx
+frontend/src/pages/founder/FounderSchoolLayout.tsx
+frontend/src/pages/founder/FounderSchoolDashboardPage.tsx
+frontend/src/pages/founder/FounderStudentsPage.tsx
+frontend/src/pages/founder/FounderTeachersPage.tsx
+frontend/src/pages/founder/FounderStaffPage.tsx
+frontend/src/pages/founder/FounderTuitionPage.tsx
+```
+
+**Modified files**
+```
+frontend/src/types/auth.types.ts    — added 'founder' to UserRole
+frontend/src/lib/queryKeys.ts       — added `founder` key namespace
+frontend/src/components/HomeRedirect.tsx — founder -> /founder/overview
+frontend/src/components/Sidebar.tsx — founder nav item + labels
+frontend/src/components/Topbar.tsx  — founder role label
+frontend/src/App.tsx                — /founder/* routes
+frontend/src/pages/UsersPage.tsx    — founder role in labels/filter/create form
+frontend/src/pages/SchoolsPage.tsx  — FounderLinkManager (super_admin-only
+                                       founder<->school ownership UI)
+```
+
+**Routes**
+- `/founder/overview` — aggregated totals across every owned school.
+- `/founder/schools/:schoolId` (+ `/students`, `/teachers`, `/staff`,
+  `/tuition`) — per-school views, wrapped in `FounderSchoolLayout` (school
+  switcher + tab bar + "school not found" handling for a stale/foreign
+  `schoolId`).
+
+**Known limitation**: the backend exposes `POST /founder/link` and
+`DELETE /founder/link/:id` but no `GET` to list a founder's existing
+school links, so `FounderLinkManager` (in SchoolsPage) can only track and
+un-link links created in the current browser session. A listing endpoint
+would remove this constraint.
+
 This is the final, integrated codebase merging every approved Sprint 1
 change into a single, conflict-free version. Frontend only. No backend
 files, no new npm packages, no new endpoints, TypeScript strict mode

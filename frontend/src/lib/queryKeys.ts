@@ -16,6 +16,8 @@
 
 import type { QueryStudentsParams } from '../api/students.api';
 import type { QueryInstallmentsParams } from '../api/tuition.api';
+import type { FounderSchoolDashboardParams } from '../api/founder.api';
+import type { QueryFounderStudentsParams } from '../types/founder.types';
 
 export const queryKeys = {
   students: {
@@ -121,5 +123,21 @@ export const queryKeys = {
     // Teacher Timetable. No filters — GET /teacher/timetable always
     // returns the caller's full schedule (see TeacherController).
     timetable: () => [...queryKeys.teacher.all(), 'timetable'] as const,
+  },
+
+  // Founder portal — read-only aggregated + per-school views (see
+  // founder-frontend-prompt.md). `schools()` is also the source list the
+  // school switcher and FounderSchoolLayout's not-found check use.
+  founder: {
+    all: () => ['founder'] as const,
+    schools: () => [...queryKeys.founder.all(), 'schools'] as const,
+    overview: () => [...queryKeys.founder.all(), 'overview'] as const,
+    dashboard: (schoolId: string, params?: FounderSchoolDashboardParams) =>
+      [...queryKeys.founder.all(), 'dashboard', schoolId, params ?? {}] as const,
+    students: (schoolId: string, params?: QueryFounderStudentsParams) =>
+      [...queryKeys.founder.all(), 'students', schoolId, params ?? {}] as const,
+    teachers: (schoolId: string) => [...queryKeys.founder.all(), 'teachers', schoolId] as const,
+    staff: (schoolId: string) => [...queryKeys.founder.all(), 'staff', schoolId] as const,
+    tuition: (schoolId: string) => [...queryKeys.founder.all(), 'tuition', schoolId] as const,
   },
 } as const;
