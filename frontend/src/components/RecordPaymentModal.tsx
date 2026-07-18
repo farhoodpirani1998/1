@@ -5,7 +5,6 @@ import { useToast } from '../lib/toast';
 import { useCreatePayment } from '../hooks/usePayments';
 import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
 import { FormError } from './FormError';
-import type { ReceiptData } from '../pages/PrintReceiptPage';
 
 export interface PayableInstallment {
   id: string;
@@ -62,9 +61,9 @@ export function RecordPaymentModal({
   const [referenceNumber, setReferenceNumber] = useState('');
   const [error, setError] = useState<ParsedApiError | null>(null);
   // Set once the payment mutation succeeds — while this holds a value, the
-  // form is replaced with the success tick and navigation to the receipt
-  // is queued for SUCCESS_TICK_MS later.
-  const [succeededReceipt, setSucceededReceipt] = useState<ReceiptData | null>(null);
+  // form is replaced with the success tick (showing the amount just paid)
+  // and navigation to the receipt page is queued for SUCCESS_TICK_MS later.
+  const [succeededAmount, setSucceededAmount] = useState<number | null>(null);
   // Generated once when the modal opens; sent on every retry of the same
   // submit action so a double-click or network retry can't create two
   // payments — backend's CreatePaymentDto.idempotencyKey exists for this.
@@ -91,21 +90,12 @@ export function RecordPaymentModal({
         onSuccess: (payment) => {
           showSuccess('پرداخت با موفقیت ثبت شد');
           onSaved();
-          // One-step flow: go straight to the existing receipt page instead
-          // of leaving the user to find a "چاپ رسید" link for the payment
-          // they just made. Reuses the same ReceiptData shape the manual
-          // print links already build (see StudentDetailPage) — no new
-          // fields, no backend change.
-          const receipt: ReceiptData = {
-            studentName,
-            installmentNumber: installment.installmentNumber,
-            amount: payment.amount,
-            paymentMethod: payment.paymentMethod ?? paymentMethod,
-            referenceNumber: payment.referenceNumber ?? undefined,
-            paidAt: payment.paidAt,
-          };
-          setSucceededReceipt(receipt);
-          setTimeout(() => navigate('/print/receipt', { state: receipt }), SUCCESS_TICK_MS);
+          // One-step flow: go straight to the receipt page instead of
+          // leaving the user to find a "چاپ رسید" link for the payment
+          // they just made. The page now fetches the receipt itself from
+          // GET /payments/:id/receipt, so all we pass along is the id.
+          setSucceededAmount(payment.amount);
+          setTimeout(() => navigate(`/print/receipt/${payment.id}`), SUCCESS_TICK_MS);
         },
         onError: (err) => {
           setError(parseApiError(err));
@@ -118,11 +108,11 @@ export function RecordPaymentModal({
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink/40 px-4">
       <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-card">
-        {succeededReceipt ? (
+        {succeededAmount !== null ? (
           <div className="flex flex-col items-center gap-3 py-4 text-center">
             <SuccessTick />
             <p className="text-sm font-medium text-ink">پرداخت ثبت شد</p>
-            <p className="tabular text-xs text-ink/50">{formatToman(succeededReceipt.amount)}</p>
+            <p className="tabular text-xs text-ink/50">{formatToman(succeededAmount)}</p>
           </div>
         ) : (
           <>

@@ -18,13 +18,25 @@
 // worse than one extra request.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createPayment, voidPayment, getPayments, type CreatePaymentInput } from '../api/payments.api';
+import { createPayment, voidPayment, getPayments, getReceipt, type CreatePaymentInput } from '../api/payments.api';
 import { queryKeys } from '../lib/queryKeys';
 
 export function usePayments(studentId?: string) {
   return useQuery({
     queryKey: queryKeys.payments.list(studentId),
     queryFn: () => getPayments(studentId).then((res) => res.data),
+  });
+}
+
+// Used by PrintReceiptPage: fetches the authoritative receipt (school
+// name/address/phone, receipt number, receivedBy) straight from the
+// backend by payment id, instead of the page relying on whatever fields
+// the navigating caller happened to pass in router state.
+export function useReceipt(paymentId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.payments.receipt(paymentId ?? ''),
+    queryFn: () => getReceipt(paymentId as string).then((res) => res.data),
+    enabled: !!paymentId,
   });
 }
 

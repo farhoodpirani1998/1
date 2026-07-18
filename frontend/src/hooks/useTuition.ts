@@ -3,8 +3,10 @@ import {
   createTuitionPlan,
   getTuitionPlan,
   generateInstallments,
+  updateTuitionPlan,
   type CreateTuitionPlanInput,
   type GenerateInstallmentsInput,
+  type UpdateTuitionPlanInput,
 } from '../api/tuition.api';
 import { queryKeys } from '../lib/queryKeys';
 
@@ -54,20 +56,37 @@ export function useGenerateInstallments() {
 }
 
 // ---------------------------------------------------------------------
-// NOT IMPLEMENTED: useUpdateTuitionPlan
+// useUpdateTuitionPlan — PATCH /tuition-plans/:id (discountAmount /
+// discountReason only; baseAmount is immutable after creation). Backend
+// added this route after the note that used to live here claiming it
+// didn't exist — see TuitionPlansController.update.
 //
-// The Phase 2 brief asked for invalidation rules for updateTuitionPlan,
-// but there is no such function in tuition.api.ts and no PATCH
-// /tuition-plans/:id route referenced anywhere in the Phase 0/1
-// comments — TuitionPlansController only exposes POST / and the
-// installments-generate sub-route. Inventing the API call would violate
-// the "don't change backend contract" rule from Phase 1, so this hook
-// is intentionally not created.
-//
-// If/when that endpoint exists, it should invalidate exactly what
-// useGenerateInstallments does above (installments.all(),
-// tuitionPlans.detail(planId), reports.all()) plus
+// Invalidates the same set useGenerateInstallments does
+// (installments.all(), tuitionPlans.detail(planId), reports.all()) plus
 // reports.studentStatement(studentId) directly, since editing a plan's
-// baseAmount/discount changes finalAmount and therefore every total on
-// the student's statement.
+// discount changes finalAmount and therefore every total on the
+// student's statement — a discount edit can also redistribute amounts
+// across still-pending/overdue installments (see backend), which is why
+// installments.all() is invalidated too.
 // ---------------------------------------------------------------------
+export function useUpdateTuitionPlan() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      planId,
+      dto,
+    }: {
+      planId: string;
+      dto: UpdateTuitionPlanInput;
+      studentId?: string; // context-only, not sent to the API — used for cache targeting below
+    }) => updateTuitionPlan(planId, dto).then((res) => res.data),
+    onSuccess: (_data, { planId, studentId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.installments.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tuitionPlans.detail(planId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports.all() });
+      if (studentId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.reports.studentStatement(studentId) });
+      }
+    },
+  });
+}

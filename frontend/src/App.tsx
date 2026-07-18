@@ -77,7 +77,7 @@ export function App() {
               <Route path="/parent/login" element={<ParentLoginPage />} />
               <Route path="/parent/forgot-password" element={<ParentForgotPasswordPage />} />
               <Route path="/teacher/login" element={<TeacherLoginPage />} />
-              <Route path="/print/receipt" element={<PrintReceiptPage />} />
+              <Route path="/print/receipt/:paymentId" element={<PrintReceiptPage />} />
 
               <Route element={<AppLayout />}>
                 {/* "/" itself isn't wrapped in RequireRole: HomeRedirect already

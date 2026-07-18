@@ -34,3 +34,14 @@ export interface QueryInstallmentsParams {
 export function getInstallments(params?: QueryInstallmentsParams) {
   return api.get<InstallmentWithStudent[]>('/installments', { params });
 }
+
+// PATCH /tuition-plans/:id — matches UpdateTuitionPlanDto: only
+// discountAmount/discountReason are editable (baseAmount is fixed once
+// the plan is created; see TuitionPlansService.update on the backend).
+export interface UpdateTuitionPlanInput {
+  discountAmount?: number;
+  discountReason?: string;
+}
+export function updateTuitionPlan(id: string, dto: UpdateTuitionPlanInput) {
+  return api.patch<TuitionPlan>(`/tuition-plans/${id}`, dto);
+}

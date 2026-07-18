@@ -22,10 +22,20 @@ import { hasPermission, Permission } from '../lib/permissions';
 import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
 import type { StudentStatus, Student, Grade } from '../types/student.types';
 import type { Payment } from '../types/payment.types';
-import { useStudent, useStudentParents, useAddStudentParent, useRemoveStudentParent } from '../hooks/useStudent';
+import type { TuitionPlan } from '../types/tuition.types';
+import { studentDocumentTypeLabels, type StudentDocumentType } from '../types/studentDocument.types';
+import {
+  useStudent,
+  useStudentParents,
+  useAddStudentParent,
+  useRemoveStudentParent,
+  useStudentDocuments,
+  useCreateStudentDocument,
+  useDeleteStudentDocument,
+} from '../hooks/useStudent';
 import { useUpdateStudent, useGrades, useAcademicYears } from '../hooks/useStudents';
 import { useStudentStatement } from '../hooks/useReports';
-import { useCreateTuitionPlan, useGenerateInstallments } from '../hooks/useTuition';
+import { useCreateTuitionPlan, useGenerateInstallments, useUpdateTuitionPlan } from '../hooks/useTuition';
 import { useVoidPayment } from '../hooks/usePayments';
 
 const statusLabels: Record<StudentStatus, string> = {
@@ -263,6 +273,15 @@ export function StudentDetailPage() {
         </div>
       )}
 
+      {/* Uploaded document references (identity, registration, contract,
+          medical, other) — matches GET/POST /students/:id/documents,
+          DELETE /documents/:id (school_admin, staff). */}
+      {student && canEditStatus && (
+        <div className="mb-6">
+          <StudentDocumentsSection studentId={student.id} canManage={canEditStatus} />
+        </div>
+      )}
+
       {/* Financial summary */}
       <SectionHeader title="خلاصه مالی" />
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -293,11 +312,17 @@ export function StudentDetailPage() {
 
       {statement.tuitionPlans.length === 0 && <CreateTuitionPlanForm studentId={statement.student.id} />}
 
-      {statement.tuitionPlans.map((plan) =>
-        plan.installments.length === 0 ? (
-          <GenerateInstallmentsForm key={plan.id} planId={plan.id} finalAmount={plan.finalAmount} />
-        ) : (
-          <Card key={plan.id} title="اقساط" className="mb-4">
+      {statement.tuitionPlans.map((plan) => (
+        <Fragment key={plan.id}>
+          <TuitionPlanDiscountCard
+            plan={plan}
+            studentId={statement.student.id}
+            canManage={user?.role === 'school_admin' || user?.role === 'accountant'}
+          />
+          {plan.installments.length === 0 ? (
+            <GenerateInstallmentsForm planId={plan.id} finalAmount={plan.finalAmount} />
+          ) : (
+            <Card title="اقساط" className="mb-4">
             <table className="ledger-lines w-full text-sm">
               <thead>
                 <tr className="text-right text-ink/50">
@@ -362,17 +387,7 @@ export function StudentDetailPage() {
                                   <td className="py-1.5 text-left">
                                     <div className="flex items-center justify-end gap-3">
                                       <button
-                                        onClick={() =>
-                                          navigate('/print/receipt', {
-                                            state: {
-                                              studentName: statement.student.fullName,
-                                              installmentNumber: inst.installmentNumber,
-                                              amount: p.amount,
-                                              paymentMethod: p.paymentMethod ?? 'card_to_card',
-                                              paidAt: p.paidAt,
-                                            },
-                                          })
-                                        }
+                                        onClick={() => navigate(`/print/receipt/${p.id}`)}
                                         className="text-ink/50 hover:underline"
                                       >
                                         چاپ رسید
@@ -399,8 +414,9 @@ export function StudentDetailPage() {
               </tbody>
             </table>
           </Card>
-        ),
-      )}
+          )}
+        </Fragment>
+      ))}
 
       {payingInstallment && (
         <RecordPaymentModal
@@ -426,6 +442,109 @@ export function StudentDetailPage() {
         />
       )}
     </div>
+  );
+}
+
+// Summary + edit for one tuition plan's discount. Shows baseAmount /
+// discountAmount / finalAmount (previously not displayed anywhere on
+// this page) and, for school_admin/accountant, a form to PATCH
+// discountAmount/discountReason. baseAmount itself is never editable —
+// matches UpdateTuitionPlanDto on the backend.
+function TuitionPlanDiscountCard({
+  plan,
+  studentId,
+  canManage,
+}: {
+  plan: TuitionPlan;
+  studentId: string;
+  canManage: boolean;
+}) {
+  const { showSuccess, showError } = useToast();
+  const updatePlan = useUpdateTuitionPlan();
+  const [showForm, setShowForm] = useState(false);
+  const [discountAmount, setDiscountAmount] = useState(plan.discountAmount);
+  const [discountReason, setDiscountReason] = useState(plan.discountReason ?? '');
+  const [error, setError] = useState<ParsedApiError | null>(null);
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    updatePlan.mutate(
+      { planId: plan.id, studentId, dto: { discountAmount, discountReason: discountReason || undefined } },
+      {
+        onSuccess: () => {
+          showSuccess('برنامه شهریه به‌روزرسانی شد');
+          setShowForm(false);
+        },
+        onError: (err) => {
+          setError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
+      },
+    );
+  }
+
+  return (
+    <Card
+      title="برنامه شهریه"
+      className="mb-4"
+      action={
+        canManage &&
+        !showForm && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setDiscountAmount(plan.discountAmount);
+              setDiscountReason(plan.discountReason ?? '');
+              setShowForm(true);
+            }}
+          >
+            ویرایش تخفیف
+          </Button>
+        )
+      }
+    >
+      {showForm ? (
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Input
+            label="مبلغ شهریه پایه"
+            value={formatToman(plan.baseAmount)}
+            disabled
+            containerClassName="opacity-70"
+          />
+          <Input
+            label="مبلغ تخفیف (تومان)"
+            type="number"
+            min={0}
+            max={plan.baseAmount}
+            value={discountAmount}
+            onChange={(e) => setDiscountAmount(Number(e.target.value))}
+          />
+          <Input label="دلیل تخفیف" value={discountReason} onChange={(e) => setDiscountReason(e.target.value)} />
+          <div className="sm:col-span-3">
+            <FormError error={error} />
+            <div className="flex gap-2">
+              <Button type="submit" loading={updatePlan.isPending}>
+                ذخیره
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+                انصراف
+              </Button>
+            </div>
+          </div>
+        </form>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <InfoRow label="مبلغ شهریه پایه" value={formatToman(plan.baseAmount)} />
+          <InfoRow
+            label="تخفیف"
+            value={plan.discountAmount > 0 ? `${formatToman(plan.discountAmount)}${plan.discountReason ? ` (${plan.discountReason})` : ''}` : '—'}
+          />
+          <InfoRow label="مبلغ نهایی" value={formatToman(plan.finalAmount)} />
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -816,6 +935,162 @@ function StudentParentsSection({
         loading={removeParent.isPending}
         onConfirm={handleConfirmRemove}
         onCancel={() => setRemovingLinkId(null)}
+      />
+    </Card>
+  );
+}
+
+// "مدارک" section on StudentDetailPage: lists uploaded document
+// references for this student (GET /students/:id/documents), a form to
+// add one (POST /students/:id/documents), and a delete button
+// (DELETE /documents/:id). The backend stores a fileUrl reference only
+// (no binary upload) — see CreateStudentDocumentDto — so the form takes
+// an already-hosted URL, same as Payment.referenceNumber elsewhere.
+function StudentDocumentsSection({ studentId, canManage }: { studentId: string; canManage: boolean }) {
+  const { showSuccess, showError } = useToast();
+  const documentsQuery = useStudentDocuments(studentId);
+  const createDocument = useCreateStudentDocument();
+  const deleteDocument = useDeleteStudentDocument(studentId);
+  const documents = documentsQuery.data ?? [];
+
+  const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState('');
+  const [documentType, setDocumentType] = useState<StudentDocumentType>('identity');
+  const [fileUrl, setFileUrl] = useState('');
+  const [description, setDescription] = useState('');
+  const [error, setError] = useState<ParsedApiError | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    createDocument.mutate(
+      { studentId, dto: { title, documentType, fileUrl, description: description || undefined } },
+      {
+        onSuccess: () => {
+          showSuccess('مدرک ثبت شد');
+          setTitle('');
+          setDocumentType('identity');
+          setFileUrl('');
+          setDescription('');
+          setShowForm(false);
+        },
+        onError: (err) => {
+          setError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
+      },
+    );
+  }
+
+  function handleConfirmRemove() {
+    if (!removingId) return;
+    deleteDocument.mutate(removingId, {
+      onSuccess: () => {
+        showSuccess('مدرک حذف شد');
+        setRemovingId(null);
+      },
+      onError: (err) => {
+        showError(getErrorMessage(err));
+        setRemovingId(null);
+      },
+    });
+  }
+
+  return (
+    <Card
+      title="مدارک"
+      action={
+        canManage &&
+        !showForm && (
+          <Button variant="ghost" size="sm" onClick={() => setShowForm(true)}>
+            افزودن مدرک
+          </Button>
+        )
+      }
+    >
+      {showForm && (
+        <form onSubmit={handleSubmit} className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Input label="عنوان" required value={title} onChange={(e) => setTitle(e.target.value)} />
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-ink dark:text-paper">نوع مدرک</label>
+            <select
+              value={documentType}
+              onChange={(e) => setDocumentType(e.target.value as StudentDocumentType)}
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink dark:border-white/15 dark:bg-navy-dark dark:text-paper"
+            >
+              {Object.entries(studentDocumentTypeLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <Input
+              label="لینک فایل"
+              required
+              type="url"
+              placeholder="https://..."
+              value={fileUrl}
+              onChange={(e) => setFileUrl(e.target.value)}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Input label="توضیحات (اختیاری)" value={description} onChange={(e) => setDescription(e.target.value)} />
+          </div>
+          <div className="sm:col-span-2">
+            <FormError error={error} />
+            <div className="flex gap-2">
+              <Button type="submit" loading={createDocument.isPending}>
+                ثبت مدرک
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setShowForm(false)}>
+                انصراف
+              </Button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {documentsQuery.isLoading ? (
+        <SkeletonRows rows={2} cols={2} />
+      ) : documents.length === 0 ? (
+        <EmptyState message="هیچ مدرکی برای این دانش‌آموز بارگذاری نشده است." />
+      ) : (
+        <div className="divide-y divide-line dark:divide-white/10">
+          {documents.map((doc) => (
+            <div key={doc.id} className="flex items-center justify-between gap-3 py-2.5">
+              <div>
+                <div className="text-sm font-medium text-ink dark:text-paper">{doc.title}</div>
+                <div className="text-xs text-ink/60 dark:text-paper/60">
+                  {studentDocumentTypeLabels[doc.documentType]} · {formatDate(doc.createdAt)}
+                  {doc.description ? ` · ${doc.description}` : ''}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-action hover:underline">
+                  مشاهده
+                </a>
+                {canManage && (
+                  <button onClick={() => setRemovingId(doc.id)} className="text-xs text-overdue hover:underline">
+                    حذف
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={!!removingId}
+        title="حذف مدرک"
+        description="این مدرک برای همیشه حذف می‌شود."
+        variant="danger"
+        loading={deleteDocument.isPending}
+        onConfirm={handleConfirmRemove}
+        onCancel={() => setRemovingId(null)}
       />
     </Card>
   );

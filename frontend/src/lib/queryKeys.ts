@@ -29,6 +29,10 @@ export const queryKeys = {
     // POST/GET /students/:id/parent(s) — parent-portal logins linked to
     // one student, managed from StudentDetailPage's "والدین" section.
     parents: (id: string) => [...queryKeys.students.all(), 'parents', id] as const,
+    // Sprint 1: POST/GET /students/:id/documents, DELETE /documents/:id
+    // — uploaded document references shown in StudentDetailPage's
+    // "مدارک" section.
+    documents: (id: string) => [...queryKeys.students.all(), 'documents', id] as const,
   },
 
   grades: {
@@ -75,6 +79,7 @@ export const queryKeys = {
   payments: {
     all: () => ['payments'] as const,
     list: (studentId?: string) => [...queryKeys.payments.all(), 'list', studentId ?? null] as const,
+    receipt: (paymentId: string) => [...queryKeys.payments.all(), 'receipt', paymentId] as const,
   },
 
   reports: {
