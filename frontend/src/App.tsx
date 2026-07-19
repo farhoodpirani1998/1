@@ -34,6 +34,11 @@ import { ParentTuitionPage } from './pages/parent/ParentTuitionPage';
 import { ParentInstallmentsPage } from './pages/parent/ParentInstallmentsPage';
 import { ParentPaymentsPage } from './pages/parent/ParentPaymentsPage';
 import { ParentReportCardPage } from './pages/parent/ParentReportCardPage';
+import { ParentAttendancePage } from './pages/parent/ParentAttendancePage';
+import { ParentAnnouncementsPage } from './pages/parent/ParentAnnouncementsPage';
+import { ParentDocumentsPage } from './pages/parent/ParentDocumentsPage';
+import { ParentTimetablePage } from './pages/parent/ParentTimetablePage';
+import { ParentHomeworkPage } from './pages/parent/ParentHomeworkPage';
 import { ParentStudentProvider } from './lib/parentStudent';
 import { TeacherLoginPage } from './pages/teacher/TeacherLoginPage';
 import { TeacherForgotPasswordPage } from './pages/teacher/TeacherForgotPasswordPage';
@@ -312,6 +317,11 @@ export function App() {
                   <Route path="installments" element={<ParentInstallmentsPage />} />
                   <Route path="payments" element={<ParentPaymentsPage />} />
                   <Route path="report-card" element={<ParentReportCardPage />} />
+                  <Route path="attendance" element={<ParentAttendancePage />} />
+                  <Route path="announcements" element={<ParentAnnouncementsPage />} />
+                  <Route path="documents" element={<ParentDocumentsPage />} />
+                  <Route path="timetable" element={<ParentTimetablePage />} />
+                  <Route path="homework" element={<ParentHomeworkPage />} />
                 </Route>
               </Route>
 

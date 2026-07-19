@@ -7,6 +7,10 @@ import {
   getMyAnnouncements,
   getStudentAssessments,
   getStudentReportCard,
+  getStudentAttendance,
+  getStudentDocuments,
+  getStudentTimetable,
+  getStudentHomework,
 } from '../api/parent.api';
 import { queryKeys } from '../lib/queryKeys';
 
@@ -62,6 +66,38 @@ export function useStudentReportCard(studentId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.parent.reportCard(studentId ?? ''),
     queryFn: () => getStudentReportCard(studentId as string).then((res) => res.data),
+    enabled: !!studentId,
+  });
+}
+
+export function useStudentAttendance(studentId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.parent.attendance(studentId ?? ''),
+    queryFn: () => getStudentAttendance(studentId as string).then((res) => res.data),
+    enabled: !!studentId,
+  });
+}
+
+export function useStudentDocuments(studentId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.parent.documents(studentId ?? ''),
+    queryFn: () => getStudentDocuments(studentId as string).then((res) => res.data),
+    enabled: !!studentId,
+  });
+}
+
+export function useStudentTimetable(studentId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.parent.timetable(studentId ?? ''),
+    queryFn: () => getStudentTimetable(studentId as string).then((res) => res.data),
+    enabled: !!studentId,
+  });
+}
+
+export function useStudentHomework(studentId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.parent.homework(studentId ?? ''),
+    queryFn: () => getStudentHomework(studentId as string).then((res) => res.data),
     enabled: !!studentId,
   });
 }

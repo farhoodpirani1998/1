@@ -95,3 +95,60 @@ export interface ReportCardView {
   terms: ReportCardTermSummary[];
   overallAverage: number | null;
 }
+
+// Mirrors backend AttendanceStatus (attendance/entities/attendance.entity.ts).
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
+
+// Mirrors backend ParentAttendanceView (attendance/dto/attendance-view.dto.ts),
+// returned by GET /parent/students/:id/attendance.
+export interface ParentAttendanceView {
+  id: string;
+  date: string;
+  status: AttendanceStatus;
+  note: string | null;
+}
+
+// Mirrors backend ParentStudentDocumentView (student-documents/dto/student-document-view.dto.ts),
+// returned by GET /parent/students/:id/documents.
+export interface ParentStudentDocumentView {
+  id: string;
+  title: string;
+  documentType: string;
+  fileUrl: string;
+  description: string | null;
+  createdAt: string;
+}
+
+// Mirrors backend RecipientTimetableEntryView (timetable/dto/timetable-entry-view.dto.ts),
+// returned by GET /parent/students/:id/timetable.
+export interface ParentTimetableEntryView {
+  id: string;
+  academicYearId: string;
+  gradeId: string;
+  gradeTitle?: string;
+  subjectId: string;
+  subjectTitle?: string;
+  teacherId: string;
+  teacherName?: string;
+  weekday: number;
+  startTime: string;
+  endTime: string;
+  room: string | null;
+}
+
+// Mirrors backend RecipientHomeworkView (homework/dto/homework-view.dto.ts),
+// returned by GET /parent/students/:id/homework.
+export interface ParentHomeworkView {
+  id: string;
+  academicYearId: string;
+  gradeId: string;
+  gradeTitle?: string;
+  subjectId: string;
+  subjectTitle?: string;
+  teacherId: string;
+  teacherName?: string;
+  title: string;
+  description: string;
+  dueDate: string;
+  attachmentUrl: string | null;
+}

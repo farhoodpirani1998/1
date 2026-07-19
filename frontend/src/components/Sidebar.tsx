@@ -16,6 +16,7 @@ import {
   UsersIcon,
   CalendarIcon,
   AttendanceIcon,
+  ListIcon,
   type IconProps,
 } from './icons/SchoolIcons';
 
@@ -50,6 +51,11 @@ const navItems: NavItem[] = [
   { to: '/parent/installments', label: 'اقساط', icon: InstallmentsIcon, roles: ['parent'] },
   { to: '/parent/payments', label: 'تاریخچه پرداخت‌ها', icon: PaymentsIcon, roles: ['parent'] },
   { to: '/parent/report-card', label: 'کارنامه', icon: ReportsIcon, roles: ['parent'] },
+  { to: '/parent/attendance', label: 'حضور و غیاب', icon: AttendanceIcon, roles: ['parent'] },
+  { to: '/parent/homework', label: 'تکالیف', icon: AssignmentsIcon, roles: ['parent'] },
+  { to: '/parent/timetable', label: 'برنامه هفتگی', icon: CalendarIcon, roles: ['parent'] },
+  { to: '/parent/documents', label: 'مدارک', icon: ListIcon, roles: ['parent'] },
+  { to: '/parent/announcements', label: 'اطلاعیه‌ها', icon: SettingsIcon, roles: ['parent'] },
 
   // Teacher portal — only ever visible to a signed-in teacher, on the
   // separate /teacher/* route group (see App.tsx). Every item below is

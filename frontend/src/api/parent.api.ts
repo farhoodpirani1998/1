@@ -7,6 +7,10 @@ import type {
   ParentAnnouncementView,
   ParentAssessmentView,
   ReportCardView,
+  ParentAttendanceView,
+  ParentStudentDocumentView,
+  ParentTimetableEntryView,
+  ParentHomeworkView,
 } from '../types/parent.types';
 
 // GET /parent/students — @Roles('parent'). Returns only the students this
@@ -51,6 +55,31 @@ export function getStudentReportCard(studentId: string) {
 // own school.
 export function getMyAnnouncements() {
   return api.get<ParentAnnouncementView[]>('/parent/announcements');
+}
+
+// GET /parent/students/:id/attendance — @Roles('parent'). Every recorded
+// attendance row for the linked child, ownership-checked server-side same
+// as tuition/installments/payments above.
+export function getStudentAttendance(studentId: string) {
+  return api.get<ParentAttendanceView[]>(`/parent/students/${studentId}/attendance`);
+}
+
+// GET /parent/students/:id/documents — @Roles('parent'). Every document
+// reference uploaded for the linked child, ownership-checked the same way.
+export function getStudentDocuments(studentId: string) {
+  return api.get<ParentStudentDocumentView[]>(`/parent/students/${studentId}/documents`);
+}
+
+// GET /parent/students/:id/timetable — @Roles('parent'). The linked
+// child's grade's weekly schedule, ownership-checked the same way.
+export function getStudentTimetable(studentId: string) {
+  return api.get<ParentTimetableEntryView[]>(`/parent/students/${studentId}/timetable`);
+}
+
+// GET /parent/students/:id/homework — @Roles('parent'). The linked
+// child's grade's assigned homework, ownership-checked the same way.
+export function getStudentHomework(studentId: string) {
+  return api.get<ParentHomeworkView[]>(`/parent/students/${studentId}/homework`);
 }
 
 // DELETE /parent/link/:id — @Roles('school_admin'). Removes a
