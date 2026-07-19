@@ -78,3 +78,71 @@ export interface UpdateTuitionPlanInput {
 export function updateTuitionPlan(id: string, dto: UpdateTuitionPlanInput) {
   return api.patch<TuitionPlan>(`/tuition-plans/${id}`, dto);
 }
+
+// POST /tuition-plans/:id/installments — appends one installment to an
+// already-generated schedule. school_admin-only on the backend
+// (Permission.INSTALLMENT_SCHEDULE_EDIT); matches AddInstallmentDto.
+export interface AddInstallmentInput {
+  amount: number;
+  dueDate: string;
+}
+export function addInstallment(planId: string, dto: AddInstallmentInput) {
+  return api.post<Installment>(`/tuition-plans/${planId}/installments`, dto);
+}
+
+// POST /tuition-plans/:id/installments/renegotiate — rebuilds the
+// unpaid remainder of a plan's schedule into a new set of installments;
+// everything already paid/cancelled/deferred/disputed/written-off is
+// left untouched (see InstallmentsService.renegotiate on the backend).
+export interface RenegotiateInstallmentsInput {
+  count: number;
+  startDate: string;
+  intervalDays: number;
+}
+export function renegotiateInstallments(planId: string, dto: RenegotiateInstallmentsInput) {
+  return api.post<Installment[]>(`/tuition-plans/${planId}/installments/renegotiate`, dto);
+}
+
+// PATCH /installments/:id — dueDate/amount only (matches
+// UpdateInstallmentDto).
+export interface UpdateInstallmentInput {
+  dueDate?: string;
+  amount?: number;
+}
+export function updateInstallment(id: string, dto: UpdateInstallmentInput) {
+  // Backend also returns an optional amountMismatchWarning when the new
+  // amount no longer matches the plan total minus its other
+  // installments — see InstallmentsService.update.
+  return api.patch<Installment & { amountMismatchWarning?: string }>(`/installments/${id}`, dto);
+}
+
+// PATCH /installments/:id/status — manual lifecycle override
+// (cancel/defer/dispute/reinstate), gated by
+// Permission.INSTALLMENT_STATUS_OVERRIDE on the backend. `reason` is
+// required (5-300 chars, see OverrideInstallmentStatusDto).
+export interface OverrideInstallmentStatusInput {
+  status: InstallmentStatus;
+  reason: string;
+}
+export function overrideInstallmentStatus(id: string, dto: OverrideInstallmentStatusInput) {
+  return api.patch<Installment>(`/installments/${id}/status`, dto);
+}
+
+// PATCH /installments/:id/write-off — forgives whatever remains owed on
+// this installment. school_admin-only (Permission.INSTALLMENT_WRITE_OFF).
+export interface WriteOffInstallmentInput {
+  reason: string;
+}
+export function writeOffInstallment(id: string, dto: WriteOffInstallmentInput) {
+  return api.patch<Installment>(`/installments/${id}/write-off`, dto);
+}
+
+// DELETE /installments/:id — only a PENDING installment can be removed
+// outright (see InstallmentsService.removeInstallment on the backend).
+// `reason` is required, same shape as writeOff/overrideStatus.
+export interface RemoveInstallmentInput {
+  reason: string;
+}
+export function removeInstallment(id: string, dto: RemoveInstallmentInput) {
+  return api.delete<{ id: string }>(`/installments/${id}`, { data: dto });
+}

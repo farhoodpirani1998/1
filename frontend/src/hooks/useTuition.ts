@@ -4,9 +4,21 @@ import {
   getTuitionPlan,
   generateInstallments,
   updateTuitionPlan,
+  addInstallment,
+  renegotiateInstallments,
+  updateInstallment,
+  overrideInstallmentStatus,
+  writeOffInstallment,
+  removeInstallment,
   type CreateTuitionPlanInput,
   type GenerateInstallmentsInput,
   type UpdateTuitionPlanInput,
+  type AddInstallmentInput,
+  type RenegotiateInstallmentsInput,
+  type UpdateInstallmentInput,
+  type OverrideInstallmentStatusInput,
+  type WriteOffInstallmentInput,
+  type RemoveInstallmentInput,
 } from '../api/tuition.api';
 import { queryKeys } from '../lib/queryKeys';
 
@@ -88,5 +100,150 @@ export function useUpdateTuitionPlan() {
         queryClient.invalidateQueries({ queryKey: queryKeys.reports.studentStatement(studentId) });
       }
     },
+  });
+}
+
+// ---------------------------------------------------------------------
+// useAddInstallment — POST /tuition-plans/:id/installments. Same
+// invalidation set as useGenerateInstallments (a new installment is new
+// debt against the plan), plus reports.studentStatement(studentId) when
+// the caller has it on hand, same "context-only" pattern as
+// useUpdateTuitionPlan's studentId field above.
+// ---------------------------------------------------------------------
+export function useAddInstallment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      planId,
+      dto,
+    }: {
+      planId: string;
+      dto: AddInstallmentInput;
+      studentId?: string;
+    }) => addInstallment(planId, dto).then((res) => res.data),
+    onSuccess: (_data, { planId, studentId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.installments.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tuitionPlans.detail(planId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports.all() });
+      if (studentId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.reports.studentStatement(studentId) });
+      }
+    },
+  });
+}
+
+// ---------------------------------------------------------------------
+// useRenegotiateInstallments — POST
+// /tuition-plans/:id/installments/renegotiate. Rebuilds the plan's
+// unpaid schedule, so the invalidation set is identical to
+// useAddInstallment/useGenerateInstallments.
+// ---------------------------------------------------------------------
+export function useRenegotiateInstallments() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      planId,
+      dto,
+    }: {
+      planId: string;
+      dto: RenegotiateInstallmentsInput;
+      studentId?: string;
+    }) => renegotiateInstallments(planId, dto).then((res) => res.data),
+    onSuccess: (_data, { planId, studentId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.installments.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.tuitionPlans.detail(planId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.reports.all() });
+      if (studentId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.reports.studentStatement(studentId) });
+      }
+    },
+  });
+}
+
+// ---------------------------------------------------------------------
+// useUpdateInstallment / useOverrideInstallmentStatus /
+// useWriteOffInstallment / useRemoveInstallment — all four act on a
+// single installment by id (no planId in the URL), so callers pass
+// planId/studentId only for cache targeting, same context-only pattern
+// used above. All change either the amount owed or an installment's
+// status, which is exactly what installments.all() + reports.all()
+// cover; tuitionPlans.detail(planId) and reports.studentStatement are
+// added whenever the caller has that context on hand.
+// ---------------------------------------------------------------------
+function invalidateInstallmentMutation(
+  queryClient: ReturnType<typeof useQueryClient>,
+  { planId, studentId }: { planId?: string; studentId?: string },
+) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.installments.all() });
+  queryClient.invalidateQueries({ queryKey: queryKeys.reports.all() });
+  if (planId) {
+    queryClient.invalidateQueries({ queryKey: queryKeys.tuitionPlans.detail(planId) });
+  }
+  if (studentId) {
+    queryClient.invalidateQueries({ queryKey: queryKeys.reports.studentStatement(studentId) });
+  }
+}
+
+export function useUpdateInstallment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      dto,
+    }: {
+      id: string;
+      dto: UpdateInstallmentInput;
+      planId?: string;
+      studentId?: string;
+    }) => updateInstallment(id, dto).then((res) => res.data),
+    onSuccess: (_data, ctx) => invalidateInstallmentMutation(queryClient, ctx),
+  });
+}
+
+export function useOverrideInstallmentStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      dto,
+    }: {
+      id: string;
+      dto: OverrideInstallmentStatusInput;
+      planId?: string;
+      studentId?: string;
+    }) => overrideInstallmentStatus(id, dto).then((res) => res.data),
+    onSuccess: (_data, ctx) => invalidateInstallmentMutation(queryClient, ctx),
+  });
+}
+
+export function useWriteOffInstallment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      dto,
+    }: {
+      id: string;
+      dto: WriteOffInstallmentInput;
+      planId?: string;
+      studentId?: string;
+    }) => writeOffInstallment(id, dto).then((res) => res.data),
+    onSuccess: (_data, ctx) => invalidateInstallmentMutation(queryClient, ctx),
+  });
+}
+
+export function useRemoveInstallment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      dto,
+    }: {
+      id: string;
+      dto: RemoveInstallmentInput;
+      planId?: string;
+      studentId?: string;
+    }) => removeInstallment(id, dto).then((res) => res.data),
+    onSuccess: (_data, ctx) => invalidateInstallmentMutation(queryClient, ctx),
   });
 }
