@@ -234,6 +234,39 @@ export const AttendanceIcon = (props: IconProps) =>
     </>
   );
 
+/** اعلان‌ها: زنگوله با نقطه‌ی کوچک برای نشان‌دادن اعلان تازه، هماهنگ با ست */
+export const NotificationIcon = (props: IconProps) =>
+  base(
+    props,
+    <>
+      <path d="M6 10a6 6 0 0 1 12 0c0 3.1 1 4.7 1.8 5.6a1 1 0 0 1-.8 1.6H5a1 1 0 0 1-.8-1.6C5 14.7 6 13.1 6 10Z" />
+      <path d="M9.5 17.2a2.6 2.6 0 0 0 5 0" />
+      <circle cx="17.5" cy="6.2" r="2.4" fill="currentColor" fillOpacity="0.15" />
+    </>
+  );
+
+/** پیام: حباب گفتگو با گوشه‌ی چمفرشده — برای پیام‌های والدین */
+export const MessageIcon = (props: IconProps) =>
+  base(
+    props,
+    <>
+      <path d="M4 5.5h13.5a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1H9l-4 3.5V16H4a1 1 0 0 1-1-1V6.5a1 1 0 0 1 1-1Z" />
+      <path d="M7 9.5h8" />
+      <path d="M7 12.5h5" />
+    </>
+  );
+
+/** فعالیت اخیر: ساعت با فلش برگشتی به دور آن، برای نمای تایم‌لاین */
+export const HistoryIcon = (props: IconProps) =>
+  base(
+    props,
+    <>
+      <path d="M12 7.5V12l3 2" />
+      <path d="M4.5 12a7.5 7.5 0 1 1 2.4 5.5" />
+      <path d="M3 8v3.5h3.5" />
+    </>
+  );
+
 /* ------------------------------------------------------------------ */
 /* ناوبری / عمومی                                                      */
 /* ------------------------------------------------------------------ */
@@ -381,6 +414,15 @@ export const ErrorIcon = (props: IconProps) =>
       <path d="M8 3.5h8L20.5 8v8L16 20.5H8L3.5 16V8Z" />
       <path d="M9.5 9.5l5 5" />
       <path d="M14.5 9.5l-5 5" />
+    </>
+  );
+
+/** پیکان ورود (RTL): برای دکمه‌های "ورود به..."/ناوبری به جلو در چیدمان راست‌به‌چپ */
+export const ChevronEnterIcon = (props: IconProps) =>
+  base(
+    props,
+    <>
+      <path d="M14.5 6.5 8 12l6.5 5.5" />
     </>
   );
 
