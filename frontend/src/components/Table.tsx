@@ -76,15 +76,13 @@ export function Table<T>({
     <div className={`overflow-x-auto ${className}`}>
       <table className="w-full text-sm">
         <thead>
-          <tr
-            className={`border-b border-line text-ink/50 dark:border-white/10 dark:text-paper/50 ${
-              stickyHeader ? 'sticky top-16 z-[5] bg-white dark:bg-navy-dark' : ''
-            }`}
-          >
+          <tr className="border-b border-line text-ink/50 dark:border-white/10 dark:text-paper/50">
             {columns.map((col) => (
               <th
                 key={col.key}
-                className={`py-2 font-medium ${ALIGN_CLASS[col.align ?? 'right']} ${col.headerClassName ?? ''}`}
+                className={`py-2 font-medium ${ALIGN_CLASS[col.align ?? 'right']} ${
+                  stickyHeader ? 'sticky top-16 z-[5] bg-white dark:bg-navy-dark' : ''
+                } ${col.headerClassName ?? ''}`}
               >
                 {col.header}
               </th>

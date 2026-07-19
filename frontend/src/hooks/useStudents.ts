@@ -20,7 +20,7 @@ import {
   type CreateStudentInput,
   type UpdateStudentInput,
 } from '../api/students.api';
-import { getGrades, createGrade, type CreateGradeInput } from '../api/grades.api';
+import { getGrades, createGrade, updateGrade, deleteGrade, type CreateGradeInput, type UpdateGradeInput } from '../api/grades.api';
 import {
   getAcademicYears,
   createAcademicYear,
@@ -123,6 +123,28 @@ export function useCreateGrade() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (dto: CreateGradeInput) => createGrade(dto).then((res) => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.grades.list() });
+    },
+  });
+}
+
+export function useUpdateGrade() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: UpdateGradeInput }) =>
+      updateGrade(id, dto).then((res) => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.grades.list() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.students.lists() });
+    },
+  });
+}
+
+export function useDeleteGrade() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteGrade(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.grades.list() });
     },

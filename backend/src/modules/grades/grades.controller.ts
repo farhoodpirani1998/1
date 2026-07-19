@@ -1,6 +1,7 @@
-import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { GradesService } from './grades.service';
 import { CreateGradeDto } from './dto/create-grade.dto';
+import { UpdateGradeDto } from './dto/update-grade.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -31,5 +32,21 @@ export class GradesController {
   @Roles('school_admin', 'accountant', 'staff')
   findOne(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
     return this.gradesService.findOne(id, schoolId);
+  }
+
+  @Patch(':id')
+  @Roles('school_admin')
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateGradeDto,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    return this.gradesService.update(id, dto, schoolId);
+  }
+
+  @Delete(':id')
+  @Roles('school_admin')
+  remove(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
+    return this.gradesService.remove(id, schoolId);
   }
 }

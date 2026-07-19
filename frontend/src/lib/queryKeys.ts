@@ -81,6 +81,12 @@ export const queryKeys = {
     list: () => [...queryKeys.academicYears.all(), 'list'] as const,
   },
 
+  // Single-shot per-school record (GET/PUT /settings) — one row per
+  // school_admin's own school, no list/detail split needed.
+  schoolSettings: {
+    all: () => ['schoolSettings'] as const,
+  },
+
   schools: {
     all: () => ['schools'] as const,
     list: () => [...queryKeys.schools.all(), 'list'] as const,

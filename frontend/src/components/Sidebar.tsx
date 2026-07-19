@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { useSchoolSettings } from '../hooks/useSchoolSettings';
 import type { UserRole } from '../types/auth.types';
 import {
   DashboardIcon,
@@ -84,12 +85,18 @@ const roleLabels: Record<string, string> = {
   founder: 'مؤسس',
 };
 
-export function Sidebar() {
+export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { user } = useAuth();
   const visibleItems = navItems.filter((item) => user && item.roles.includes(user.role));
   const isParent = user?.role === 'parent';
   const isTeacher = user?.role === 'teacher';
   const isFounder = user?.role === 'founder';
+
+  // GET /settings is school_admin-only on the backend — useSchoolSettings
+  // already no-ops for every other role, so this is safe to call
+  // unconditionally here.
+  const settingsQuery = useSchoolSettings();
+  const schoolLogoUrl = settingsQuery.data?.logoUrl;
 
   return (
     <aside className="flex h-screen w-64 flex-col border-l border-white/[0.06] bg-navy text-white">
@@ -111,12 +118,31 @@ export function Sidebar() {
         </div>
       </div>
 
+      {schoolLogoUrl && (
+        <div className="flex items-center gap-2.5 border-b border-white/[0.06] px-6 pb-4">
+          {/* If the URL saved in settings 404s or fails to load, hide it
+              instead of showing a broken-image icon in the nav. */}
+          <img
+            src={schoolLogoUrl}
+            alt={settingsQuery.data?.schoolName ?? 'لوگوی مدرسه'}
+            className="h-7 w-7 shrink-0 rounded-md bg-white/95 object-contain p-1"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+          {settingsQuery.data?.schoolName && (
+            <div className="truncate text-xs font-medium text-white/60">{settingsQuery.data.schoolName}</div>
+          )}
+        </div>
+      )}
+
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3">
         {visibleItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
+            onClick={onNavigate}
             className={({ isActive }) =>
               `group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors duration-150 ${
                 isActive

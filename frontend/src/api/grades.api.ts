@@ -12,7 +12,13 @@ export function createGrade(dto: CreateGradeInput) {
   return api.post<Grade>('/grades', dto);
 }
 
-// NOTE: no updateGrade() here — GradesController only exposes
-// POST / and GET /, GET /:id. There is no PATCH route on the backend to
-// rename/edit a grade. Flagged in the Phase 1 report rather than
-// invented here.
+export interface UpdateGradeInput {
+  title: string;
+}
+export function updateGrade(id: string, dto: UpdateGradeInput) {
+  return api.patch<Grade>(`/grades/${id}`, dto);
+}
+
+export function deleteGrade(id: string) {
+  return api.delete<void>(`/grades/${id}`);
+}

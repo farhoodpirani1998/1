@@ -30,9 +30,18 @@ export function generateInstallments(planId: string, dto: GenerateInstallmentsIn
 
 export interface QueryInstallmentsParams {
   status?: InstallmentStatus;
+  page?: number;
+  limit?: number;
 }
+
+// Same Phase-4A truncation as getStudents() above — InstallmentsPage
+// paginates the returned array client-side and never sent a limit, so
+// it silently never saw past the backend's default 50 installments.
+// Request the backend's own ceiling (200) by default.
+const FULL_LIST_LIMIT = 200;
+
 export function getInstallments(params?: QueryInstallmentsParams) {
-  return api.get<InstallmentWithStudent[]>('/installments', { params });
+  return api.get<InstallmentWithStudent[]>('/installments', { params: { limit: FULL_LIST_LIMIT, ...params } });
 }
 
 // PATCH /tuition-plans/:id — matches UpdateTuitionPlanDto: only

@@ -1,9 +1,10 @@
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { Card } from '../components/Card';
 import { PageHeader } from '../components/PageHeader';
 import { SectionHeader } from '../components/SectionHeader';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
+import { Modal } from '../components/Modal';
 import { PersianDatePicker } from '../components/PersianDatePicker';
 import { Table, type TableColumn } from '../components/Table';
 import { toPersianDigits, formatDate } from '../lib/format';
@@ -16,8 +17,11 @@ import {
   useUpdateAcademicYear,
   useGrades,
   useCreateGrade,
+  useUpdateGrade,
+  useDeleteGrade,
 } from '../hooks/useStudents';
-import { useSubjects, useCreateSubject } from '../hooks/useSubjects';
+import { useSubjects, useCreateSubject, useUpdateSubject, useDeleteSubject } from '../hooks/useSubjects';
+import { useSchoolSettings, useUpdateSchoolSettings } from '../hooks/useSchoolSettings';
 import type { AcademicYear, Grade } from '../types/student.types';
 import type { Subject } from '../types/teacher.types';
 
@@ -29,12 +33,98 @@ export function SettingsPage() {
   return (
     <div className="fade-in">
       <PageHeader title="تنظیمات مدرسه" description="مدیریت سال‌های تحصیلی، پایه‌ها و دروس مدرسه" />
+      <div className="mb-6">
+        <SchoolLogoPanel />
+      </div>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <AcademicYearsPanel />
         <GradesPanel />
         <SubjectsPanel />
       </div>
     </div>
+  );
+}
+
+// The school's own logo, shown in the sidebar once set (Sidebar.tsx
+// reads it from useSchoolSettings). Backed by GET/PUT /settings —
+// school_admin-only, same as everything else on this page.
+function SchoolLogoPanel() {
+  const settingsQuery = useSchoolSettings();
+  const updateSettings = useUpdateSchoolSettings();
+  const { showSuccess, showError } = useToast();
+
+  const [logoUrl, setLogoUrl] = useState('');
+  const [error, setError] = useState<ParsedApiError | null>(null);
+  const [previewOk, setPreviewOk] = useState(true);
+
+  // Seed the input once the current setting loads, without clobbering
+  // whatever the admin is mid-typing on a later refetch.
+  useEffect(() => {
+    if (settingsQuery.data) {
+      setLogoUrl(settingsQuery.data.logoUrl ?? '');
+    }
+  }, [settingsQuery.data]);
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const trimmed = logoUrl.trim();
+    updateSettings.mutate(
+      { logoUrl: trimmed === '' ? null : trimmed },
+      {
+        onSuccess: () => showSuccess('لوگوی مدرسه بروزرسانی شد'),
+        onError: (err) => {
+          setError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
+      },
+    );
+  }
+
+  return (
+    <Card title="لوگوی مدرسه">
+      <p className="mb-4 text-sm text-ink/60 dark:text-paper/60">
+        آدرس اینترنتی تصویر لوگوی مدرسه را وارد کنید. این لوگو در نوار کناری، کنار نام مدرسه نمایش داده می‌شود.
+      </p>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+        <Input
+          value={logoUrl}
+          onChange={(e) => {
+            setLogoUrl(e.target.value);
+            setPreviewOk(true);
+          }}
+          type="url"
+          placeholder="https://example.com/logo.png"
+          label="آدرس لوگو"
+          containerClassName="flex-1"
+        />
+        <Button type="submit" loading={updateSettings.isPending} className="shrink-0">
+          ذخیره
+        </Button>
+      </form>
+
+      <FormError error={error} />
+
+      {logoUrl.trim() !== '' && (
+        <div className="mt-4 flex items-center gap-3 rounded-lg border border-line bg-paper/60 p-3 dark:border-white/10 dark:bg-white/[0.03]">
+          {previewOk ? (
+            <img
+              src={logoUrl}
+              alt="پیش‌نمایش لوگو"
+              className="h-12 w-12 rounded-md border border-line bg-white object-contain p-1 dark:border-white/10"
+              onError={() => setPreviewOk(false)}
+            />
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded-md border border-overdue/25 bg-overdue/10 text-[10px] text-overdue">
+              خطا
+            </div>
+          )}
+          <span className="text-xs text-ink/50 dark:text-paper/50">
+            {previewOk ? 'پیش‌نمایش' : 'بارگذاری تصویر از این آدرس ممکن نشد.'}
+          </span>
+        </div>
+      )}
+    </Card>
   );
 }
 
@@ -162,11 +252,17 @@ function AcademicYearsPanel() {
 function GradesPanel() {
   const gradesQuery = useGrades();
   const createGrade = useCreateGrade();
+  const updateGrade = useUpdateGrade();
+  const deleteGrade = useDeleteGrade();
   const grades = gradesQuery.data ?? [];
+  const { showError, showSuccess } = useToast();
 
   const [title, setTitle] = useState('');
   const [error, setError] = useState<ParsedApiError | null>(null);
-  const { showError } = useToast();
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [deletingGrade, setDeletingGrade] = useState<Grade | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -183,6 +279,43 @@ function GradesPanel() {
     );
   }
 
+  function startEdit(g: Grade) {
+    setEditingId(g.id);
+    setEditingTitle(g.title);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditingTitle('');
+  }
+
+  function saveEdit(id: string) {
+    updateGrade.mutate(
+      { id, dto: { title: editingTitle } },
+      {
+        onSuccess: () => {
+          cancelEdit();
+          showSuccess('پایه بروزرسانی شد');
+        },
+        onError: (err) => showError(getErrorMessage(err)),
+      },
+    );
+  }
+
+  function confirmDelete() {
+    if (!deletingGrade) return;
+    deleteGrade.mutate(deletingGrade.id, {
+      onSuccess: () => {
+        setDeletingGrade(null);
+        showSuccess('پایه حذف شد');
+      },
+      onError: (err) => {
+        showError(getErrorMessage(err));
+        setDeletingGrade(null);
+      },
+    });
+  }
+
   const columns: TableColumn<Grade>[] = [
     {
       key: 'index',
@@ -193,7 +326,42 @@ function GradesPanel() {
     {
       key: 'title',
       header: 'عنوان پایه',
-      render: (g) => <span className="font-medium text-ink dark:text-paper">{g.title}</span>,
+      render: (g) =>
+        editingId === g.id ? (
+          <Input
+            autoFocus
+            value={editingTitle}
+            onChange={(e) => setEditingTitle(e.target.value)}
+            containerClassName="mb-0"
+          />
+        ) : (
+          <span className="font-medium text-ink dark:text-paper">{g.title}</span>
+        ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'left',
+      render: (g) =>
+        editingId === g.id ? (
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={cancelEdit}>
+              انصراف
+            </Button>
+            <Button size="sm" loading={updateGrade.isPending} onClick={() => saveEdit(g.id)}>
+              ذخیره
+            </Button>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => startEdit(g)}>
+              ویرایش
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setDeletingGrade(g)}>
+              حذف
+            </Button>
+          </div>
+        ),
     },
   ];
 
@@ -227,6 +395,27 @@ function GradesPanel() {
         loading={gradesQuery.isLoading}
         emptyMessage="هنوز پایه‌ای ثبت نشده است."
       />
+
+      <Modal
+        open={!!deletingGrade}
+        onClose={() => setDeletingGrade(null)}
+        title="حذف پایه تحصیلی"
+        description={
+          deletingGrade ? `آیا از حذف «${deletingGrade.title}» مطمئن هستید؟ این عملیات قابل بازگشت نیست.` : undefined
+        }
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeletingGrade(null)}>
+              انصراف
+            </Button>
+            <Button variant="danger" loading={deleteGrade.isPending} onClick={confirmDelete}>
+              حذف
+            </Button>
+          </>
+        }
+      >
+        {null}
+      </Modal>
     </Card>
   );
 }
@@ -240,11 +429,17 @@ function GradesPanel() {
 function SubjectsPanel() {
   const subjectsQuery = useSubjects();
   const createSubject = useCreateSubject();
+  const updateSubject = useUpdateSubject();
+  const deleteSubject = useDeleteSubject();
   const subjects = subjectsQuery.data ?? [];
+  const { showError, showSuccess } = useToast();
 
   const [title, setTitle] = useState('');
   const [error, setError] = useState<ParsedApiError | null>(null);
-  const { showError } = useToast();
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [deletingSubject, setDeletingSubject] = useState<Subject | null>(null);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -261,6 +456,43 @@ function SubjectsPanel() {
     );
   }
 
+  function startEdit(s: Subject) {
+    setEditingId(s.id);
+    setEditingTitle(s.title);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditingTitle('');
+  }
+
+  function saveEdit(id: string) {
+    updateSubject.mutate(
+      { id, dto: { title: editingTitle } },
+      {
+        onSuccess: () => {
+          cancelEdit();
+          showSuccess('درس بروزرسانی شد');
+        },
+        onError: (err) => showError(getErrorMessage(err)),
+      },
+    );
+  }
+
+  function confirmDelete() {
+    if (!deletingSubject) return;
+    deleteSubject.mutate(deletingSubject.id, {
+      onSuccess: () => {
+        setDeletingSubject(null);
+        showSuccess('درس حذف شد');
+      },
+      onError: (err) => {
+        showError(getErrorMessage(err));
+        setDeletingSubject(null);
+      },
+    });
+  }
+
   const columns: TableColumn<Subject>[] = [
     {
       key: 'index',
@@ -271,7 +503,42 @@ function SubjectsPanel() {
     {
       key: 'title',
       header: 'عنوان درس',
-      render: (s) => <span className="font-medium text-ink dark:text-paper">{s.title}</span>,
+      render: (s) =>
+        editingId === s.id ? (
+          <Input
+            autoFocus
+            value={editingTitle}
+            onChange={(e) => setEditingTitle(e.target.value)}
+            containerClassName="mb-0"
+          />
+        ) : (
+          <span className="font-medium text-ink dark:text-paper">{s.title}</span>
+        ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'left',
+      render: (s) =>
+        editingId === s.id ? (
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" size="sm" onClick={cancelEdit}>
+              انصراف
+            </Button>
+            <Button size="sm" loading={updateSubject.isPending} onClick={() => saveEdit(s.id)}>
+              ذخیره
+            </Button>
+          </div>
+        ) : (
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" size="sm" onClick={() => startEdit(s)}>
+              ویرایش
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setDeletingSubject(s)}>
+              حذف
+            </Button>
+          </div>
+        ),
     },
   ];
 
@@ -305,6 +572,27 @@ function SubjectsPanel() {
         loading={subjectsQuery.isLoading}
         emptyMessage="هنوز درسی ثبت نشده است."
       />
+
+      <Modal
+        open={!!deletingSubject}
+        onClose={() => setDeletingSubject(null)}
+        title="حذف درس"
+        description={
+          deletingSubject ? `آیا از حذف «${deletingSubject.title}» مطمئن هستید؟ این عملیات قابل بازگشت نیست.` : undefined
+        }
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeletingSubject(null)}>
+              انصراف
+            </Button>
+            <Button variant="danger" loading={deleteSubject.isPending} onClick={confirmDelete}>
+              حذف
+            </Button>
+          </>
+        }
+      >
+        {null}
+      </Modal>
     </Card>
   );
 }

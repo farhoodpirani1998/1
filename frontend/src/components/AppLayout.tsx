@@ -32,7 +32,7 @@ export function AppLayout({ loginPath = '/login' }: { loginPath?: string }) {
           mobileNavOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'
         }`}
       >
-        <Sidebar />
+        <Sidebar onNavigate={() => setMobileNavOpen(false)} />
       </div>
 
       <div className="min-w-0 flex-1">

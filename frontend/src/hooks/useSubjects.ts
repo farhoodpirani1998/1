@@ -3,7 +3,14 @@
 // reasoning as useGrades() in hooks/useStudents.ts.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { listSubjects, createSubject, type CreateSubjectInput } from '../api/subjects.api';
+import {
+  listSubjects,
+  createSubject,
+  updateSubject,
+  deleteSubject,
+  type CreateSubjectInput,
+  type UpdateSubjectInput,
+} from '../api/subjects.api';
 import { queryKeys } from '../lib/queryKeys';
 
 // Rarely changes; safe to treat as long-lived reference data.
@@ -23,6 +30,27 @@ export function useCreateSubject() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (dto: CreateSubjectInput) => createSubject(dto).then((res) => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.subjects.list() });
+    },
+  });
+}
+
+export function useUpdateSubject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: UpdateSubjectInput }) =>
+      updateSubject(id, dto).then((res) => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.subjects.list() });
+    },
+  });
+}
+
+export function useDeleteSubject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteSubject(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.subjects.list() });
     },

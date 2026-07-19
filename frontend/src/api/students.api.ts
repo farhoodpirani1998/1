@@ -6,10 +6,23 @@ export interface QueryStudentsParams {
   status?: StudentStatus;
   gradeId?: string;
   academicYearId?: string;
+  page?: number;
+  limit?: number;
 }
 
+// Backend default is 50 rows (see DEFAULT_PAGE_LIMIT in
+// backend/src/common/utils/pagination.ts) when no limit is sent, and
+// none of this app's callers ever sent one — they all treat the response
+// as "the full roster" and paginate/filter it client-side (StudentsPage,
+// plus every dropdown that reads useStudents()). That silently hid every
+// student past the 50th. MAX_PAGE_LIMIT (200) is the backend's own
+// ceiling for a single request; request it by default so a caller that
+// does pass an explicit limit/page (for real server-side pagination)
+// still overrides this.
+const FULL_ROSTER_LIMIT = 200;
+
 export function getStudents(params?: QueryStudentsParams) {
-  return api.get<Student[]>('/students', { params });
+  return api.get<Student[]>('/students', { params: { limit: FULL_ROSTER_LIMIT, ...params } });
 }
 
 export function getStudent(id: string) {

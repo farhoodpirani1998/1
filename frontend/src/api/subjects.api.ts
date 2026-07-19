@@ -21,3 +21,14 @@ export interface CreateSubjectInput {
 export function createSubject(dto: CreateSubjectInput) {
   return api.post<Subject>('/subjects', dto);
 }
+
+export interface UpdateSubjectInput {
+  title: string;
+}
+export function updateSubject(id: string, dto: UpdateSubjectInput) {
+  return api.patch<Subject>(`/subjects/${id}`, dto);
+}
+
+export function deleteSubject(id: string) {
+  return api.delete<void>(`/subjects/${id}`);
+}
