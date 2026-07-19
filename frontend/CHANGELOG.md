@@ -1,6 +1,42 @@
 # Changelog — Integration Build
 
-## StaffDashboard: "چک‌لیست امروز" placeholder section (this change)
+## Sprint 3.3 — Students table: row selection + bulk action bar (this change)
+
+Added checkbox-based row selection to the Students workspace table, on
+top of the Sprint 3.2 table/toolbar work. Scope is UI-only, same spirit
+as the Sprint 3.1 toolbar placeholders — no query, filter, pagination,
+backend, or routing changes.
+
+- New first column in `StudentsPage`'s `columns` array: a per-row
+  checkbox plus a header select-all checkbox (tri-state: none / some
+  (indeterminate) / all), following the exact selection pattern already
+  used by `InstallmentsPage` (`Set<string>` of selected ids,
+  `allPageSelected`/`toggleSelectAll`-style helpers). "Select all" only
+  ever acts on the current page's rows, matching that precedent and
+  leaving pagination untouched.
+- New Bulk Action Bar, shown only when `selectedIds.size > 0`: selected
+  count, a "لغو انتخاب" (clear selection) button, and three visual-only
+  buttons — خروجی/بایگانی/حذف انتخاب‌شده‌ها (Export/Archive/Delete
+  Selected). All three are `disabled` with the same "پس از اتصال به
+  بک‌اند فعال می‌شود" tooltip convention already used by the dashboard's
+  `TodayChecklist` placeholder actions — **no bulk action is wired to
+  any API**.
+- Selected rows get the table's existing selected-row highlight
+  treatment (tinted background, accent border in `comfortable` density)
+  — no new colors introduced.
+
+**Modified:** `frontend/src/pages/StudentsPage.tsx` — selection state/
+handlers, selection column, bulk action bar, `SelectionCheckbox` and a
+few small local icons (`ArchiveIcon`, `DeleteIcon`, `ClearSelectionIcon`).
+
+**Modified (additive only):** `frontend/src/components/Table.tsx` — added
+an optional `selectedRowKeys?: Set<string>` prop alongside the existing
+`selectedRowKey` (single-key) prop, so multiple rows can get the same
+highlight styling. Every other current caller of `<Table>` is unaffected
+— the prop defaults to `undefined` and the highlight logic is additive
+(`isSelected = singleMatch || keys?.has(key)`).
+
+## StaffDashboard: "چک‌لیست امروز" placeholder section
 
 Added a "Today's checklist" section to the staff dashboard
 (`DashboardPage.tsx` → `StaffDashboard`), addressing feedback that the

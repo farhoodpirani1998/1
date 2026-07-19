@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState, FormEvent, ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, FormEvent, ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Card } from '../components/Card';
-import { PageHeader } from '../components/PageHeader';
 import { SearchInput } from '../components/SearchInput';
 import { Select } from '../components/Select';
 import { FilterBar } from '../components/FilterBar';
@@ -26,7 +25,7 @@ import {
   useAcademicYears,
 } from '../hooks/useStudents';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { UsersIcon, CheckIcon, AlertIcon, CalendarIcon } from '../components/icons/SchoolIcons';
+import { UsersIcon, CheckIcon, AlertIcon, CalendarIcon, ChevronEnterIcon } from '../components/icons/SchoolIcons';
 import { BulkImportStudentsPanel } from '../components/BulkImportStudentsPanel';
 
 const PAGE_SIZE = 10;
@@ -88,9 +87,27 @@ export function StudentsPage() {
   const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
   const [gradeId, setGradeId] = useState('');
   const [academicYearId, setAcademicYearId] = useState('');
+  // Sprint 3.1 — toolbar shell only. These two are intentionally NOT part
+  // of filterParams below: per the Sprint 3.1 spec, Status and Class are
+  // visual placeholders with no filtering logic yet. Class in particular
+  // has no backing field on Student today (only `grade`), so it can't be
+  // wired to a real query param until that data model question is settled
+  // — left for Sprint 3.2.
+  const [statusFilterDisplay, setStatusFilterDisplay] = useState('');
+  const [classFilterDisplay, setClassFilterDisplay] = useState('');
   const [page, setPage] = useState(1);
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
   const [exporting, setExporting] = useState(false);
+  // Sprint 3.3 — row selection / bulk action bar. Same Set<string>-of-ids
+  // pattern already used by InstallmentsPage's selection column, kept
+  // local to this page's UI state — it doesn't touch the query, filters,
+  // or pagination in any way. Like InstallmentsPage, selection persists
+  // across page/filter changes on purpose (a paginated "select all"
+  // scope is per-page only — see `pageSelectedCount` below — but ids the
+  // user already checked on another page stay checked if they navigate
+  // back), and is only ever cleared explicitly via "لغو انتخاب" or by
+  // checking a row/select-all off.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const filterParams = {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
@@ -124,6 +141,42 @@ export function StudentsPage() {
   const grades = gradesQuery.data ?? [];
   const academicYears = academicYearsQuery.data ?? [];
   const loading = studentsQuery.isLoading;
+
+  // Sprint 3.3 — selection state derived from the current page + selectedIds.
+  // "Select all" only ever acts on the rows currently on screen (matches
+  // the InstallmentsPage precedent) — it never reaches across pages, so
+  // pagination/query logic stays untouched.
+  const pageSelectedCount = pageItems.filter((s) => selectedIds.has(s.id)).length;
+  const allPageSelected = pageItems.length > 0 && pageSelectedCount === pageItems.length;
+  const somePageSelected = pageSelectedCount > 0 && !allPageSelected;
+
+  function toggleSelectRow(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function toggleSelectAllOnPage() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        pageItems.forEach((s) => next.delete(s.id));
+      } else {
+        pageItems.forEach((s) => next.add(s.id));
+      }
+      return next;
+    });
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
 
   // Reset to page 1 whenever any filter narrows/widens the result set —
   // search (debounced), grade, or academic year — so pagination can't be
@@ -162,6 +215,10 @@ export function StudentsPage() {
   const isFiltered = Boolean(debouncedSearch || gradeId || academicYearId);
 
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  // Sprint 3.2 — presentational only, for the "نمایش X–Y از Z" pagination
+  // summary. Derived entirely from state already in scope; no new query.
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * PAGE_SIZE, totalCount);
 
   const activeCount = activeCountQuery.data?.total ?? 0;
   const inactiveCount = Math.max(0, totalCount - activeCount);
@@ -177,8 +234,30 @@ export function StudentsPage() {
 
   const columns: TableColumn<Student>[] = [
     {
+      key: 'select',
+      header: (
+        <SelectionCheckbox
+          checked={allPageSelected}
+          indeterminate={somePageSelected}
+          onChange={toggleSelectAllOnPage}
+          ariaLabel="انتخاب همه‌ی دانش‌آموزان این صفحه"
+        />
+      ),
+      align: 'center',
+      headerClassName: 'w-10',
+      cellClassName: 'w-10',
+      render: (s) => (
+        <SelectionCheckbox
+          checked={selectedIds.has(s.id)}
+          onChange={() => toggleSelectRow(s.id)}
+          ariaLabel={`انتخاب ${s.fullName}`}
+        />
+      ),
+    },
+    {
       key: 'name',
       header: 'نام',
+      cellClassName: 'min-w-[11rem]',
       render: (s) => (
         <div className="flex items-center gap-3">
           <StudentAvatar name={s.fullName} />
@@ -195,12 +274,18 @@ export function StudentsPage() {
     {
       key: 'guardian',
       header: 'والد',
-      cellClassName: 'text-ink/70 dark:text-paper/70',
+      // Sprint 3.2 — hidden below sm to reduce horizontal cramping on small
+      // screens (task 5); the data itself is unchanged and still reachable
+      // from the student's own statement page via the actions link.
+      headerClassName: 'hidden sm:table-cell',
+      cellClassName: 'hidden sm:table-cell text-ink/70 dark:text-paper/70',
       render: (s) => s.guardian?.fullName ?? '—',
     },
     {
       key: 'status',
       header: 'وضعیت',
+      align: 'center',
+      headerClassName: 'text-center',
       render: (s) => <StudentStatusBadge status={s.status} />,
     },
     {
@@ -208,8 +293,12 @@ export function StudentsPage() {
       header: '',
       align: 'left',
       render: (s) => (
-        <Link to={`/students/${s.id}`} className="text-sm font-medium text-action hover:underline">
+        <Link
+          to={`/students/${s.id}`}
+          className="inline-flex items-center gap-1 rounded-lg border border-transparent px-2.5 py-1.5 text-sm font-medium text-action transition-colors hover:border-action/25 hover:bg-action-soft dark:hover:bg-action/10"
+        >
           صورت‌حساب
+          <ChevronEnterIcon size={14} />
         </Link>
       ),
     },
@@ -217,32 +306,40 @@ export function StudentsPage() {
 
   return (
     <div className="fade-in">
-      <PageHeader
-        title="دانش‌آموزان"
-        description="مدیریت اطلاعات، وضعیت ثبت‌نام و صورت‌حساب دانش‌آموزان"
-        actions={
-          <div className="flex gap-2">
-            <Button
-              variant={showBulkImport ? 'secondary' : 'ghost'}
-              onClick={() => {
-                setShowBulkImport((v) => !v);
-                setShowForm(false);
-              }}
+      {/* Sprint 3.1 — workspace header. Same title/description/action data
+          and handlers as before, just restyled: a student-count pill next
+          to the title (reuses `totalCount`, already fetched for the stat
+          cards below — no new query), and a single primary action per the
+          Sprint 3.1 header spec. The bulk-import toggle keeps its exact
+          existing state/handler (`showBulkImport`/`setShowBulkImport`) but
+          is now surfaced as the toolbar's "Import" button instead of a
+          second header action — see the toolbar Actions area below. */}
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-xl font-bold text-ink dark:text-paper">دانش‌آموزان</h1>
+            <span
+              className="badge border-line bg-ink/5 text-ink/60 dark:border-white/10 dark:bg-white/10 dark:text-paper/60"
+              aria-label="تعداد کل دانش‌آموزان"
             >
-              {showBulkImport ? 'انصراف' : 'آپلود اکسل'}
-            </Button>
-            <Button
-              variant={showForm ? 'secondary' : 'primary'}
-              onClick={() => {
-                setShowForm((v) => !v);
-                setShowBulkImport(false);
-              }}
-            >
-              {showForm ? 'انصراف' : '+ دانش‌آموز جدید'}
-            </Button>
+              <UsersIcon size={12} />
+              {loading ? '…' : `${toPersianCount(totalCount)} دانش‌آموز`}
+            </span>
           </div>
-        }
-      />
+          <p className="mt-1.5 text-sm text-ink/55 dark:text-paper/55">
+            مدیریت اطلاعات، وضعیت ثبت‌نام و صورت‌حساب دانش‌آموزان
+          </p>
+        </div>
+        <Button
+          variant={showForm ? 'secondary' : 'primary'}
+          onClick={() => {
+            setShowForm((v) => !v);
+            setShowBulkImport(false);
+          }}
+        >
+          {showForm ? 'انصراف' : '+ دانش‌آموز جدید'}
+        </Button>
+      </div>
 
       {loading ? (
         <div className="mb-2">
@@ -299,59 +396,181 @@ export function StudentsPage() {
       )}
 
       <Card className="mt-6">
-        <FilterBar
-          actions={
-            <>
-              <Link to="/students/archived" className="btn-secondary">
-                غیرفعال‌ها
-              </Link>
-              <Button variant="secondary" onClick={handleExport} loading={exporting}>
-                خروجی Excel
+        {/* Sprint 3.1 — toolbar shell. Bottom border + margin separates it
+            from the table as its own zone (visual hierarchy). Search,
+            grade and academic-year keep their exact pre-existing state/
+            handlers and still drive the real query below; Status, Class
+            and "More filters" are new, visual-only placeholders per the
+            Sprint 3.1 spec (no filtering logic attached — see task 2). */}
+        <div className="mb-4 border-b border-line pb-4 dark:border-white/10">
+          <FilterBar
+            actions={
+              <>
+                <Link to="/students/archived" className="btn-secondary">
+                  غیرفعال‌ها
+                </Link>
+                <Button variant="secondary" leftIcon={<ImportIcon />} onClick={() => { setShowBulkImport((v) => !v); setShowForm(false); }}>
+                  ورودی اکسل
+                </Button>
+                <Button variant="secondary" leftIcon={<ExportIcon />} onClick={handleExport} loading={exporting}>
+                  خروجی اکسل
+                </Button>
+                {/* Sprint 3.1 — visual only. Wiring this to studentsQuery /
+                    activeCountQuery / gradesQuery / academicYearsQuery
+                    refetch is a one-line change but is deliberately left
+                    for Sprint 3.2 so this sprint stays UI-shell-only. */}
+                <Button variant="ghost" leftIcon={<RefreshIcon />} aria-label="بروزرسانی فهرست">
+                  بروزرسانی
+                </Button>
+              </>
+            }
+          >
+            <SearchInput
+              value={search}
+              onChange={setSearch}
+              onClear={() => setSearch('')}
+              placeholder="جستجو با نام..."
+              containerClassName="w-full sm:w-60"
+            />
+            <Select
+              value={gradeId}
+              onChange={(e) => setGradeId(e.target.value)}
+              options={[{ value: '', label: 'همه‌ی پایه‌ها' }, ...grades.map((g) => ({ value: g.id, label: g.title }))]}
+              containerClassName="w-auto"
+              aria-label="فیلتر پایه تحصیلی"
+            />
+            <Select
+              value={academicYearId}
+              onChange={(e) => setAcademicYearId(e.target.value)}
+              options={[
+                { value: '', label: 'همه‌ی سال‌های تحصیلی' },
+                ...academicYears.map((y) => ({
+                  value: y.id,
+                  label: `${y.title}${y.isCurrent ? ' (جاری)' : ''}`,
+                })),
+              ]}
+              containerClassName="w-auto"
+              aria-label="فیلتر سال تحصیلی"
+            />
+            {/* Sprint 3.1 — visual-only placeholder. Not part of
+                filterParams; selecting a value does not change the table. */}
+            <Select
+              value={statusFilterDisplay}
+              onChange={(e) => setStatusFilterDisplay(e.target.value)}
+              options={[
+                { value: '', label: 'همه‌ی وضعیت‌ها' },
+                { value: 'active', label: 'فعال' },
+                { value: 'withdrawn', label: 'انصرافی' },
+                { value: 'graduated', label: 'فارغ‌التحصیل' },
+              ]}
+              containerClassName="w-auto"
+              aria-label="فیلتر وضعیت (به‌زودی)"
+            />
+            {/* Sprint 3.1 — visual-only placeholder. Student has no `class`/
+                section field yet (only `grade`), so there is no real data
+                to filter by until that's added — see Sprint 3.2 notes. */}
+            <Select
+              value={classFilterDisplay}
+              onChange={(e) => setClassFilterDisplay(e.target.value)}
+              options={[{ value: '', label: 'همه‌ی کلاس‌ها' }]}
+              containerClassName="w-auto"
+              aria-label="فیلتر کلاس (به‌زودی)"
+            />
+            <Button variant="ghost" leftIcon={<MoreFiltersIcon />}>
+              فیلترهای بیشتر
+            </Button>
+          </FilterBar>
+        </div>
+
+        {/* Sprint 3.3 — bulk action bar, shown only once at least one row
+            is selected. Purely visual/UI-state: count + clear come from
+            selectedIds already in scope, and the three action buttons are
+            deliberately unwired placeholders (disabled, with the same
+            "not connected yet" tooltip convention used elsewhere in this
+            codebase — see DashboardPage's StaffDashboard checklist). */}
+        {selectedIds.size > 0 && (
+          <div
+            role="region"
+            aria-label="نوار عملیات گروهی"
+            className="fade-in mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-action/25 bg-action-soft px-4 py-2.5 dark:border-action/30 dark:bg-action/10"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-action dark:text-action-light" aria-live="polite">
+                {toPersianCount(selectedIds.size)} مورد انتخاب شده
+              </span>
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-ink/60 transition-colors hover:bg-white/60 hover:text-ink dark:text-paper/60 dark:hover:bg-white/10 dark:hover:text-paper"
+              >
+                <ClearSelectionIcon />
+                لغو انتخاب
+              </button>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<ExportIcon />}
+                disabled
+                title="پس از اتصال به بک‌اند فعال می‌شود"
+              >
+                خروجی انتخاب‌شده‌ها
               </Button>
-            </>
-          }
-        >
-          <SearchInput
-            value={search}
-            onChange={setSearch}
-            onClear={() => setSearch('')}
-            placeholder="جستجو با نام..."
-            containerClassName="w-56 sm:w-64"
-          />
-          <Select
-            value={gradeId}
-            onChange={(e) => setGradeId(e.target.value)}
-            options={[{ value: '', label: 'همه‌ی پایه‌ها' }, ...grades.map((g) => ({ value: g.id, label: g.title }))]}
-            containerClassName="w-auto"
-          />
-          <Select
-            value={academicYearId}
-            onChange={(e) => setAcademicYearId(e.target.value)}
-            options={[
-              { value: '', label: 'همه‌ی سال‌های تحصیلی' },
-              ...academicYears.map((y) => ({
-                value: y.id,
-                label: `${y.title}${y.isCurrent ? ' (جاری)' : ''}`,
-              })),
-            ]}
-            containerClassName="w-auto"
-          />
-        </FilterBar>
+              <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<ArchiveIcon />}
+                disabled
+                title="پس از اتصال به بک‌اند فعال می‌شود"
+              >
+                بایگانی انتخاب‌شده‌ها
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                leftIcon={<DeleteIcon />}
+                disabled
+                title="پس از اتصال به بک‌اند فعال می‌شود"
+              >
+                حذف انتخاب‌شده‌ها
+              </Button>
+            </div>
+          </div>
+        )}
 
         <Table
           stickyHeader
+          density="comfortable"
           columns={columns}
           data={pageItems}
           rowKey={(s) => s.id}
+          selectedRowKeys={selectedIds}
           loading={loading}
           skeletonRows={6}
           emptyMessage={isFiltered ? 'دانش‌آموزی با این مشخصات یافت نشد.' : 'هنوز دانش‌آموزی ثبت نشده است.'}
           emptyDescription={
             isFiltered ? 'جستجو یا فیلترها را تغییر دهید.' : 'برای شروع، اولین دانش‌آموز مدرسه را ثبت کنید.'
           }
-          emptyIcon={isFiltered ? undefined : <StudentsEmptyIcon />}
+          emptyIcon={isFiltered ? <NoSearchResultsIcon /> : <StudentsEmptyIcon />}
           emptyAction={
-            isFiltered ? undefined : (
+            isFiltered ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setSearch('');
+                  setGradeId('');
+                  setAcademicYearId('');
+                  // Visual-only placeholders from Sprint 3.1 — reset for
+                  // consistency even though they don't drive the query.
+                  setStatusFilterDisplay('');
+                  setClassFilterDisplay('');
+                }}
+              >
+                پاک کردن فیلترها
+              </Button>
+            ) : (
               <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
                 + همین حالا اضافه کنید
               </Button>
@@ -359,7 +578,14 @@ export function StudentsPage() {
           }
         />
 
-        {!loading && totalCount > 0 && <Pagination page={page} pageCount={pageCount} onChange={setPage} />}
+        {!loading && totalCount > 0 && (
+          <div className="mt-4 border-t border-line pt-4 text-center dark:border-white/10">
+            <p className="tabular mb-2 text-xs text-ink/50 dark:text-paper/50">
+              نمایش {toPersianCount(rangeStart)}–{toPersianCount(rangeEnd)} از {toPersianCount(totalCount)} دانش‌آموز
+            </p>
+            <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+          </div>
+        )}
       </Card>
     </div>
   );
@@ -367,6 +593,129 @@ export function StudentsPage() {
 
 function toPersianCount(n: number): string {
   return n.toLocaleString('fa-IR');
+}
+
+// Sprint 3.3 — shared checkbox for the selection column (row checkboxes +
+// header select-all). Wraps a native <input type="checkbox"> so it keeps
+// full built-in keyboard/screen-reader behavior; `indeterminate` is set
+// imperatively via ref since it isn't a real DOM attribute React can bind
+// directly. Sized/colored from existing tokens only (action / line) —
+// no new design system additions.
+function SelectionCheckbox({
+  checked,
+  indeterminate = false,
+  onChange,
+  ariaLabel,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: () => void;
+  ariaLabel: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      onChange={onChange}
+      onClick={(e) => e.stopPropagation()}
+      aria-label={ariaLabel}
+      className="h-4 w-4 cursor-pointer rounded border-line text-action accent-action focus:outline-none focus:ring-2 focus:ring-action/30 dark:border-white/25"
+    />
+  );
+}
+
+// Sprint 3.3 toolbar/bar icons — same local convention as the Export/
+// Import/Refresh/MoreFilters icons above (15x15, viewBox 0 0 24 24,
+// currentColor stroke), kept page-local since they're specific to the
+// bulk action bar rather than a general-purpose nav/domain icon.
+function ArchiveIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <rect x="3.5" y="4" width="17" height="4.5" rx="1.2" />
+      <path d="M4.5 8.5v9.5a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8.5" />
+      <path d="M10 13h4" />
+    </svg>
+  );
+}
+
+function DeleteIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M4.5 7h15" />
+      <path d="M9.5 7V4.8c0-.6.5-1.1 1.1-1.1h2.8c.6 0 1.1.5 1.1 1.1V7" />
+      <path d="M6.5 7l.9 12a2 2 0 0 0 2 1.9h5.2a2 2 0 0 0 2-1.9l.9-12" />
+      <path d="M10.3 11v6M13.7 11v6" />
+    </svg>
+  );
+}
+
+function ClearSelectionIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+// Sprint 3.1 toolbar icons — kept local to this page (same convention as
+// StudentsEmptyIcon below) rather than added to the shared SchoolIcons set,
+// since they're specific to this toolbar's Export/Import/Refresh/"more
+// filters" buttons rather than a general-purpose domain icon.
+function ExportIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M12 3v12" />
+      <path d="m7 10 5 5 5-5" />
+      <path d="M4 19.5h16" />
+    </svg>
+  );
+}
+
+function ImportIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M12 15V3" />
+      <path d="m7 8 5-5 5 5" />
+      <path d="M4 19.5h16" />
+    </svg>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M3.5 12a8.5 8.5 0 0 1 14.6-5.9M20.5 12a8.5 8.5 0 0 1-14.6 5.9" />
+      <path d="M18.1 3.6v3.2h-3.2" />
+      <path d="M5.9 20.4v-3.2h3.2" />
+    </svg>
+  );
+}
+
+function MoreFiltersIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+      <path d="M4 6h16" />
+      <path d="M7 12h10" />
+      <path d="M10 18h4" />
+    </svg>
+  );
+}
+
+function NoSearchResultsIcon() {
+  return (
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m20 20-4.3-4.3" />
+      <path d="M8 10.5h5" opacity="0.6" />
+    </svg>
+  );
 }
 
 function StudentsEmptyIcon() {
