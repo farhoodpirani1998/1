@@ -11,6 +11,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getStudents,
+  getStudentsPaginated,
   createStudent,
   updateStudent,
   archiveStudent,
@@ -36,6 +37,18 @@ export function useStudents(params?: QueryStudentsParams) {
   return useQuery({
     queryKey: queryKeys.students.list(params),
     queryFn: () => getStudents(params).then((res) => res.data),
+  });
+}
+
+// Phase 4B: real server-side pagination for StudentsPage only. Distinct
+// from useStudents() above — that one is used by ArchivedStudentsPage,
+// DashboardPage, and every dropdown that just wants "the roster" as a
+// plain array, and must keep getting exactly that (unchanged) response
+// shape.
+export function useStudentsPaginated(page: number, limit: number, params?: QueryStudentsParams) {
+  return useQuery({
+    queryKey: queryKeys.students.list({ ...params, page, limit }),
+    queryFn: () => getStudentsPaginated(page, limit, params).then((res) => res.data),
   });
 }
 

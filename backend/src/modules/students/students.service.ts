@@ -24,7 +24,11 @@ import {
   toStudentParentViewFromUser,
 } from './dto/student-parent-view.dto';
 import { GuardiansService } from './guardians.service';
-import { normalizePagination } from '../../common/utils/pagination';
+import {
+  normalizePagination,
+  wantsPaginatedResponse,
+  type PaginatedResult,
+} from '../../common/utils/pagination';
 import { Role } from '../../common/authorization/roles.enum';
 import type { BulkImportRowResult, BulkImportStudentsResult } from './dto/bulk-import-result.dto';
 
@@ -163,7 +167,7 @@ export class StudentsService {
   async findWithFilters(
     query: QueryStudentsDto,
     schoolId: string,
-  ): Promise<Student[]> {
+  ): Promise<Student[] | PaginatedResult<Student>> {
     const qb = this.studentRepo
       .createQueryBuilder('student')
       .leftJoinAndSelect('student.guardian', 'guardian')
@@ -191,13 +195,26 @@ export class StudentsService {
     // page/limit are honored when the caller passes them — previously this
     // ran unbounded, so a school with a large student roster loaded every
     // row (plus its guardian/grade joins) on every list request.
-    const { limit, skip } = normalizePagination(query);
+    const { page, limit, skip } = normalizePagination(query);
 
-    return qb
+    // Phase 4B: real server-side pagination. `getManyAndCount` runs the
+    // same query twice (once with a COUNT), which is the standard
+    // TypeORM way to get a total alongside a bounded page — needed so
+    // the frontend can render real page numbers instead of guessing from
+    // whatever fit in a single capped request (MAX_PAGE_LIMIT). Only
+    // callers that explicitly pass page/limit get this wrapped shape;
+    // everyone else (dropdowns, dashboard, archived-list) keeps getting
+    // the plain array they always have, so this is additive.
+    const [data, total] = await qb
       .orderBy('student.fullName', 'ASC')
       .skip(skip)
       .take(limit)
-      .getMany();
+      .getManyAndCount();
+
+    if (wantsPaginatedResponse(query)) {
+      return { data, total, page, limit };
+    }
+    return data;
   }
 
   async findOne(id: string, schoolId: string): Promise<Student> {

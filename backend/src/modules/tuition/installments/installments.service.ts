@@ -30,7 +30,11 @@ import {
   InstallmentRemovedEvent,
   InstallmentsRenegotiatedEvent,
 } from '../../../common/events/domain-events';
-import { normalizePagination } from '../../../common/utils/pagination';
+import {
+  normalizePagination,
+  wantsPaginatedResponse,
+  type PaginatedResult,
+} from '../../../common/utils/pagination';
 
 @Injectable()
 export class InstallmentsService {
@@ -112,7 +116,9 @@ export class InstallmentsService {
     return saved;
   }
 
-  async findWithFilters(query: QueryInstallmentsDto): Promise<Installment[]> {
+  async findWithFilters(
+    query: QueryInstallmentsDto,
+  ): Promise<Installment[] | PaginatedResult<Installment>> {
     const qb = this.installmentRepo
       .createQueryBuilder('installment')
       .leftJoinAndSelect('installment.tuitionPlan', 'plan')
@@ -133,18 +139,34 @@ export class InstallmentsService {
         schoolId: query.schoolId,
       });
     }
+    // Phase 4B: name search — matches InstallmentsPage's previous
+    // client-side nameFilter, now applied server-side so it still works
+    // once the list is genuinely paginated (see QueryInstallmentsDto).
+    if (query.search) {
+      qb.andWhere('student.fullName ILIKE :search', {
+        search: `%${query.search}%`,
+      });
+    }
 
     // Phase 4A: bounded result set by default — this previously ran
     // unbounded (leftJoinAndSelect on tuitionPlan + student for every
     // matching installment), so a school with a large installment history
     // loaded its entire table on every list request.
-    const { limit, skip } = normalizePagination(query);
+    const { page, limit, skip } = normalizePagination(query);
 
-    return qb
+    // Phase 4B: real total via getManyAndCount, wrapped only when the
+    // caller explicitly asked for pagination — see StudentsService for
+    // the identical pattern/rationale.
+    const [data, total] = await qb
       .orderBy('installment.dueDate', 'ASC')
       .skip(skip)
       .take(limit)
-      .getMany();
+      .getManyAndCount();
+
+    if (wantsPaginatedResponse(query)) {
+      return { data, total, page, limit };
+    }
+    return data;
   }
 
   async findOne(id: string, schoolId: string): Promise<Installment> {

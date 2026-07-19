@@ -6,7 +6,7 @@ import { SearchInput } from '../components/SearchInput';
 import { Select } from '../components/Select';
 import { FilterBar } from '../components/FilterBar';
 import { Table, type TableColumn } from '../components/Table';
-import { Pagination, paginate } from '../components/Pagination';
+import { Pagination } from '../components/Pagination';
 import { StatCard } from '../components/StatCard';
 import { Button } from '../components/Button';
 import { PersianDatePicker } from '../components/PersianDatePicker';
@@ -15,8 +15,16 @@ import { useToast } from '../lib/toast';
 import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
 import { FormError } from '../components/FormError';
 import { exportToExcel } from '../lib/exportExcel';
+import { fetchAllPages } from '../lib/fetchAllPages';
+import { getStudentsPaginated } from '../api/students.api';
 import type { Student, Grade, AcademicYear } from '../types/student.types';
-import { useStudents, useCreateStudent, useGrades, useAcademicYears } from '../hooks/useStudents';
+import {
+  useStudents,
+  useStudentsPaginated,
+  useCreateStudent,
+  useGrades,
+  useAcademicYears,
+} from '../hooks/useStudents';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { UsersIcon, CheckIcon, AlertIcon, CalendarIcon } from '../components/icons/SchoolIcons';
 import { BulkImportStudentsPanel } from '../components/BulkImportStudentsPanel';
@@ -82,17 +90,37 @@ export function StudentsPage() {
   const [academicYearId, setAcademicYearId] = useState('');
   const [page, setPage] = useState(1);
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
+  const [exporting, setExporting] = useState(false);
 
-  const studentsQuery = useStudents({
+  const filterParams = {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(gradeId ? { gradeId } : {}),
     ...(academicYearId ? { academicYearId } : {}),
-  });
+  };
+
+  // Phase 4B: real server-side pagination — the table only ever holds
+  // one page (PAGE_SIZE rows) in memory, and `total` below is the true
+  // filtered count from the backend, not capped at MAX_PAGE_LIMIT (200).
+  const studentsQuery = useStudentsPaginated(page, PAGE_SIZE, filterParams);
+  // Cheap accurate active/inactive counts: same filters, limit=1 — the
+  // backend still runs COUNT(*) over the full matching set (getManyAndCount),
+  // so `total` is correct however many students that is, without fetching
+  // their rows. See StudentsService.findWithFilters.
+  const activeCountQuery = useStudentsPaginated(1, 1, { ...filterParams, status: 'active' });
   const gradesQuery = useGrades();
   const academicYearsQuery = useAcademicYears();
   const createStudent = useCreateStudent();
 
-  const students = studentsQuery.data ?? [];
+  // "New this month" (enrollmentDate in the current calendar month) has
+  // no matching backend filter yet, so it's kept on the old bounded
+  // getStudents() call (capped at 200, same as before this fix) rather
+  // than adding a new date-range endpoint param — a pre-existing,
+  // smaller limitation on this one stat card, not the list-truncation
+  // bug this change addresses.
+  const statsRosterQuery = useStudents(filterParams);
+
+  const pageItems = studentsQuery.data?.data ?? [];
+  const totalCount = studentsQuery.data?.total ?? 0;
   const grades = gradesQuery.data ?? [];
   const academicYears = academicYearsQuery.data ?? [];
   const loading = studentsQuery.isLoading;
@@ -104,18 +132,28 @@ export function StudentsPage() {
     setPage(1);
   }, [debouncedSearch, gradeId, academicYearId]);
 
-  function handleExport() {
-    exportToExcel(
-      'دانش‌آموزان',
-      'دانش‌آموزان',
-      students.map((s) => ({
-        نام: s.fullName,
-        پایه: s.grade?.title ?? '',
-        والد: s.guardian?.fullName ?? '',
-        'تلفن والد': s.guardian?.phone ?? '',
-        وضعیت: statusLabels[s.status],
-      })),
-    );
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const allStudents = await fetchAllPages((p, l) =>
+        getStudentsPaginated(p, l, filterParams).then((res) => res.data),
+      );
+      exportToExcel(
+        'دانش‌آموزان',
+        'دانش‌آموزان',
+        allStudents.map((s) => ({
+          نام: s.fullName,
+          پایه: s.grade?.title ?? '',
+          والد: s.guardian?.fullName ?? '',
+          'تلفن والد': s.guardian?.phone ?? '',
+          وضعیت: statusLabels[s.status],
+        })),
+      );
+    } catch (err) {
+      showError(getErrorMessage(err));
+    } finally {
+      setExporting(false);
+    }
   }
 
   // Distinguishes "the roster is genuinely empty" (show an inviting
@@ -123,27 +161,19 @@ export function StudentsPage() {
   // (show a plain no-results message instead).
   const isFiltered = Boolean(debouncedSearch || gradeId || academicYearId);
 
-  const pageCount = Math.max(1, Math.ceil(students.length / PAGE_SIZE));
-  const pageItems = useMemo(() => paginate(students, page, PAGE_SIZE), [students, page]);
+  const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
-  // Stats derived entirely from the already-fetched `students` list — no
-  // separate endpoint/mock data. They reflect whatever's currently loaded
-  // (i.e. the active search, if any), same as the table below.
-  const totalCount = students.length;
-  const activeCount = useMemo(() => students.filter((s) => s.status === 'active').length, [students]);
-  const inactiveCount = totalCount - activeCount;
-  // "New this month" only exists because Student.enrollmentDate is a real
-  // backend field — this counts students whose enrollmentDate falls in the
-  // current calendar month/year. Students without an enrollmentDate are
-  // simply not counted, not treated as 0/fake.
+  const activeCount = activeCountQuery.data?.total ?? 0;
+  const inactiveCount = Math.max(0, totalCount - activeCount);
+  const statsRoster = statsRosterQuery.data ?? [];
   const newThisMonthCount = useMemo(() => {
     const now = new Date();
-    return students.filter((s) => {
+    return statsRoster.filter((s) => {
       if (!s.enrollmentDate) return false;
       const d = new Date(s.enrollmentDate);
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
     }).length;
-  }, [students]);
+  }, [statsRoster]);
 
   const columns: TableColumn<Student>[] = [
     {
@@ -275,7 +305,7 @@ export function StudentsPage() {
               <Link to="/students/archived" className="btn-secondary">
                 غیرفعال‌ها
               </Link>
-              <Button variant="secondary" onClick={handleExport}>
+              <Button variant="secondary" onClick={handleExport} loading={exporting}>
                 خروجی Excel
               </Button>
             </>
@@ -329,7 +359,7 @@ export function StudentsPage() {
           }
         />
 
-        {!loading && students.length > 0 && <Pagination page={page} pageCount={pageCount} onChange={setPage} />}
+        {!loading && totalCount > 0 && <Pagination page={page} pageCount={pageCount} onChange={setPage} />}
       </Card>
     </div>
   );

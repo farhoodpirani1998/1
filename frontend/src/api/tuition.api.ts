@@ -30,6 +30,11 @@ export function generateInstallments(planId: string, dto: GenerateInstallmentsIn
 
 export interface QueryInstallmentsParams {
   status?: InstallmentStatus;
+  // Phase 4B: name search — matches against the installment's student
+  // (see QueryInstallmentsDto on the backend). Previously InstallmentsPage
+  // filtered its already-fetched array by this locally; now sent as a
+  // real query param so it works against pages that aren't in memory.
+  search?: string;
   page?: number;
   limit?: number;
 }
@@ -42,6 +47,25 @@ const FULL_LIST_LIMIT = 200;
 
 export function getInstallments(params?: QueryInstallmentsParams) {
   return api.get<InstallmentWithStudent[]>('/installments', { params: { limit: FULL_LIST_LIMIT, ...params } });
+}
+
+// Phase 4B: real server-side pagination — same pattern/rationale as
+// getStudentsPaginated() in students.api.ts. Always sends an explicit
+// page/limit, which flips the backend to the wrapped `{ data, total,
+// page, limit }` shape.
+export interface PaginatedInstallmentsResult {
+  data: InstallmentWithStudent[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export function getInstallmentsPaginated(
+  page: number,
+  limit: number,
+  params?: QueryInstallmentsParams,
+) {
+  return api.get<PaginatedInstallmentsResult>('/installments', { params: { ...params, page, limit } });
 }
 
 // PATCH /tuition-plans/:id — matches UpdateTuitionPlanDto: only

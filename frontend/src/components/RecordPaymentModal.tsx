@@ -35,7 +35,7 @@ const SUCCESS_TICK_MS = 550;
 export function RecordPaymentModal({
   installment,
   studentId,
-  studentName,
+  studentName: _studentName,
   onClose,
   onSaved,
 }: {

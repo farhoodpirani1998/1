@@ -25,6 +25,26 @@ export function getStudents(params?: QueryStudentsParams) {
   return api.get<Student[]>('/students', { params: { limit: FULL_ROSTER_LIMIT, ...params } });
 }
 
+// Phase 4B: real server-side pagination. Distinct from getStudents()
+// above — that one is for "give me the roster" callers (dropdowns,
+// dashboard, archived list) that want a plain array and don't care
+// about page boundaries. This one is for StudentsPage: it always sends
+// an explicit page/limit, which flips the backend response to the
+// wrapped `{ data, total, page, limit }` shape (see
+// StudentsService.findWithFilters / wantsPaginatedResponse on the
+// backend) so the page component can render real page numbers instead
+// of guessing from a single capped 200-row fetch.
+export interface PaginatedStudentsResult {
+  data: Student[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export function getStudentsPaginated(page: number, limit: number, params?: QueryStudentsParams) {
+  return api.get<PaginatedStudentsResult>('/students', { params: { ...params, page, limit } });
+}
+
 export function getStudent(id: string) {
   return api.get<Student>(`/students/${id}`);
 }

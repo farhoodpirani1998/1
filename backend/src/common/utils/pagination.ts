@@ -24,6 +24,25 @@ export interface NormalizedPagination {
   skip: number;
 }
 
+/**
+ * Real server-side pagination wrapper. Only returned when the caller
+ * explicitly passed `page` or `limit` — see `wantsPaginatedResponse()`.
+ * Callers that don't ask for pagination keep getting a plain array back
+ * (unchanged behavior for every existing consumer of these list
+ * endpoints), so this is additive, not a breaking change to the
+ * endpoint's default shape.
+ */
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export function wantsPaginatedResponse(params: PaginationParams): boolean {
+  return params.page !== undefined || params.limit !== undefined;
+}
+
 export function normalizePagination(params: PaginationParams): NormalizedPagination {
   const page = params.page && params.page > 0 ? Math.floor(params.page) : 1;
   const requestedLimit =
