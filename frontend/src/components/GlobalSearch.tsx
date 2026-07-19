@@ -8,12 +8,13 @@ import type { SearchResults } from '../types/search.types';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
-// Phase 5N: Global Search, wired into the Topbar. Only students have a
-// real staff-facing detail route today (/students/:id) — parents,
-// teachers, subjects, homework, and announcements have no dedicated
-// staff-facing detail page to link to, so those groups render as plain
-// (non-clickable) rows. When one of those routes exists, add its `to`
-// the same way the students group builds its link.
+// Phase 5N: Global Search, wired into the Topbar. Every group now has a
+// real staff-facing detail route to link to: students -> /students/:id,
+// parents -> /guardians/:id, teachers -> /teachers/:id, subjects ->
+// /subjects/:id, homework -> /homework/:id, announcements ->
+// /announcements/:id. All six results rows are buttons that close the
+// panel, clear the query, and navigate — same goToResult() shape for
+// every group.
 const categoryLabels: Record<keyof SearchResults, string> = {
   students: 'دانش‌آموزان',
   parents: 'والدین',
@@ -53,10 +54,10 @@ export function GlobalSearch() {
     };
   }, [open]);
 
-  function goToStudent(id: string) {
+  function goToResult(path: string) {
     setOpen(false);
     setQ('');
-    navigate(`/students/${id}`);
+    navigate(path);
   }
 
   return (
@@ -95,7 +96,7 @@ export function GlobalSearch() {
                   {results.students.map((s) => (
                     <button
                       key={s.id}
-                      onClick={() => goToStudent(s.id)}
+                      onClick={() => goToResult(`/students/${s.id}`)}
                       className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-right text-sm text-ink transition-colors hover:bg-paper dark:text-paper dark:hover:bg-white/5"
                     >
                       <span>{s.fullName}</span>
@@ -115,10 +116,14 @@ export function GlobalSearch() {
                     {categoryLabels.parents}
                   </div>
                   {results.parents.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between px-2.5 py-1.5 text-sm text-ink/80 dark:text-paper/80">
+                    <button
+                      key={p.id}
+                      onClick={() => goToResult(`/guardians/${p.id}`)}
+                      className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-right text-sm text-ink transition-colors hover:bg-paper dark:text-paper dark:hover:bg-white/5"
+                    >
                       <span>{p.fullName}</span>
                       <span className="text-xs text-ink/40 dark:text-paper/40">{toPersianDigits(p.phone)}</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -129,10 +134,14 @@ export function GlobalSearch() {
                     {categoryLabels.teachers}
                   </div>
                   {results.teachers.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between px-2.5 py-1.5 text-sm text-ink/80 dark:text-paper/80">
+                    <button
+                      key={t.id}
+                      onClick={() => goToResult(`/teachers/${t.id}`)}
+                      className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-right text-sm text-ink transition-colors hover:bg-paper dark:text-paper dark:hover:bg-white/5"
+                    >
                       <span>{t.fullName}</span>
                       <span className="text-xs text-ink/40 dark:text-paper/40">{toPersianDigits(t.phone)}</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -143,9 +152,13 @@ export function GlobalSearch() {
                     {categoryLabels.subjects}
                   </div>
                   {results.subjects.map((sub) => (
-                    <div key={sub.id} className="px-2.5 py-1.5 text-sm text-ink/80 dark:text-paper/80">
+                    <button
+                      key={sub.id}
+                      onClick={() => goToResult(`/subjects/${sub.id}`)}
+                      className="block w-full rounded-lg px-2.5 py-1.5 text-right text-sm text-ink transition-colors hover:bg-paper dark:text-paper dark:hover:bg-white/5"
+                    >
                       {sub.title}
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -156,10 +169,14 @@ export function GlobalSearch() {
                     {categoryLabels.homework}
                   </div>
                   {results.homework.map((hw) => (
-                    <div key={hw.id} className="flex items-center justify-between px-2.5 py-1.5 text-sm text-ink/80 dark:text-paper/80">
+                    <button
+                      key={hw.id}
+                      onClick={() => goToResult(`/homework/${hw.id}`)}
+                      className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-right text-sm text-ink transition-colors hover:bg-paper dark:text-paper dark:hover:bg-white/5"
+                    >
                       <span>{hw.title}</span>
                       <span className="text-xs text-ink/40 dark:text-paper/40">{formatDate(hw.dueDate)}</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -170,9 +187,13 @@ export function GlobalSearch() {
                     {categoryLabels.announcements}
                   </div>
                   {results.announcements.map((a) => (
-                    <div key={a.id} className="px-2.5 py-1.5 text-sm text-ink/80 dark:text-paper/80">
+                    <button
+                      key={a.id}
+                      onClick={() => goToResult(`/announcements/${a.id}`)}
+                      className="block w-full rounded-lg px-2.5 py-1.5 text-right text-sm text-ink transition-colors hover:bg-paper dark:text-paper dark:hover:bg-white/5"
+                    >
                       {a.title}
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}

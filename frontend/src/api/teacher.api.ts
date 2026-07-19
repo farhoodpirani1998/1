@@ -113,6 +113,15 @@ export function getTeacherList() {
   return api.get<TeacherListItem[]>('/teacher/list');
 }
 
+// GET /teacher/:id — @Roles('school_admin','accountant','staff'). A
+// single teacher's own profile view (same TeacherProfileView shape as
+// GET /teacher/profile), for the teacher detail page linked from Global
+// Search results. Distinct from getProfile() above, which is always the
+// signed-in teacher's own account.
+export function getTeacherById(id: string) {
+  return api.get<TeacherProfileView>(`/teacher/${id}`);
+}
+
 // ---------------------------------------------------------------------
 // Teacher Attendance (Part 1). POST /teacher/attendance — @Roles('teacher').
 // One call per student (backend has no bulk endpoint — see

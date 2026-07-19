@@ -33,6 +33,17 @@ export class AnnouncementsController {
     return announcements.map(toAnnouncementView);
   }
 
+  // Global Search's announcement results link here -- roles match
+  // SearchController's, not just findAll() above, since accountant/staff
+  // can already see an announcement's title in a search result and
+  // shouldn't hit a 403 opening it.
+  @Get(':id')
+  @Roles('school_admin', 'accountant', 'staff')
+  async findOne(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
+    const announcement = await this.announcementsService.findOneForSchool(id, schoolId);
+    return toAnnouncementView(announcement);
+  }
+
   @Delete(':id')
   @Roles('school_admin')
   @HttpCode(204)

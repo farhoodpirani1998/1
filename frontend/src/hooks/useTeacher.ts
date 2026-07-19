@@ -8,6 +8,7 @@ import {
   createAssignment,
   deleteAssignment,
   getTeacherList,
+  getTeacherById,
   recordAttendance,
   recordAssessment,
   getHomework,
@@ -110,6 +111,17 @@ export function useTeacherList() {
     queryKey: queryKeys.teacher.list(),
     queryFn: () => getTeacherList().then((res) => res.data),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+// GET /teacher/:id — the teacher detail page linked from Global Search
+// results. Distinct from useTeacherProfile() above, which is always the
+// signed-in teacher's own account.
+export function useTeacherDetail(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.teacher.detail(id ?? ''),
+    queryFn: () => getTeacherById(id as string).then((res) => res.data),
+    enabled: !!id,
   });
 }
 

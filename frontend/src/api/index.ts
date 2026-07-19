@@ -11,3 +11,5 @@ export * from './analytics.api';
 export * from './parent.api';
 export * from './teacher.api';
 export * from './subjects.api';
+export * from './homework.api';
+export * from './announcements.api';

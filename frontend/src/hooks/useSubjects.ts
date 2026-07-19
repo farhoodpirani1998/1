@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   listSubjects,
+  getSubject,
   createSubject,
   updateSubject,
   deleteSubject,
@@ -19,6 +20,16 @@ export function useSubjects() {
     queryKey: queryKeys.subjects.list(),
     queryFn: () => listSubjects().then((res) => res.data),
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+// GET /subjects/:id — the subject detail page linked from Global Search
+// results.
+export function useSubject(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.subjects.detail(id ?? ''),
+    queryFn: () => getSubject(id as string).then((res) => res.data),
+    enabled: !!id,
   });
 }
 

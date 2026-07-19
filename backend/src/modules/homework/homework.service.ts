@@ -251,6 +251,19 @@ export class HomeworkService {
     });
   }
 
+  /**
+   * school_admin-facing single-record read, for the homework detail page
+   * linked from Global Search results. Not restricted to a particular
+   * teacherId (unlike update()/remove() above) -- same (id, schoolId)-only
+   * scoping as findAllForSchool(), just narrowed to one row. Reuses the
+   * private findOneOrThrow() below, which already loads HOMEWORK_RELATIONS
+   * and 404s the same "wrong tenant looks identical to nonexistent" way
+   * every other findOneForSchool-style method in this codebase does.
+   */
+  async findOneForSchool(id: string, schoolId: string): Promise<Homework> {
+    return this.findOneOrThrow(id, schoolId);
+  }
+
   // ---------------------------------------------------------------------
   // internal helpers
   // ---------------------------------------------------------------------

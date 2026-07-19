@@ -15,6 +15,12 @@ export function listSubjects() {
   return api.get<Subject[]>('/subjects');
 }
 
+// GET /subjects/:id — school_admin/accountant/staff. Used by the subject
+// detail page linked from Global Search results.
+export function getSubject(id: string) {
+  return api.get<Subject>(`/subjects/${id}`);
+}
+
 export interface CreateSubjectInput {
   title: string;
 }

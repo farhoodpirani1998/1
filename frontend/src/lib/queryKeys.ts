@@ -75,6 +75,9 @@ export const queryKeys = {
   subjects: {
     all: () => ['subjects'] as const,
     list: () => [...queryKeys.subjects.all(), 'list'] as const,
+    // GET /subjects/:id — the subject detail page linked from Global
+    // Search results.
+    detail: (id: string) => [...queryKeys.subjects.all(), 'detail', id] as const,
   },
 
   academicYears: {
@@ -164,6 +167,27 @@ export const queryKeys = {
     // Teacher Timetable. No filters — GET /teacher/timetable always
     // returns the caller's full schedule (see TeacherController).
     timetable: () => [...queryKeys.teacher.all(), 'timetable'] as const,
+    // school_admin-facing single-teacher read (GET /teacher/:id), for the
+    // teacher detail page linked from Global Search results — distinct
+    // from `profile()` above, which is always the signed-in teacher's own
+    // account.
+    detail: (id: string) => [...queryKeys.teacher.all(), 'detail', id] as const,
+  },
+
+  // Admin/staff-facing homework reads (GET /homework, GET /homework/:id —
+  // HomeworkController). Distinct from `teacher.homework` above, which is
+  // the signed-in teacher's own posted homework (GET /teacher/homework).
+  adminHomework: {
+    all: () => ['adminHomework'] as const,
+    detail: (id: string) => [...queryKeys.adminHomework.all(), 'detail', id] as const,
+  },
+
+  // Admin-facing announcement reads (GET /announcements/:id —
+  // AnnouncementsController). Distinct from `parent.announcements` above,
+  // which is the signed-in parent's recipient-facing feed.
+  adminAnnouncements: {
+    all: () => ['adminAnnouncements'] as const,
+    detail: (id: string) => [...queryKeys.adminAnnouncements.all(), 'detail', id] as const,
   },
 
   // Founder portal — read-only aggregated + per-school views (see

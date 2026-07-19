@@ -207,4 +207,24 @@ export class TeacherController {
   async deleteHomework(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     await this.homeworkService.remove(id, user.id, user.schoolId);
   }
+
+  // ---------------------------------------------------------------------
+  // school_admin-facing single-teacher read, for the teacher detail page
+  // linked from Global Search results. Deliberately declared last: every
+  // other route on this controller is a literal path ('assignments',
+  // 'list', 'profile', 'classes', ...), so ':id' here can never shadow
+  // them regardless of match order. Reuses getProfile() -- it already
+  // scopes by (teacherId, schoolId) only, with no restriction to the
+  // caller's own id, so it's exactly the read a school_admin viewing
+  // another teacher's profile needs. Roles match SearchController's, not
+  // just 'school_admin', since accountant/staff can already see a
+  // teacher's name/phone in a search result and shouldn't hit a 403
+  // opening it.
+  // ---------------------------------------------------------------------
+  @Get(':id')
+  @Roles('school_admin', 'accountant', 'staff')
+  async findOne(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
+    const { user: teacher, assignments } = await this.teacherService.getProfile(id, schoolId);
+    return toTeacherProfileView(teacher, assignments);
+  }
 }

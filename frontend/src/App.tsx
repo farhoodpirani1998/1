@@ -17,6 +17,11 @@ import { SchoolsPage } from './pages/SchoolsPage';
 import { UsersPage } from './pages/UsersPage';
 import { TeacherAssignmentsPage } from './pages/TeacherAssignmentsPage';
 import { GuardiansPage } from './pages/GuardiansPage';
+import { GuardianDetailPage } from './pages/GuardianDetailPage';
+import { TeacherDetailPage } from './pages/TeacherDetailPage';
+import { SubjectDetailPage } from './pages/SubjectDetailPage';
+import { HomeworkDetailPage } from './pages/HomeworkDetailPage';
+import { AnnouncementDetailPage } from './pages/AnnouncementDetailPage';
 import { TimetablePage } from './pages/TimetablePage';
 import { AttendancePage } from './pages/AttendancePage';
 import { PrintReceiptPage } from './pages/PrintReceiptPage';
@@ -195,6 +200,53 @@ export function App() {
                   element={
                     <RequireRole roles={['school_admin', 'accountant', 'staff']}>
                       <GuardiansPage />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/guardians/:id"
+                  element={
+                    <RequireRole roles={['school_admin', 'accountant', 'staff']}>
+                      <GuardianDetailPage />
+                    </RequireRole>
+                  }
+                />
+
+                {/* Phase 5N follow-up: Global Search detail routes for the
+                    four groups that previously had no staff-facing detail
+                    page (see GlobalSearch.tsx). Roles match GET /search's
+                    own role gate (school_admin, accountant, staff) — same
+                    principle as /guardians/:id above: whoever can see a
+                    result in search can open it. */}
+                <Route
+                  path="/teachers/:id"
+                  element={
+                    <RequireRole roles={['school_admin', 'accountant', 'staff']}>
+                      <TeacherDetailPage />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/subjects/:id"
+                  element={
+                    <RequireRole roles={['school_admin', 'accountant', 'staff']}>
+                      <SubjectDetailPage />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/homework/:id"
+                  element={
+                    <RequireRole roles={['school_admin', 'accountant', 'staff']}>
+                      <HomeworkDetailPage />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/announcements/:id"
+                  element={
+                    <RequireRole roles={['school_admin', 'accountant', 'staff']}>
+                      <AnnouncementDetailPage />
                     </RequireRole>
                   }
                 />

@@ -59,6 +59,19 @@ export class AnnouncementsService {
   }
 
   /**
+   * school_admin-facing single-record read, for the announcement detail
+   * page linked from Global Search results. Same (id, schoolId)-scoped
+   * 404 shape as delete() above.
+   */
+  async findOneForSchool(id: string, schoolId: string): Promise<Announcement> {
+    const announcement = await this.announcementRepo.findOne({ where: { id, schoolId } });
+    if (!announcement) {
+      throw new NotFoundException('اطلاعیه یافت نشد');
+    }
+    return announcement;
+  }
+
+  /**
    * Recipient-facing read (teacher/parent): announcements targeted at
    * 'all' or the caller's own audience, scoped to their own school --
    * never a cross-school row, never an announcement aimed at a different
