@@ -26,11 +26,10 @@ export interface NormalizedPagination {
 
 /**
  * Real server-side pagination wrapper. Only returned when the caller
- * explicitly passed `page` or `limit` — see `wantsPaginatedResponse()`.
- * Callers that don't ask for pagination keep getting a plain array back
- * (unchanged behavior for every existing consumer of these list
- * endpoints), so this is additive, not a breaking change to the
- * endpoint's default shape.
+ * explicitly passed `page` — see `wantsPaginatedResponse()`. Callers
+ * that only pass `limit` (raising the row cap without asking for a
+ * specific page) still get a plain array back, same as callers that
+ * pass neither.
  */
 export interface PaginatedResult<T> {
   data: T[];
@@ -40,7 +39,15 @@ export interface PaginatedResult<T> {
 }
 
 export function wantsPaginatedResponse(params: PaginationParams): boolean {
-  return params.page !== undefined || params.limit !== undefined;
+  // Deliberately `page` only, not `limit`. Some callers (getStudents(),
+  // getInstallments() on the frontend) send `limit` alone to raise the
+  // row cap from DEFAULT_PAGE_LIMIT to MAX_PAGE_LIMIT while still
+  // expecting a plain array back (dropdowns, stat cards, dashboard
+  // charts). Every real server-side-pagination caller in this codebase
+  // (getStudentsPaginated, getInstallmentsPaginated) always sends `page`
+  // alongside `limit`, so gating on `page` alone still correctly flips
+  // to the wrapped `{ data, total, page, limit }` shape for them.
+  return params.page !== undefined;
 }
 
 export function normalizePagination(params: PaginationParams): NormalizedPagination {
