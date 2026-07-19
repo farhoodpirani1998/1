@@ -4,7 +4,7 @@ import { AuthProvider } from './lib/auth';
 import { ToastProvider } from './lib/toast';
 import { ThemeProvider } from './lib/theme';
 import { AppLayout } from './components/AppLayout';
-import { RouteErrorBoundary } from './components/AppErrorBoundary';
+import { AppErrorBoundary, RouteErrorBoundary } from './components/AppErrorBoundary';
 import { RequireRole } from './components/RequireRole';
 import { LoginPage } from './pages/LoginPage';
 import { AdminForgotPasswordPage } from './pages/AdminForgotPasswordPage';
@@ -87,6 +87,7 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
+      <AppErrorBoundary>
       <ThemeProvider>
         <ToastProvider>
           <AuthProvider>
@@ -366,6 +367,7 @@ export function App() {
           </AuthProvider>
         </ToastProvider>
       </ThemeProvider>
+      </AppErrorBoundary>
     </BrowserRouter>
     </QueryClientProvider>
   );
