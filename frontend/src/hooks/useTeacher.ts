@@ -16,6 +16,7 @@ import {
   updateHomework,
   deleteHomework,
   getTimetable,
+  getMyAnnouncements,
   type CreateTeacherAssignmentInput,
   type RecordAttendanceInput,
   type RecordAssessmentInput,
@@ -207,5 +208,18 @@ export function useTeacherTimetable() {
   return useQuery({
     queryKey: queryKeys.teacher.timetable(),
     queryFn: () => getTimetable().then((res) => res.data),
+  });
+}
+
+// ---------------------------------------------------------------------
+// Teacher Announcements (Phase 5H). GET /teacher/announcements —
+// read-only, no mutations — same "query only, nothing to invalidate"
+// shape as useTeacherTimetable above.
+// ---------------------------------------------------------------------
+
+export function useTeacherAnnouncements() {
+  return useQuery({
+    queryKey: queryKeys.teacher.announcements(),
+    queryFn: () => getMyAnnouncements().then((res) => res.data),
   });
 }

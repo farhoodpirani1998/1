@@ -43,7 +43,7 @@ import { TeacherAttendancePage } from './pages/teacher/TeacherAttendancePage';
 import { TeacherAssessmentsPage } from './pages/teacher/TeacherAssessmentsPage';
 import { TeacherHomeworkPage } from './pages/teacher/TeacherHomeworkPage';
 import { TeacherTimetablePage } from './pages/teacher/TeacherTimetablePage';
-import { TeacherComingSoonPage } from './pages/teacher/TeacherComingSoonPage';
+import { TeacherAnnouncementsPage } from './pages/teacher/TeacherAnnouncementsPage';
 import { FounderOverviewPage } from './pages/founder/FounderOverviewPage';
 import { FounderSchoolLayout } from './pages/founder/FounderSchoolLayout';
 import { FounderSchoolDashboardPage } from './pages/founder/FounderSchoolDashboardPage';
@@ -319,9 +319,7 @@ export function App() {
                   the parent route group above — RequireRole gates every
                   route on 'teacher', and AppLayout redirects an
                   unauthenticated visit to /teacher/login instead of the
-                  staff /login. Only /teacher/announcements still points
-                  at the shared placeholder (TeacherComingSoonPage);
-                  every other route below is a real page. */}
+                  staff /login. Every route below is a real page. */}
               <Route element={<AppLayout loginPath="/teacher/login" />}>
                 <Route
                   path="/teacher"
@@ -337,7 +335,7 @@ export function App() {
                   <Route path="assessments" element={<TeacherAssessmentsPage />} />
                   <Route path="homework" element={<TeacherHomeworkPage />} />
                   <Route path="timetable" element={<TeacherTimetablePage />} />
-                  <Route path="announcements" element={<TeacherComingSoonPage title="اطلاعیه‌ها" />} />
+                  <Route path="announcements" element={<TeacherAnnouncementsPage />} />
                 </Route>
               </Route>
 

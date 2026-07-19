@@ -581,11 +581,6 @@ function HomeworkFormModal({
   );
 }
 
-// TODO (Teacher Announcements — out of scope for this feature):
-//   - GET /teacher/announcements already exists on the backend
-//     (Phase 5H), unimplemented on the frontend — TeacherComingSoonPage
-//     still serves /teacher/announcements.
-//
 // Known limitation carried into this feature (see the module comment at
 // the top of this file): there is no teacher-facing endpoint to list
 // academic years, so academicYearId is auto-detected from the teacher's

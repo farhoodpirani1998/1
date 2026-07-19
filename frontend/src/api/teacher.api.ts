@@ -325,3 +325,27 @@ export function getTimetable() {
   return api.get<TimetableEntryView[]>('/teacher/timetable');
 }
 
+// ---------------------------------------------------------------------
+// Teacher Announcements (Phase 5H). GET /teacher/announcements —
+// @Roles('teacher'). Read-only, teacher-scoped: only announcements
+// targeted at 'all' or 'teachers', within the caller's own school (see
+// TeacherController.getMyAnnouncements) — same audience-filtering shape
+// the backend already applies for GET /parent/announcements. This route
+// existed server-side with no frontend consumer until now; the sidebar's
+// "اطلاعیه‌ها" item pointed at a placeholder page instead.
+//
+// Mirrors backend RecipientAnnouncementView (announcements/dto/announcement-view.dto.ts).
+// ---------------------------------------------------------------------
+
+export interface TeacherAnnouncementView {
+  id: string;
+  title: string;
+  message: string;
+  targetType: string;
+  createdAt: string;
+}
+
+export function getMyAnnouncements() {
+  return api.get<TeacherAnnouncementView[]>('/teacher/announcements');
+}
+

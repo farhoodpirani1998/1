@@ -51,10 +51,9 @@ const navItems: NavItem[] = [
   { to: '/parent/payments', label: 'تاریخچه پرداخت‌ها', icon: PaymentsIcon, roles: ['parent'] },
   { to: '/parent/report-card', label: 'کارنامه', icon: ReportsIcon, roles: ['parent'] },
 
-  // Teacher portal (Sprint 1) — only ever visible to a signed-in teacher,
-  // on the separate /teacher/* route group (see App.tsx). Only Dashboard
-  // is a real page this sprint; the rest point at a shared placeholder
-  // page (TeacherComingSoonPage) until the sprints that build them.
+  // Teacher portal — only ever visible to a signed-in teacher, on the
+  // separate /teacher/* route group (see App.tsx). Every item below is
+  // a real page.
   { to: '/teacher/dashboard', label: 'داشبورد', icon: DashboardIcon, roles: ['teacher'] },
   { to: '/teacher/students', label: 'دانش‌آموزان', icon: StudentsIcon, roles: ['teacher'] },
   { to: '/teacher/attendance', label: 'حضور و غیاب', icon: InstallmentsIcon, roles: ['teacher'] },

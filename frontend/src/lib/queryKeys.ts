@@ -174,6 +174,10 @@ export const queryKeys = {
     // from `profile()` above, which is always the signed-in teacher's own
     // account.
     detail: (id: string) => [...queryKeys.teacher.all(), 'detail', id] as const,
+    // Teacher Announcements. No filters — GET /teacher/announcements
+    // always returns the caller's full audience-filtered feed (see
+    // TeacherController.getMyAnnouncements).
+    announcements: () => [...queryKeys.teacher.all(), 'announcements'] as const,
   },
 
   // Admin/staff-facing homework reads (GET /homework, GET /homework/:id —

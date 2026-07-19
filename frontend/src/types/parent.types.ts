@@ -58,3 +58,40 @@ export interface ParentAnnouncementView {
   targetType: string;
   createdAt: string;
 }
+
+// Mirrors backend AssessmentTerm (student-assessments/entities/assessment.entity.ts).
+export type AssessmentTerm = 'first_term' | 'second_term';
+
+// Mirrors backend ParentAssessmentView (student-assessments/dto/assessment-view.dto.ts),
+// returned by GET /parent/students/:id/assessments.
+export interface ParentAssessmentView {
+  id: string;
+  subjectId: string;
+  subjectTitle?: string;
+  term: AssessmentTerm;
+  score: number;
+  maxScore: number;
+  note: string | null;
+}
+
+// Mirrors backend ReportCardView (student-assessments/dto/report-card-view.dto.ts),
+// returned by GET /parent/students/:id/report-card.
+export interface ReportCardSubjectEntry {
+  subjectId: string;
+  subjectTitle?: string;
+  score: number;
+  maxScore: number;
+}
+
+export interface ReportCardTermSummary {
+  term: AssessmentTerm;
+  subjects: ReportCardSubjectEntry[];
+  average: number | null;
+}
+
+export interface ReportCardView {
+  studentId: string;
+  academicYearId: string | null;
+  terms: ReportCardTermSummary[];
+  overallAverage: number | null;
+}
