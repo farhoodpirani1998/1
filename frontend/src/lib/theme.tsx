@@ -8,11 +8,21 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark');
+  const [isDark, setIsDark] = useState(() => {
+    try {
+      return localStorage.getItem('theme') === 'dark';
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDark);
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    try {
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    } catch {
+      // Storage unavailable (blocked/full) — theme just won't persist.
+    }
   }, [isDark]);
 
   return (
