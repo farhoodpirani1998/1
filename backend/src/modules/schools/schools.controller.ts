@@ -24,26 +24,31 @@ import { Roles } from '../../common/decorators/roles.decorator';
 export class SchoolsController {
   constructor(private readonly schoolsService: SchoolsService) {}
 
+  @Roles('super_admin')
   @Post()
   create(@Body() dto: CreateSchoolDto) {
     return this.schoolsService.create(dto);
   }
 
+  @Roles('super_admin')
   @Get()
   findAll() {
     return this.schoolsService.findAll();
   }
 
+  @Roles('super_admin')
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.schoolsService.findOne(id);
   }
 
+  @Roles('super_admin')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateSchoolDto) {
     return this.schoolsService.update(id, dto);
   }
 
+  @Roles('super_admin')
   @Delete(':id')
   deactivate(@Param('id') id: string) {
     return this.schoolsService.deactivate(id);

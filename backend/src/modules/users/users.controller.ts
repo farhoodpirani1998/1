@@ -12,6 +12,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
+  @Roles('super_admin')
   @Get()
   findAll() {
     return this.usersService.findAll();
@@ -21,11 +22,13 @@ export class UsersController {
   // now also accepts fullName/phone (see UpdateUserDto). Still handles
   // the plain activate/deactivate toggle, since UpdateUserDto's fields
   // are all optional.
+  @Roles('super_admin')
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateUserDto) {
     return this.usersService.update(id, dto);
   }
 
+  @Roles('super_admin')
   @Patch(':id/reset-password')
   resetPassword(@Param('id') id: string, @Body() dto: ResetPasswordDto) {
     return this.usersService.resetPassword(id, dto.newPassword);
