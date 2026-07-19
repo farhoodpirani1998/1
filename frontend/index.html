@@ -12,6 +12,36 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function () {
+        function showFatalError(title, detail) {
+          var root = document.getElementById('root');
+          if (!root) return;
+          if (root.childNodes.length > 0) return;
+          root.innerHTML =
+            '<div dir="rtl" style="padding:24px;font-family:sans-serif;max-width:720px;margin:0 auto;">' +
+            '<h1 style="color:#C0392B;font-size:18px;margin-bottom:8px;">صفحه لود نشد (خطای اولیه قبل از رندر شدن اپ)</h1>' +
+            '<p style="color:#333;margin-bottom:16px;">متن پایین رو کپی کن و بفرست:</p>' +
+            '<pre style="direction:ltr;text-align:left;white-space:pre-wrap;word-break:break-word;background:#f4f4f4;border:1px solid #ddd;border-radius:8px;padding:12px;font-size:12px;color:#111;">' +
+            title + '\n\n' + detail +
+            '</pre></div>';
+        }
+        window.addEventListener('error', function (e) {
+          showFatalError(
+            e.message || 'Unknown error',
+            (e.filename ? e.filename + ':' + e.lineno + ':' + e.colno + '\n' : '') +
+              (e.error && e.error.stack ? e.error.stack : ''),
+          );
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          var reason = e.reason;
+          showFatalError(
+            'Unhandled promise rejection: ' + (reason && reason.message ? reason.message : String(reason)),
+            reason && reason.stack ? reason.stack : '',
+          );
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

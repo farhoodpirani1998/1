@@ -82,6 +82,19 @@ export function useCreateStudentDocument() {
   });
 }
 
+// DELETE /documents/:id — the "حذف مدرک" action in the "مدارک" section.
+export function useDeleteStudentDocument(studentId: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (documentId: string) => deleteStudentDocument(documentId).then((res) => res.data),
+    onSuccess: () => {
+      if (studentId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.students.documents(studentId) });
+      }
+    },
+  });
+}
+
 // GET /students/:id/profile — the shared <StudentProfileModal/> data
 // source for the school_admin/accountant portal. `id` undefined (modal
 // closed / no student picked) leaves the query disabled, same pattern
