@@ -4,6 +4,7 @@ import {
   getClasses,
   getSubjects,
   getTeacherStudents,
+  getTeacherStudentProfile,
   getAssignments,
   createAssignment,
   deleteAssignment,
@@ -221,5 +222,21 @@ export function useTeacherAnnouncements() {
   return useQuery({
     queryKey: queryKeys.teacher.announcements(),
     queryFn: () => getMyAnnouncements().then((res) => res.data),
+  });
+}
+
+// ---------------------------------------------------------------------
+// Student Profile card. GET /teacher/students/:id/profile —
+// @Roles('teacher'). Same shared shape as useStudentProfile
+// (hooks/useStudent.ts), scoped to one of the teacher's own assigned
+// students — powers <StudentProfileModal/> from every teacher-portal
+// page that lists students (TeacherStudentsPage, TeacherAssessmentsPage).
+// ---------------------------------------------------------------------
+
+export function useTeacherStudentProfile(studentId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.teacher.studentProfile(studentId ?? ''),
+    queryFn: () => getTeacherStudentProfile(studentId as string).then((res) => res.data),
+    enabled: !!studentId,
   });
 }
