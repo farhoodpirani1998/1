@@ -1,5 +1,6 @@
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
+import { GlobalSearch } from './GlobalSearch';
 
 const roleLabels: Record<string, string> = {
   super_admin: 'مدیر کل',
@@ -10,6 +11,11 @@ const roleLabels: Record<string, string> = {
   teacher: 'معلم',
   founder: 'مؤسس',
 };
+
+// GET /search is staff-only on the backend (school_admin/accountant/
+// staff — see SearchController's @Roles), so the box is hidden for
+// every other role rather than rendering a box that would just 403.
+const SEARCH_ROLES = new Set(['school_admin', 'accountant', 'staff']);
 
 export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, logout } = useAuth();
@@ -31,7 +37,9 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex flex-1 items-center justify-end gap-2 sm:gap-3">
+        {user && SEARCH_ROLES.has(user.role) && <GlobalSearch />}
+
         <button
           onClick={toggle}
           title={isDark ? 'حالت روشن' : 'حالت تاریک'}

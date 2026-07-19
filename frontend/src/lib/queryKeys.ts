@@ -21,6 +21,7 @@ import type { QueryFounderStudentsParams } from '../types/founder.types';
 import type { QueryGuardiansParams } from '../api/guardians.api';
 import type { QueryTimetableParams } from '../api/timetable.api';
 import type { QueryAttendanceByDateParams } from '../api/attendance.api';
+import type { QuerySearchParams } from '../api/search.api';
 
 export const queryKeys = {
   students: {
@@ -182,5 +183,13 @@ export const queryKeys = {
     allTeachers: () => [...queryKeys.founder.all(), 'teachers', 'all'] as const,
     staff: (schoolId: string) => [...queryKeys.founder.all(), 'staff', schoolId] as const,
     tuition: (schoolId: string) => [...queryKeys.founder.all(), 'tuition', schoolId] as const,
+  },
+
+  // Phase 5N: Global Search (GET /search) — single-shot, keyed by the
+  // exact query text + limit, same "params or {}" shape as every other
+  // list(params) above.
+  search: {
+    all: () => ['search'] as const,
+    query: (params: QuerySearchParams) => [...queryKeys.search.all(), params] as const,
   },
 } as const;
