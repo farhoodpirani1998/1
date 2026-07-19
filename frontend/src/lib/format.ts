@@ -43,6 +43,25 @@ export function formatDate(isoDate: string): string {
   }
 }
 
+// Compact "زمان نسبی" — for feeds where the exact date is less useful than
+// how recent something is (notifications widget, activity timeline). Falls
+// back to formatDate() once something is more than a week old, since
+// "۱۲ روز پیش" reads worse than an actual date at that distance.
+export function formatRelativeTime(isoDate: string): string {
+  const then = new Date(isoDate).getTime();
+  if (Number.isNaN(then)) return isoDate;
+  const diffMs = Date.now() - then;
+  const diffMinutes = Math.floor(diffMs / (60 * 1000));
+  if (diffMinutes < 1) return 'همین الان';
+  if (diffMinutes < 60) return `${toPersianDigits(diffMinutes)} دقیقه پیش`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${toPersianDigits(diffHours)} ساعت پیش`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return 'دیروز';
+  if (diffDays < 7) return `${toPersianDigits(diffDays)} روز پیش`;
+  return formatDate(isoDate);
+}
+
 // Was previously a module-private const duplicated in DashboardPage.tsx —
 // moved here so every page (admin DashboardPage, parent portal pages)
 // shares one source instead of each redefining the same three labels.
