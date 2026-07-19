@@ -5,6 +5,8 @@ import type {
   ParentInstallmentView,
   ParentPaymentView,
   ParentAnnouncementView,
+  ParentAssessmentView,
+  ReportCardView,
 } from '../types/parent.types';
 
 // GET /parent/students — @Roles('parent'). Returns only the students this
@@ -28,6 +30,20 @@ export function getStudentInstallments(studentId: string) {
 // payments (already filtered server-side).
 export function getStudentPaymentHistory(studentId: string) {
   return api.get<ParentPaymentView[]>(`/parent/students/${studentId}/payments`);
+}
+
+// GET /parent/students/:id/assessments — @Roles('parent'). Every recorded
+// assessment (subject/term/score) for the linked child, ownership-checked
+// server-side same as tuition/installments/payments above.
+export function getStudentAssessments(studentId: string) {
+  return api.get<ParentAssessmentView[]>(`/parent/students/${studentId}/assessments`);
+}
+
+// GET /parent/students/:id/report-card — @Roles('parent'). Per-term and
+// overall averages built from the same assessments, ownership-checked the
+// same way.
+export function getStudentReportCard(studentId: string) {
+  return api.get<ReportCardView>(`/parent/students/${studentId}/report-card`);
 }
 
 // GET /parent/announcements — @Roles('parent'). Not scoped to one student;

@@ -5,6 +5,8 @@ import {
   getStudentInstallments,
   getStudentPaymentHistory,
   getMyAnnouncements,
+  getStudentAssessments,
+  getStudentReportCard,
 } from '../api/parent.api';
 import { queryKeys } from '../lib/queryKeys';
 
@@ -45,5 +47,21 @@ export function useMyAnnouncements() {
   return useQuery({
     queryKey: queryKeys.parent.announcements(),
     queryFn: () => getMyAnnouncements().then((res) => res.data),
+  });
+}
+
+export function useStudentAssessments(studentId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.parent.assessments(studentId ?? ''),
+    queryFn: () => getStudentAssessments(studentId as string).then((res) => res.data),
+    enabled: !!studentId,
+  });
+}
+
+export function useStudentReportCard(studentId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.parent.reportCard(studentId ?? ''),
+    queryFn: () => getStudentReportCard(studentId as string).then((res) => res.data),
+    enabled: !!studentId,
   });
 }

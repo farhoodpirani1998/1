@@ -138,6 +138,8 @@ export const queryKeys = {
     installments: (studentId: string) => [...queryKeys.parent.all(), 'installments', studentId] as const,
     payments: (studentId: string) => [...queryKeys.parent.all(), 'payments', studentId] as const,
     announcements: () => [...queryKeys.parent.all(), 'announcements'] as const,
+    assessments: (studentId: string) => [...queryKeys.parent.all(), 'assessments', studentId] as const,
+    reportCard: (studentId: string) => [...queryKeys.parent.all(), 'report-card', studentId] as const,
   },
 
   // Sprint 1 (Teacher Portal Foundation) — profile/classes/subjects only.

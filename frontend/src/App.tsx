@@ -33,6 +33,7 @@ import { ParentDashboardPage } from './pages/parent/ParentDashboardPage';
 import { ParentTuitionPage } from './pages/parent/ParentTuitionPage';
 import { ParentInstallmentsPage } from './pages/parent/ParentInstallmentsPage';
 import { ParentPaymentsPage } from './pages/parent/ParentPaymentsPage';
+import { ParentReportCardPage } from './pages/parent/ParentReportCardPage';
 import { ParentStudentProvider } from './lib/parentStudent';
 import { TeacherLoginPage } from './pages/teacher/TeacherLoginPage';
 import { TeacherForgotPasswordPage } from './pages/teacher/TeacherForgotPasswordPage';
@@ -310,6 +311,7 @@ export function App() {
                   <Route path="tuition" element={<ParentTuitionPage />} />
                   <Route path="installments" element={<ParentInstallmentsPage />} />
                   <Route path="payments" element={<ParentPaymentsPage />} />
+                  <Route path="report-card" element={<ParentReportCardPage />} />
                 </Route>
               </Route>
 

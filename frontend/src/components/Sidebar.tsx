@@ -49,6 +49,7 @@ const navItems: NavItem[] = [
   { to: '/parent/tuition', label: 'وضعیت شهریه', icon: TuitionIcon, roles: ['parent'] },
   { to: '/parent/installments', label: 'اقساط', icon: InstallmentsIcon, roles: ['parent'] },
   { to: '/parent/payments', label: 'تاریخچه پرداخت‌ها', icon: PaymentsIcon, roles: ['parent'] },
+  { to: '/parent/report-card', label: 'کارنامه', icon: ReportsIcon, roles: ['parent'] },
 
   // Teacher portal (Sprint 1) — only ever visible to a signed-in teacher,
   // on the separate /teacher/* route group (see App.tsx). Only Dashboard
