@@ -1,6 +1,7 @@
 import { api } from '../lib/api';
 import type { TeacherProfileView, TeacherClassView, TeacherSubjectView } from '../types/teacher.types';
 import type { Student } from '../types/student.types';
+import type { StudentProfileView } from '../types/studentProfile.types';
 
 // Sprint 1 scope only — the three read endpoints the Teacher Dashboard
 // needs. Attendance/assessments/homework/timetable/announcements calls
@@ -42,6 +43,15 @@ export function getTeacherStudents(gradeId?: string) {
   return api.get<Student[]>('/teacher/students', {
     params: gradeId ? { gradeId } : undefined,
   });
+}
+
+// GET /teacher/students/:id/profile — @Roles('teacher'). Same
+// "پروفایل دانش‌آموز" card as students.api.ts's getStudentProfile
+// (student info/parents+phones/attendance/average/homework), scoped to
+// one of the teacher's own assigned students — the backend rejects any
+// other student with 403/404, same gate as recordAttendance/recordAssessment.
+export function getTeacherStudentProfile(studentId: string) {
+  return api.get<StudentProfileView>(`/teacher/students/${studentId}/profile`);
 }
 
 // ---------------------------------------------------------------------

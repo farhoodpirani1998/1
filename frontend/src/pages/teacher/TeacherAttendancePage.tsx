@@ -29,31 +29,28 @@ import { EmptyState } from '../../components/EmptyState';
 import { useToast } from '../../lib/toast';
 import { getErrorMessage } from '../../lib/error-handler';
 import { useTeacherClasses, useTeacherStudents, useRecordAttendance } from '../../hooks/useTeacher';
-import type { AttendanceStatusValue } from '../../api/teacher.api';
+import { getPreviousSessionAttendance } from '../../api/attendancePreviousSession.mock';
+import {
+  ATTENDANCE_DISPLAY_OPTIONS,
+  DISPLAY_STATUS_BADGE_CLASS,
+  DISPLAY_STATUS_LABEL,
+  DISPLAY_STATUS_TAG,
+  DISPLAY_TO_BACKEND_STATUS,
+  type AttendanceDisplayStatus,
+} from '../../types/attendanceExtras.types';
 import type { Student } from '../../types/student.types';
 
-const STATUS_OPTIONS: { value: AttendanceStatusValue; label: string }[] = [
-  { value: 'present', label: 'حاضر' },
-  { value: 'absent', label: 'غایب' },
-  { value: 'late', label: 'تأخیر' },
-  { value: 'excused', label: 'موجه' },
-];
-
-const STATUS_BADGE_CLASS: Record<AttendanceStatusValue, string> = {
-  present: 'bg-paid/10 text-paid border-paid/25',
-  absent: 'bg-overdue/10 text-overdue border-overdue/25',
-  late: 'bg-action-soft text-action border-action/25',
-  excused: 'bg-ink/5 text-ink/60 border-line dark:bg-white/5 dark:text-paper/60 dark:border-white/10',
-};
+const STATUS_OPTIONS = ATTENDANCE_DISPLAY_OPTIONS;
+const STATUS_BADGE_CLASS = DISPLAY_STATUS_BADGE_CLASS;
 
 // Local per-student editor state. `savedFor` records the (status, note)
 // pair that was last successfully persisted, so a row only gets
 // re-submitted when something has actually changed since its last
 // successful save — not on every click of Save.
 interface RowState {
-  status: AttendanceStatusValue | '';
+  status: AttendanceDisplayStatus | '';
   note: string;
-  savedFor: { status: AttendanceStatusValue; note: string } | null;
+  savedFor: { status: AttendanceDisplayStatus; note: string } | null;
   error: string | null;
 }
 
@@ -81,6 +78,8 @@ export function TeacherAttendancePage() {
   const [date, setDate] = useState(todayIso());
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [saving, setSaving] = useState(false);
+  const [copyingPrevious, setCopyingPrevious] = useState(false);
+  const [showStats, setShowStats] = useState(false);
 
   const classesQuery = useTeacherClasses();
   const studentsQuery = useTeacherStudents(gradeId || undefined);
@@ -103,7 +102,7 @@ export function TeacherAttendancePage() {
   // Accepts '' too — selecting the Select's placeholder option again
   // resets a student back to "not marked" rather than being an invalid
   // status.
-  function setStatus(studentId: string, status: AttendanceStatusValue | '') {
+  function setStatus(studentId: string, status: AttendanceDisplayStatus | '') {
     setRows((prev) => ({
       ...prev,
       [studentId]: { ...rowFor(studentId), status, error: null },
@@ -117,22 +116,82 @@ export function TeacherAttendancePage() {
     }));
   }
 
+  // «ثبت گروهی» — همه حاضر / همه غایب. فقط دانش‌آموزانی که هنوز
+  // «ذخیره‌شده» با همین وضعیت نیستند تغییر می‌کنند (تا یک ثبت گروهی
+  // اشتباهی، وضعیت‌های قبلاً ذخیره‌شده و دستی را overwrite نکند —
+  // برای آن، خود وضعیت هر ردیف را جداگانه عوض کنید).
+  function markAll(status: AttendanceDisplayStatus) {
+    setRows((prev) => {
+      const next = { ...prev };
+      for (const s of students) {
+        next[s.id] = { ...rowFor(s.id), status, error: null };
+      }
+      return next;
+    });
+  }
+
+  // «کپی از جلسه قبل» — در نبود endpoint واقعی برای خواندن جلسه قبلی
+  // (توضیح در api/attendancePreviousSession.mock.ts)، فعلاً Mock است.
+  async function copyFromPreviousSession() {
+    if (students.length === 0) return;
+    setCopyingPrevious(true);
+    try {
+      const previous = await getPreviousSessionAttendance(students.map((s) => s.id));
+      setRows((prev) => {
+        const next = { ...prev };
+        for (const s of students) {
+          const status = previous[s.id];
+          if (!status) continue;
+          next[s.id] = { ...rowFor(s.id), status, error: null };
+        }
+        return next;
+      });
+      showSuccess('وضعیت جلسه قبل کپی شد — قبل از ذخیره بررسی کنید');
+    } catch {
+      showError('کپی از جلسه قبل با خطا مواجه شد');
+    } finally {
+      setCopyingPrevious(false);
+    }
+  }
+
   const dirtyEntries = Object.entries(rows).filter(([, row]) => isDirty(row));
   const canSave = !!gradeId && dirtyEntries.length > 0 && !saving;
+
+  // «نمایش آمار» — شمارش زنده از وضعیت‌های در حال ویرایش (rows)، نه یک
+  // منبع Mock جدا — همیشه دقیقاً همان چیزی را نشان می‌دهد که در جدول است.
+  const statusCounts = STATUS_OPTIONS.reduce<Record<AttendanceDisplayStatus, number>>(
+    (acc, opt) => {
+      acc[opt.value] = 0;
+      return acc;
+    },
+    {} as Record<AttendanceDisplayStatus, number>,
+  );
+  let unmarkedCount = 0;
+  for (const s of students) {
+    const status = rowFor(s.id).status;
+    if (status) statusCounts[status] += 1;
+    else unmarkedCount += 1;
+  }
 
   async function handleSaveAll() {
     if (dirtyEntries.length === 0) return;
     setSaving(true);
 
     const results = await Promise.allSettled(
-      dirtyEntries.map(([studentId, row]) =>
-        recordAttendance.mutateAsync({
+      dirtyEntries.map(([studentId, row]) => {
+        const displayStatus = row.status as AttendanceDisplayStatus;
+        const tag = DISPLAY_STATUS_TAG[displayStatus];
+        // برچسب وضعیت‌های فاقد معادل دقیق در enum واقعی (مرخصی/غیبت
+        // غیرموجه) به یادداشت اضافه می‌شود تا با ذخیره واقعی هم گم نشود
+        // — توضیح کامل در types/attendanceExtras.types.ts.
+        const note = tag ? `[${tag}]${row.note.trim() ? ' ' + row.note.trim() : ''}` : row.note.trim();
+        return recordAttendance.mutateAsync({
           studentId,
           date,
-          status: row.status as AttendanceStatusValue,
-          note: row.note.trim() || undefined,
-        }),
-      ),
+          status: DISPLAY_TO_BACKEND_STATUS[displayStatus],
+          note: note || undefined,
+        });
+      }),
     );
 
     setRows((prev) => {
@@ -142,7 +201,7 @@ export function TeacherAttendancePage() {
         if (result.status === 'fulfilled') {
           next[studentId] = {
             ...row,
-            savedFor: { status: row.status as AttendanceStatusValue, note: row.note },
+            savedFor: { status: row.status as AttendanceDisplayStatus, note: row.note },
             error: null,
           };
         } else {
@@ -184,7 +243,7 @@ export function TeacherAttendancePage() {
         return (
           <Select
             value={row.status}
-            onChange={(e) => setStatus(s.id, e.target.value as AttendanceStatusValue | '')}
+            onChange={(e) => setStatus(s.id, e.target.value as AttendanceDisplayStatus | '')}
             placeholder="ثبت نشده"
             options={STATUS_OPTIONS}
             containerClassName="min-w-[130px]"
@@ -246,6 +305,47 @@ export function TeacherAttendancePage() {
         />
         <PersianDatePicker value={date} onChange={setDate} containerClassName="min-w-[160px]" />
       </FilterBar>
+
+      {gradeId && students.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-ink/50 dark:text-paper/50">ثبت گروهی:</span>
+          <Button variant="secondary" size="sm" onClick={() => markAll('present')}>
+            همه حاضر
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => markAll('quick_absent')}>
+            همه غایب
+          </Button>
+          <Button variant="secondary" size="sm" onClick={copyFromPreviousSession} loading={copyingPrevious}>
+            کپی از جلسه قبل
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setShowStats((v) => !v)}>
+            {showStats ? 'بستن آمار' : 'نمایش آمار'}
+          </Button>
+        </div>
+      )}
+
+      {showStats && gradeId && students.length > 0 && (
+        <Card className="mb-4">
+          <div className="flex flex-wrap gap-4">
+            {STATUS_OPTIONS.map((opt) => (
+              <div key={opt.value} className="flex items-center gap-2">
+                <span className={`badge ${STATUS_BADGE_CLASS[opt.value]}`}>
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                  {DISPLAY_STATUS_LABEL[opt.value]}
+                </span>
+                <span className="text-sm font-medium text-ink dark:text-paper">{statusCounts[opt.value]}</span>
+              </div>
+            ))}
+            <div className="flex items-center gap-2">
+              <span className="badge bg-ink/5 text-ink/50 border-line dark:bg-white/5 dark:text-paper/50 dark:border-white/10">
+                <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                ثبت‌نشده
+              </span>
+              <span className="text-sm font-medium text-ink dark:text-paper">{unmarkedCount}</span>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <Card>
         {!gradeId ? (

@@ -25,8 +25,10 @@ import {
   useAcademicYears,
 } from '../hooks/useStudents';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useAuth } from '../lib/auth';
 import { UsersIcon, CheckIcon, AlertIcon, CalendarIcon, ChevronEnterIcon } from '../components/icons/SchoolIcons';
 import { BulkImportStudentsPanel } from '../components/BulkImportStudentsPanel';
+import { StudentProfileModal } from '../components/StudentProfileModal';
 
 const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -69,6 +71,13 @@ function StudentAvatar({ name }: { name: string }) {
 }
 
 export function StudentsPage() {
+  // GET /students/:id/profile is school_admin/accountant only (it embeds
+  // the tuition/payment summary) — staff can browse this page but never
+  // sees the "پروفایل" action, same "staff can see the student record
+  // but not the financial summary" gate the backend documents on that
+  // route.
+  const { user } = useAuth();
+  const canViewProfile = user?.role === 'school_admin' || user?.role === 'accountant';
   const { showSuccess, showError } = useToast();
   const location = useLocation();
   // The staff dashboard's "quick registration" shortcut links here with
@@ -108,6 +117,9 @@ export function StudentsPage() {
   // back), and is only ever cleared explicitly via "لغو انتخاب" or by
   // checking a row/select-all off.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // پروفایل دانش‌آموز — opened via the "پروفایل" row action below; shared
+  // modal, same component TeacherAssessmentsPage/TeacherStudentsPage use.
+  const [profileStudentId, setProfileStudentId] = useState<string | null>(null);
 
   const filterParams = {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
@@ -293,13 +305,24 @@ export function StudentsPage() {
       header: '',
       align: 'left',
       render: (s) => (
-        <Link
-          to={`/students/${s.id}`}
-          className="inline-flex items-center gap-1 rounded-lg border border-transparent px-2.5 py-1.5 text-sm font-medium text-action transition-colors hover:border-action/25 hover:bg-action-soft dark:hover:bg-action/10"
-        >
-          صورت‌حساب
-          <ChevronEnterIcon size={14} />
-        </Link>
+        <div className="flex items-center justify-end gap-1">
+          {canViewProfile && (
+            <button
+              type="button"
+              onClick={() => setProfileStudentId(s.id)}
+              className="inline-flex items-center gap-1 rounded-lg border border-transparent px-2.5 py-1.5 text-sm font-medium text-ink/60 transition-colors hover:border-line hover:bg-paper dark:text-paper/60 dark:hover:bg-white/5"
+            >
+              پروفایل
+            </button>
+          )}
+          <Link
+            to={`/students/${s.id}`}
+            className="inline-flex items-center gap-1 rounded-lg border border-transparent px-2.5 py-1.5 text-sm font-medium text-action transition-colors hover:border-action/25 hover:bg-action-soft dark:hover:bg-action/10"
+          >
+            صورت‌حساب
+            <ChevronEnterIcon size={14} />
+          </Link>
+        </div>
       ),
     },
   ];
@@ -587,6 +610,13 @@ export function StudentsPage() {
           </div>
         )}
       </Card>
+
+      <StudentProfileModal
+        studentId={profileStudentId ?? undefined}
+        open={profileStudentId !== null}
+        onClose={() => setProfileStudentId(null)}
+        role="admin"
+      />
     </div>
   );
 }

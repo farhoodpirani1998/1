@@ -45,6 +45,7 @@ import { EmptyState } from '../../components/EmptyState';
 import { Modal } from '../../components/Modal';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { FormError } from '../../components/FormError';
+import { HomeworkSubmissionsModal } from '../../components/HomeworkSubmissionsModal';
 import { useToast } from '../../lib/toast';
 import { parseApiError, getErrorMessage, type ParsedApiError } from '../../lib/error-handler';
 import { formatDate } from '../../lib/format';
@@ -58,7 +59,9 @@ import {
   useUpdateHomework,
   useDeleteHomework,
 } from '../../hooks/useTeacher';
+import { useHomeworkExtras, useSaveHomeworkExtras } from '../../hooks/useHomeworkExtras';
 import type { HomeworkView, CreateHomeworkInput, UpdateHomeworkInput } from '../../api/teacher.api';
+import { DEFAULT_HOMEWORK_EXTRAS, type HomeworkExtras } from '../../types/homeworkExtras.types';
 
 // Every distinct academicYearId visible anywhere in the teacher's own
 // data — timetable entries first (the teacher's active schedule, so the
@@ -86,6 +89,10 @@ interface FormState {
   description: string;
   dueDate: string;
   attachmentUrl: string;
+  // فیلدهای زیر واقعی نیستند (به بک‌اند ارسال نمی‌شوند) — طبق فیدبک
+  // اضافه شده‌اند و از طریق hooks/useHomeworkExtras.ts روی
+  // api/homeworkExtras.mock.ts ذخیره می‌شوند. جزئیات در آن فایل.
+  extras: HomeworkExtras;
 }
 
 const EMPTY_FORM: FormState = {
@@ -95,6 +102,7 @@ const EMPTY_FORM: FormState = {
   description: '',
   dueDate: '',
   attachmentUrl: '',
+  extras: DEFAULT_HOMEWORK_EXTRAS,
 };
 
 function isOverdue(dueDate: string): boolean {
@@ -126,6 +134,9 @@ export function TeacherHomeworkPage() {
   const createHomework = useCreateHomework();
   const updateHomework = useUpdateHomework();
   const deleteHomework = useDeleteHomework();
+  const saveHomeworkExtras = useSaveHomeworkExtras();
+
+  const [submissionsTarget, setSubmissionsTarget] = useState<HomeworkView | null>(null);
 
   const assignments = profileQuery.data?.assignments ?? [];
   const classes = classesQuery.data ?? [];
@@ -180,6 +191,9 @@ export function TeacherHomeworkPage() {
         { id: editing.id, dto },
         {
           onSuccess: () => {
+            // extras فیلدهای Mock‌اند و در DTO بالا نیستند (whitelist:true
+            // روی بک‌اند رد می‌کند) — جداگانه و محلی ذخیره می‌شوند.
+            saveHomeworkExtras.mutate({ homeworkId: editing.id, extras: form.extras });
             showSuccess('تکلیف با موفقیت ویرایش شد');
             closeForm();
           },
@@ -200,7 +214,8 @@ export function TeacherHomeworkPage() {
         ...(attachmentUrl ? { attachmentUrl } : {}),
       };
       createHomework.mutate(dto, {
-        onSuccess: () => {
+        onSuccess: (created) => {
+          saveHomeworkExtras.mutate({ homeworkId: created.id, extras: form.extras });
           showSuccess('تکلیف با موفقیت ثبت شد');
           closeForm();
         },
@@ -282,11 +297,19 @@ export function TeacherHomeworkPage() {
         ),
     },
     {
+      key: 'points',
+      header: 'امتیاز',
+      render: (hw) => <PointsCell homeworkId={hw.id} />,
+    },
+    {
       key: 'actions',
       header: '',
       align: 'left',
       render: (hw) => (
         <div className="flex justify-end gap-2">
+          <Button variant="secondary" size="sm" onClick={() => setSubmissionsTarget(hw)}>
+            ارسال‌ها
+          </Button>
           <Button variant="secondary" size="sm" onClick={() => openEdit(hw)}>
             ویرایش
           </Button>
@@ -372,7 +395,27 @@ export function TeacherHomeworkPage() {
         onConfirm={confirmDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+
+      <HomeworkSubmissionsModal
+        open={!!submissionsTarget}
+        onClose={() => setSubmissionsTarget(null)}
+        homeworkId={submissionsTarget?.id ?? null}
+        homeworkTitle={submissionsTarget?.title ?? ''}
+      />
     </div>
+  );
+}
+
+// ستون «امتیاز» جدول — از api/homeworkExtras.mock.ts خوانده می‌شود
+// (فیلد واقعی در HomeworkView نیست، توضیح کامل در آن فایل).
+function PointsCell({ homeworkId }: { homeworkId: string }) {
+  const extrasQuery = useHomeworkExtras(homeworkId);
+  if (extrasQuery.isLoading) return <span className="text-ink/30 dark:text-paper/30">…</span>;
+  const points = extrasQuery.data?.points;
+  return points != null ? (
+    <span className="font-medium text-ink dark:text-paper">{points}</span>
+  ) : (
+    <span className="text-ink/35 dark:text-paper/35">—</span>
   );
 }
 
@@ -403,6 +446,10 @@ function HomeworkFormModal({
   // state on a key change" shape as TeacherAssessmentsPage resetting
   // `rows` when grade/subject/term changes.
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  // extras فقط وقتی موجودند که در حال ویرایش هستیم — بارگذاری async است،
+  // پس با رسیدن داده یک‌بار روی فرم اعمال می‌شود (بدون clobber کردن
+  // تغییراتی که کاربر خودش تا آن لحظه داده).
+  const editingExtrasQuery = useHomeworkExtras(editing?.id);
 
   useEffect(() => {
     if (!open) return;
@@ -414,6 +461,7 @@ function HomeworkFormModal({
         description: editing.description,
         dueDate: editing.dueDate,
         attachmentUrl: editing.attachmentUrl ?? '',
+        extras: DEFAULT_HOMEWORK_EXTRAS,
       });
     } else {
       setForm({
@@ -424,6 +472,12 @@ function HomeworkFormModal({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editing]);
+
+  useEffect(() => {
+    if (!open || !editing || !editingExtrasQuery.data) return;
+    setForm((f) => ({ ...f, extras: editingExtrasQuery.data }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editing, editingExtrasQuery.data]);
 
   // academicYearOptions is resolved from the timetable/homework queries,
   // which can still be loading (or can finish loading later) at the
@@ -564,6 +618,129 @@ function HomeworkFormModal({
             placeholder="جزئیات تکلیف را بنویسید..."
           />
         </Field>
+
+        <div className="sm:col-span-2 rounded-lg border border-dashed border-line p-3 dark:border-white/15">
+          <p className="mb-3 text-xs font-medium text-ink/50 dark:text-paper/50">
+            تنظیمات تکمیلی — این بخش هنوز روی سرور ذخیره نمی‌شود و صرفاً نمایشی است.
+          </p>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input
+              type="time"
+              label="ساعت تحویل (اختیاری)"
+              value={form.extras.dueTime ?? ''}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, extras: { ...f.extras, dueTime: e.target.value || null } }))
+              }
+              helperText="اگر خالی بماند، مهلت تا پایان روز تعیین‌شده است."
+            />
+
+            <Input
+              type="number"
+              label="امتیاز"
+              min={0}
+              value={form.extras.points ?? ''}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  extras: { ...f.extras, points: e.target.value ? Number(e.target.value) : null },
+                }))
+              }
+              placeholder="مثلاً ۲۰"
+            />
+
+            <Field label="بارگذاری فایل (اختیاری)" className="sm:col-span-2">
+              <input
+                type="file"
+                className="input"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  setForm((f) => ({
+                    ...f,
+                    extras: {
+                      ...f.extras,
+                      teacherUploadedFileName: file?.name ?? null,
+                      teacherUploadedFileSizeKb: file ? Math.round(file.size / 1024) : null,
+                    },
+                  }));
+                }}
+              />
+              {form.extras.teacherUploadedFileName && (
+                <p className="mt-1.5 text-xs text-ink/45 dark:text-paper/45">
+                  {form.extras.teacherUploadedFileName} ({form.extras.teacherUploadedFileSizeKb} کیلوبایت)
+                </p>
+              )}
+            </Field>
+
+            <Input
+              type="number"
+              label="حداکثر حجم فایل مجاز برای دانش‌آموز (مگابایت)"
+              min={1}
+              value={form.extras.maxFileSizeMb ?? ''}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  extras: { ...f.extras, maxFileSizeMb: e.target.value ? Number(e.target.value) : null },
+                }))
+              }
+            />
+
+            <Input
+              type="text"
+              label="نوع فایل مجاز (با کاما جدا کنید)"
+              value={form.extras.allowedFileTypes.join(', ')}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  extras: {
+                    ...f.extras,
+                    allowedFileTypes: e.target.value
+                      .split(',')
+                      .map((t) => t.trim().replace(/^\./, '').toLowerCase())
+                      .filter(Boolean),
+                  },
+                }))
+              }
+              placeholder="pdf, jpg, png"
+            />
+
+            <Input
+              type="datetime-local"
+              label="انتشار زمان‌بندی‌شده (اختیاری)"
+              value={form.extras.scheduledPublishAt ?? ''}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  extras: { ...f.extras, scheduledPublishAt: e.target.value || null },
+                }))
+              }
+              helperText="اگر خالی بماند، تکلیف بلافاصله پس از ثبت نمایان می‌شود."
+              containerClassName="sm:col-span-2"
+            />
+
+            <label className="flex items-center gap-2 text-sm text-ink dark:text-paper">
+              <input
+                type="checkbox"
+                checked={form.extras.visibleToParent}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, extras: { ...f.extras, visibleToParent: e.target.checked } }))
+                }
+              />
+              نمایش برای والدین
+            </label>
+
+            <label className="flex items-center gap-2 text-sm text-ink dark:text-paper">
+              <input
+                type="checkbox"
+                checked={form.extras.visibleToStudent}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, extras: { ...f.extras, visibleToStudent: e.target.checked } }))
+                }
+              />
+              نمایش برای دانش‌آموز
+            </label>
+          </div>
+        </div>
 
         <div className="sm:col-span-2">
           <FormError error={error} />

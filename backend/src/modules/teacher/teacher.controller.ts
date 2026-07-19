@@ -118,6 +118,17 @@ export class TeacherController {
     return this.teacherService.getMyStudents(user.id, user.schoolId, query);
   }
 
+  // The same "پروفایل دانش‌آموز" card (photo/info/parent phone/
+  // attendance/average/progress chart/homework) the school_admin portal
+  // sees at GET /students/:id/profile, scoped to one of the teacher's
+  // own assigned students — see TeacherService.getStudentProfile for the
+  // assignment gate.
+  @Get('students/:id/profile')
+  @Roles('teacher')
+  getMyStudentProfile(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.teacherService.getStudentProfile(user.id, user.schoolId, id);
+  }
+
   // Recording/correcting attendance for one of the teacher's own assigned
   // classes. TeacherService.recordAttendance() checks the assignment
   // before delegating to AttendanceService.record(), which owns every

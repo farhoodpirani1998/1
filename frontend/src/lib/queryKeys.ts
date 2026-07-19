@@ -37,6 +37,10 @@ export const queryKeys = {
     // — uploaded document references shown in StudentDetailPage's
     // "مدارک" section.
     documents: (id: string) => [...queryKeys.students.all(), 'documents', id] as const,
+    // GET /students/:id/profile — the aggregated "پروفایل دانش‌آموز" card
+    // (photo/info/parent phone/attendance/average/progress/homework)
+    // shown via <StudentProfileModal/>, school_admin/accountant side.
+    profile: (id: string) => [...queryKeys.students.all(), 'profile', id] as const,
   },
 
   guardians: {
@@ -159,6 +163,10 @@ export const queryKeys = {
     // teacher's assigned grades — same "id or null" shape as
     // teacher.assignments(teacherId) below.
     students: (gradeId?: string) => [...queryKeys.teacher.all(), 'students', gradeId ?? null] as const,
+    // GET /teacher/students/:id/profile — same "پروفایل دانش‌آموز" card as
+    // queryKeys.students.profile above, scoped to one of the teacher's own
+    // assigned students.
+    studentProfile: (id: string) => [...queryKeys.teacher.all(), 'studentProfile', id] as const,
     // Sprint 2A (Teacher Assignments, school_admin-only).
     assignments: (teacherId?: string) => [...queryKeys.teacher.all(), 'assignments', teacherId ?? null] as const,
     // Sprint 2B: the school_admin-facing teacher roster (GET /teacher/list),

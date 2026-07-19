@@ -1,5 +1,6 @@
 import { api } from '../lib/api';
 import type { Student, StudentStatus } from '../types/student.types';
+import type { StudentProfileView } from '../types/studentProfile.types';
 
 export interface QueryStudentsParams {
   search?: string;
@@ -135,4 +136,14 @@ export function getStudentParents(studentId: string) {
 // Phase 1 report as a naming/semantic gap, not a new behavior.
 export function restoreStudent(id: string) {
   return updateStudent(id, { status: 'active' });
+}
+
+// GET /students/:id/profile — @Roles('school_admin','accountant'). The
+// aggregated "پروفایل دانش‌آموز" card: student info, parents+phones,
+// attendance history, assessments/average, homework — see
+// types/studentProfile.types.ts for the full shape. Powers
+// <StudentProfileModal/>, the shared component every "student profile"
+// entry point in the admin/accountant portal opens.
+export function getStudentProfile(id: string) {
+  return api.get<StudentProfileView>(`/students/${id}/profile`);
 }

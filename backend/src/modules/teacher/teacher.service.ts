@@ -15,6 +15,8 @@ import { CreateAssessmentDto } from '../student-assessments/dto/create-assessmen
 import { AttendanceService } from '../attendance/attendance.service';
 import { AssessmentsService } from '../student-assessments/assessments.service';
 import { Role } from '../../common/authorization/roles.enum';
+import { StudentProfileService } from '../students/profile/student-profile.service';
+import { StudentProfileView } from '../students/profile/student-profile-view.dto';
 
 // Sprint 2B: 'teacher' added alongside 'grade'/'subject' so
 // toTeacherAssignmentView can populate teacherName as well as
@@ -44,6 +46,14 @@ export class TeacherService {
     // recordAssessment below).
     private readonly attendanceService: AttendanceService,
     private readonly assessmentsService: AssessmentsService,
+    // Backs GET /teacher/students/:id/profile — reuses the exact same
+    // aggregation as the school_admin-facing GET /students/:id/profile
+    // (StudentProfileService.getForSchoolAdmin already does the
+    // schoolId tenant check); getStudentProfile() below only adds the
+    // same "is this teacher assigned to this student's grade" gate used
+    // by recordAttendance/recordAssessment, never a second copy of the
+    // profile-building logic itself.
+    private readonly studentProfileService: StudentProfileService,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -252,6 +262,33 @@ export class TeacherService {
       relations: ['grade'],
       order: { fullName: 'ASC' },
     });
+  }
+
+  /**
+   * Backs GET /teacher/students/:id/profile — the same profile card
+   * (photo/info/parent phone/attendance/average/progress/homework) the
+   * school_admin portal sees, scoped to a teacher's own assigned
+   * students. Same "attendance has no subject of its own" reasoning as
+   * recordAttendance() above: a teacher may open the profile of any
+   * student in any grade they're assigned to, not just grades they
+   * teach a specific subject in.
+   */
+  async getStudentProfile(
+    teacherId: string,
+    schoolId: string,
+    studentId: string,
+  ): Promise<StudentProfileView> {
+    const student = await this.studentRepo.findOne({ where: { id: studentId, schoolId } });
+    if (!student) {
+      throw new NotFoundException('دانش‌آموز یافت نشد');
+    }
+
+    const assignedGradeIds = await this.assignedGradeIds(teacherId, schoolId);
+    if (!assignedGradeIds.includes(student.gradeId)) {
+      throw new ForbiddenException('شما به کلاس این دانش‌آموز دسترسی ندارید');
+    }
+
+    return this.studentProfileService.getForSchoolAdmin(studentId, schoolId);
   }
 
   // ---------------------------------------------------------------------

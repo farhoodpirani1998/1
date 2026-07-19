@@ -6,6 +6,7 @@ import {
   getStudent,
   addStudentParent,
   getStudentParents,
+  getStudentProfile,
   type AddStudentParentInput,
 } from '../api/students.api';
 import { unlinkParentStudent } from '../api/parent.api';
@@ -81,15 +82,14 @@ export function useCreateStudentDocument() {
   });
 }
 
-// DELETE /documents/:id
-export function useDeleteStudentDocument(studentId: string | undefined) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (documentId: string) => deleteStudentDocument(documentId),
-    onSuccess: () => {
-      if (studentId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.students.documents(studentId) });
-      }
-    },
+// GET /students/:id/profile — the shared <StudentProfileModal/> data
+// source for the school_admin/accountant portal. `id` undefined (modal
+// closed / no student picked) leaves the query disabled, same pattern
+// as useStudent above.
+export function useStudentProfile(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.students.profile(id ?? ''),
+    queryFn: () => getStudentProfile(id as string).then((res) => res.data),
+    enabled: !!id,
   });
 }

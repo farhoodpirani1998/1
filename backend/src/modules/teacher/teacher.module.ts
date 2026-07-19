@@ -12,6 +12,11 @@ import { StudentAssessmentsModule } from '../student-assessments/student-assessm
 import { AnnouncementsModule } from '../announcements/announcements.module';
 import { TimetableModule } from '../timetable/timetable.module';
 import { HomeworkModule } from '../homework/homework.module';
+// Student Profile card (photo/info/parent phone/attendance/average/
+// progress/homework sections) reused as-is from the school_admin-facing
+// profile — see StudentProfileModule for why it's safe to import here
+// (it never imports TeacherModule back, so there's no cycle).
+import { StudentProfileModule } from '../students/profile/student-profile.module';
 
 // Phase 5G: Teacher Portal Foundation.
 //
@@ -33,6 +38,7 @@ import { HomeworkModule } from '../homework/homework.module';
     AnnouncementsModule,
     TimetableModule,
     HomeworkModule,
+    StudentProfileModule,
   ],
   controllers: [TeacherController],
   providers: [TeacherService],

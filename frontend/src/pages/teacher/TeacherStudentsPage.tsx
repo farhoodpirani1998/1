@@ -20,6 +20,7 @@ import { Select } from '../../components/Select';
 import { Table, type TableColumn } from '../../components/Table';
 import { Button } from '../../components/Button';
 import { EmptyState } from '../../components/EmptyState';
+import { StudentProfileModal } from '../../components/StudentProfileModal';
 import { formatDate } from '../../lib/format';
 import { useTeacherClasses, useTeacherStudents } from '../../hooks/useTeacher';
 import type { Student } from '../../types/student.types';
@@ -47,6 +48,9 @@ function StudentStatusBadge({ status }: { status: Student['status'] }) {
 
 export function TeacherStudentsPage() {
   const [gradeId, setGradeId] = useState('');
+  // پروفایل دانش‌آموز — opened by clicking a row; shared modal, same as
+  // TeacherAssessmentsPage.
+  const [profileStudentId, setProfileStudentId] = useState<string | null>(null);
 
   const classesQuery = useTeacherClasses();
   const studentsQuery = useTeacherStudents(gradeId || undefined);
@@ -110,6 +114,7 @@ export function TeacherStudentsPage() {
             columns={columns}
             data={students}
             rowKey={(s) => s.id}
+            onRowClick={(s) => setProfileStudentId(s.id)}
             loading={loading}
             skeletonRows={5}
             emptyMessage="دانش‌آموزی یافت نشد."
@@ -119,6 +124,13 @@ export function TeacherStudentsPage() {
           />
         )}
       </Card>
+
+      <StudentProfileModal
+        studentId={profileStudentId ?? undefined}
+        open={profileStudentId !== null}
+        onClose={() => setProfileStudentId(null)}
+        role="teacher"
+      />
     </div>
   );
 }
