@@ -94,6 +94,7 @@ export const queryKeys = {
   schools: {
     all: () => ['schools'] as const,
     list: () => [...queryKeys.schools.all(), 'list'] as const,
+    detail: (id: string) => [...queryKeys.schools.all(), 'detail', id] as const,
   },
 
   users: {

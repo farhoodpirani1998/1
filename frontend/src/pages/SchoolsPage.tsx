@@ -1,4 +1,5 @@
 import { useMemo, useState, FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/Card';
 import { PageHeader } from '../components/PageHeader';
 import { SearchInput } from '../components/SearchInput';
@@ -50,6 +51,7 @@ function toPersianCount(n: number): string {
 }
 
 export function SchoolsPage() {
+  const navigate = useNavigate();
   const { showSuccess, showError } = useToast();
   const schoolsQuery = useSchools();
   const createSchool = useCreateSchool();
@@ -130,6 +132,12 @@ export function SchoolsPage() {
 
   const columns: TableColumn<School>[] = [
     {
+      key: 'index',
+      header: '#',
+      cellClassName: 'tabular text-ink/40 dark:text-paper/40',
+      render: (s) => toPersianCount(filteredSchools.indexOf(s) + 1),
+    },
+    {
       key: 'name',
       header: 'نام',
       render: (s) => (
@@ -173,7 +181,14 @@ export function SchoolsPage() {
       header: '',
       align: 'left',
       render: (s) => (
-        <Button variant={s.isActive ? 'secondary' : 'primary'} size="sm" onClick={() => toggleActive(s)}>
+        <Button
+          variant={s.isActive ? 'secondary' : 'primary'}
+          size="sm"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleActive(s);
+          }}
+        >
           {s.isActive ? 'غیرفعال کردن' : 'فعال کردن'}
         </Button>
       ),
@@ -245,6 +260,7 @@ export function SchoolsPage() {
           skeletonRows={5}
           emptyMessage="هنوز مدرسه‌ای ثبت نشده است."
           emptyDescription={hasActiveFilters ? 'برای این جستجو/فیلتر نتیجه‌ای یافت نشد.' : undefined}
+          onRowClick={(s) => navigate(`/schools/${s.id}`)}
         />
       </Card>
 

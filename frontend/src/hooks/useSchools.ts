@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getSchools,
+  getSchool,
   createSchool,
   updateSchool,
   deactivateSchool,
@@ -13,6 +14,14 @@ export function useSchools() {
   return useQuery({
     queryKey: queryKeys.schools.list(),
     queryFn: () => getSchools().then((res) => res.data),
+  });
+}
+
+export function useSchool(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.schools.detail(id ?? ''),
+    queryFn: () => getSchool(id as string).then((res) => res.data),
+    enabled: !!id,
   });
 }
 
@@ -31,8 +40,9 @@ export function useUpdateSchool() {
   return useMutation({
     mutationFn: ({ id, dto }: { id: string; dto: UpdateSchoolInput }) =>
       updateSchool(id, dto).then((res) => res.data),
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.schools.list() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.schools.detail(variables.id) });
     },
   });
 }
@@ -41,8 +51,9 @@ export function useDeactivateSchool() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => deactivateSchool(id),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.schools.list() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.schools.detail(id) });
     },
   });
 }
