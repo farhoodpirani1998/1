@@ -5,6 +5,10 @@ export function getSchools() {
   return api.get<School[]>('/schools');
 }
 
+export function getSchool(id: string) {
+  return api.get<School>(`/schools/${id}`);
+}
+
 export interface CreateSchoolInput {
   name: string;
   address?: string;

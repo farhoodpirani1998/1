@@ -74,13 +74,18 @@ export function Table<T>({
 
   return (
     <div className={`overflow-x-auto ${className}`}>
-      <table className="w-full text-sm">
+      {/* min-w-max: the table always renders at its natural content width.
+          Without this, `w-full` on a narrow viewport forces every column to
+          shrink, which wraps header labels onto 2+ lines and throws off
+          vertical alignment between the header row and its data cells.
+          The wrapping div's overflow-x-auto then does the actual scrolling. */}
+      <table className="w-full min-w-max text-sm">
         <thead>
           <tr className="border-b border-line text-ink/50 dark:border-white/10 dark:text-paper/50">
             {columns.map((col) => (
               <th
                 key={col.key}
-                className={`py-2 font-medium ${ALIGN_CLASS[col.align ?? 'right']} ${
+                className={`whitespace-nowrap py-2 font-medium ${ALIGN_CLASS[col.align ?? 'right']} ${
                   stickyHeader ? 'sticky top-16 z-[5] bg-white dark:bg-navy-dark' : ''
                 } ${col.headerClassName ?? ''}`}
               >

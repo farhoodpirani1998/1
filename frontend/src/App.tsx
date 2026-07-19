@@ -4,6 +4,7 @@ import { AuthProvider } from './lib/auth';
 import { ToastProvider } from './lib/toast';
 import { ThemeProvider } from './lib/theme';
 import { AppLayout } from './components/AppLayout';
+import { RouteErrorBoundary } from './components/AppErrorBoundary';
 import { RequireRole } from './components/RequireRole';
 import { LoginPage } from './pages/LoginPage';
 import { AdminForgotPasswordPage } from './pages/AdminForgotPasswordPage';
@@ -14,6 +15,7 @@ import { InstallmentsPage } from './pages/InstallmentsPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { SchoolsPage } from './pages/SchoolsPage';
+import { SchoolDetailPage } from './pages/SchoolDetailPage';
 import { UsersPage } from './pages/UsersPage';
 import { TeacherAssignmentsPage } from './pages/TeacherAssignmentsPage';
 import { GuardiansPage } from './pages/GuardiansPage';
@@ -88,6 +90,7 @@ export function App() {
       <ThemeProvider>
         <ToastProvider>
           <AuthProvider>
+            <RouteErrorBoundary>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
               <Route path="/forgot-password" element={<AdminForgotPasswordPage />} />
@@ -159,6 +162,14 @@ export function App() {
                   element={
                     <RequireRole roles={['super_admin']}>
                       <SchoolsPage />
+                    </RequireRole>
+                  }
+                />
+                <Route
+                  path="/schools/:id"
+                  element={
+                    <RequireRole roles={['super_admin']}>
+                      <SchoolDetailPage />
                     </RequireRole>
                   }
                 />
@@ -351,6 +362,7 @@ export function App() {
 
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
+            </RouteErrorBoundary>
           </AuthProvider>
         </ToastProvider>
       </ThemeProvider>
