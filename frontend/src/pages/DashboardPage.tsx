@@ -29,8 +29,13 @@ import {
   AttendanceIcon,
   AssignmentsIcon,
   CalendarIcon,
+  TeacherIcon,
+  StudentIcon,
+  NotificationIcon,
+  ScoreIcon,
+  ClassIcon,
 } from '../components/icons/SchoolIcons';
-import { formatToman, formatDate, toPersianDigits, paymentMethodLabels } from '../lib/format';
+import { formatToman, formatDate, formatRelativeTime, toPersianDigits, paymentMethodLabels } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { useOverdueSummary, useDebtorStudents, useMonthlyIncome, useMonthlyIncomeTrend } from '../hooks/useReports';
 import { useStudents } from '../hooks/useStudents';
@@ -259,6 +264,173 @@ function TodayChecklist() {
   );
 }
 
+// Sprint 2.1 — no endpoint anywhere in this frontend returns a teacher
+// count yet (DashboardView has no `teachers` field — see
+// analytics.types.ts — and there's no GET /teachers list either). Shown
+// as a clearly-labeled mock, same pattern as the SAMPLE_* checklist data
+// above, until a real count is exposed.
+const MOCK_TOTAL_TEACHERS = 24;
+
+// Sprint 2.2 — Action Center. No backend endpoint aggregates these four
+// signals into one feed (absences, overdue payments, registrations,
+// announcements each live behind their own module/role, same situation
+// as the StaffDashboard's SAMPLE_* checklist above), so this is shown
+// with clearly-labeled sample data until a real feed exists.
+type ActionSeverity = 'critical' | 'warning' | 'info';
+
+interface ActionCenterItem {
+  id: string;
+  icon: ReactNode;
+  title: string;
+  description: string;
+  severity: ActionSeverity;
+}
+
+const ACTION_CENTER_ITEMS: ActionCenterItem[] = [
+  {
+    id: 'ac1',
+    icon: <AttendanceIcon size={18} />,
+    title: 'غایبان امروز',
+    description: '۱۲ دانش‌آموز امروز غایب ثبت شده‌اند',
+    severity: 'warning',
+  },
+  {
+    id: 'ac2',
+    icon: <AlertIcon size={18} />,
+    title: 'پرداخت‌های معوق',
+    description: '۸ قسط از سررسید خود گذشته‌اند',
+    severity: 'critical',
+  },
+  {
+    id: 'ac3',
+    icon: <AssignmentsIcon size={18} />,
+    title: 'ثبت‌نام‌های در انتظار',
+    description: '۵ درخواست ثبت‌نام نیاز به بررسی دارند',
+    severity: 'warning',
+  },
+  {
+    id: 'ac4',
+    icon: <NotificationIcon size={18} />,
+    title: 'اطلاعیه‌های منتشرنشده',
+    description: '۲ اطلاعیه به‌صورت پیش‌نویس باقی مانده‌اند',
+    severity: 'info',
+  },
+];
+
+const SEVERITY_CONFIG: Record<ActionSeverity, { label: string; className: string }> = {
+  critical: { label: 'بحرانی', className: 'bg-overdue/10 text-overdue border-overdue/25' },
+  warning: { label: 'هشدار', className: 'bg-warning/10 text-warning border-warning/25' },
+  info: { label: 'اطلاعیه', className: 'bg-action-soft text-action border-action/25' },
+};
+
+// Same visual language as StatusBadge (badge shell + accent-tinted
+// border/text from index.css), sized for a generic severity rather than
+// StatusBadge's InstallmentStatus-only union.
+function SeverityBadge({ severity }: { severity: ActionSeverity }) {
+  const config = SEVERITY_CONFIG[severity];
+  return (
+    <span className={`badge ${config.className}`}>
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {config.label}
+    </span>
+  );
+}
+
+// Sprint 2.2 — Quick Actions. Visual only, no handlers: these mirror the
+// disabled-button pattern already used by StaffDashboard's
+// ChecklistSection above, until each destination flow is wired up.
+interface QuickAction {
+  id: string;
+  icon: ReactNode;
+  label: string;
+}
+
+// Sprint 2.3 — Financial Overview summary. Monthly revenue, tuition
+// collected and outstanding balance all come straight from the existing
+// finance/monthlyPayments data useDashboard() already fetches. Collection
+// rate is derived from totalPaid/totalTuition (same ratio-of-two-existing-
+// numbers technique FinancialDashboard's collectionRate already uses
+// below) — it only has no real value when totalTuition is 0 (no tuition
+// plans yet), in which case this clearly-labeled mock takes over instead
+// of a misleading 0%/NaN.
+const MOCK_COLLECTION_RATE = 72;
+
+// Sprint 2.4 — Academic Overview. Attendance rate and average assessment
+// score both come from useDashboard() (attendance.attendanceRate,
+// assessments.averageScore — already used elsewhere on this page). Class
+// count and teacher workload have no backend support anywhere in this
+// frontend yet (no classes/sections endpoint, no per-teacher load
+// endpoint), so both are shown as clearly-labeled mocks, same pattern as
+// MOCK_TOTAL_TEACHERS/MOCK_COLLECTION_RATE above.
+const MOCK_ACTIVE_CLASSES_TODAY = 18;
+const MOCK_TEACHER_WORKLOAD_PERCENT = 78;
+
+// Sprint 2.5 — Recent Activity feed. Payments and attendance entries are
+// real (data.recentActivity.payments / .attendance — already returned by
+// GET /analytics/dashboard but not consumed anywhere on this page until
+// now). Student registration and teacher-assignment events have no
+// per-event backend feed anywhere in this frontend (only aggregate
+// monthly counts exist for registrations — see monthlyRegistrations
+// above — and there's no class-assignment endpoint at all), so those two
+// are shown as clearly-labeled mocks.
+type ActivityKind = 'registration' | 'payment' | 'attendance' | 'teacher_assignment';
+
+interface RecentActivityItem {
+  id: string;
+  kind: ActivityKind;
+  icon: ReactNode;
+  title: string;
+  description: string;
+  timestamp: string;
+  mock: boolean;
+}
+
+// Same icon-badge tinting convention as KPICard/StatCard's own ICON_BG
+// maps elsewhere in this codebase — reused here for the timeline dots.
+const ACTIVITY_ICON_BG: Record<ActivityKind, string> = {
+  registration: 'bg-action-soft text-action dark:bg-action/15 dark:text-action-light',
+  payment: 'bg-paid-soft text-paid dark:bg-paid/15',
+  attendance: 'bg-warning-soft text-warning dark:bg-warning/15',
+  teacher_assignment: 'bg-ink/5 text-ink/60 dark:bg-white/10 dark:text-paper/60',
+};
+
+// Fixed backward offsets from "now" — computed at render time (see
+// SchoolAdminDashboard) so the relative-time labels ("۴۰ دقیقه پیش")
+// stay accurate for as long as the tab stays open.
+const MOCK_ACTIVITY_TEMPLATES: {
+  id: string;
+  kind: ActivityKind;
+  icon: ReactNode;
+  title: string;
+  description: string;
+  offsetMinutes: number;
+}[] = [
+  {
+    id: 'mock-registration-1',
+    kind: 'registration',
+    icon: <StudentIcon size={16} />,
+    title: 'دانش‌آموز جدید ثبت‌نام شد',
+    description: 'یک دانش‌آموز جدید در سامانه ثبت‌نام شد (نمونه)',
+    offsetMinutes: 40,
+  },
+  {
+    id: 'mock-teacher-assignment-1',
+    kind: 'teacher_assignment',
+    icon: <TeacherIcon size={16} />,
+    title: 'معلم به کلاس تخصیص یافت',
+    description: 'یک معلم به یک کلاس درسی جدید اختصاص یافت (نمونه)',
+    offsetMinutes: 150,
+  },
+];
+
+const QUICK_ACTIONS: QuickAction[] = [
+  { id: 'qa1', icon: <StudentIcon size={20} />, label: 'افزودن دانش‌آموز' },
+  { id: 'qa2', icon: <TuitionIcon size={20} />, label: 'ثبت پرداخت' },
+  { id: 'qa3', icon: <TeacherIcon size={20} />, label: 'تخصیص معلم' },
+  { id: 'qa4', icon: <AttendanceIcon size={20} />, label: 'ثبت حضور و غیاب' },
+  { id: 'qa5', icon: <NotificationIcon size={20} />, label: 'ایجاد اطلاعیه' },
+];
+
 // school_admin dashboard, backed by the single GET /analytics/dashboard
 // call (useDashboard()). Unlike FinancialDashboard below, the finance
 // totals here are exact (totalTuition/totalPaid/totalUnpaid/overdueAmount
@@ -266,6 +438,7 @@ function TodayChecklist() {
 // summaries and a real monthly-payments trend — none of which existed on
 // the dashboard before. accountant/staff never render this component.
 function SchoolAdminDashboard() {
+  const { user } = useAuth();
   const dashboardQuery = useDashboard();
   const data = dashboardQuery.data ?? null;
   const loading = dashboardQuery.isLoading;
@@ -274,7 +447,57 @@ function SchoolAdminDashboard() {
   const finance = data?.finance ?? null;
   const attendance = data?.attendance ?? null;
   const assessments = data?.assessments ?? null;
+  const recentActivity = data?.recentActivity ?? null;
   const monthlyPayments = data?.charts.monthlyPayments ?? [];
+  const monthlyRegistrations = data?.charts.monthlyRegistrations ?? [];
+
+  // Sprint 2.5 — merge real payment/attendance events with the two mock
+  // event kinds, then sort newest-first. Composed here at render time
+  // only; no new request, no change to what useDashboard() fetches.
+  const recentActivityItems: RecentActivityItem[] = [
+    ...(recentActivity?.payments ?? []).map((p): RecentActivityItem => ({
+      id: `payment-${p.id}`,
+      kind: 'payment',
+      icon: <TuitionIcon size={16} />,
+      title: 'پرداخت دریافت شد',
+      description: `${p.studentFullName} — ${formatToman(p.amount)}`,
+      timestamp: p.paidAt,
+      mock: false,
+    })),
+    ...(recentActivity?.attendance ?? []).map((a): RecentActivityItem => ({
+      id: `attendance-${a.id}`,
+      kind: 'attendance',
+      icon: <AttendanceIcon size={16} />,
+      title: 'حضور و غیاب ثبت شد',
+      description: `${a.studentFullName} — وضعیت: ${a.status}`,
+      timestamp: a.date,
+      mock: false,
+    })),
+    ...MOCK_ACTIVITY_TEMPLATES.map((t): RecentActivityItem => ({
+      id: t.id,
+      kind: t.kind,
+      icon: t.icon,
+      title: t.title,
+      description: t.description,
+      timestamp: new Date(Date.now() - t.offsetMinutes * 60 * 1000).toISOString(),
+      mock: true,
+    })),
+  ]
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 8);
+
+  // Current-month points are just the last entry of each trend series
+  // that useDashboard() already fetched — no new request added.
+  const currentMonthRevenue = monthlyPayments[monthlyPayments.length - 1]?.totalIncome ?? 0;
+  const currentMonthRegistrations = monthlyRegistrations[monthlyRegistrations.length - 1]?.count ?? 0;
+
+  // Sprint 2.3 — collection rate for the Financial Overview summary.
+  // null only when totalTuition is 0 (nothing to divide by yet); the
+  // labeled mock (MOCK_COLLECTION_RATE) covers that case at render time.
+  const collectionRate =
+    finance && finance.totalTuition > 0 ? (finance.totalPaid / finance.totalTuition) * 100 : null;
+
+  const todayLabel = formatDate(new Date().toISOString());
 
   const paymentTrendPoints = monthlyPayments.map((p) => ({
     ...p,
@@ -302,7 +525,30 @@ function SchoolAdminDashboard() {
 
   return (
     <div className="fade-in">
-      <PageHeader title="داشبورد" description="نمای کلی وضعیت مدرسه" />
+      {/* Sprint 2.1 — redesigned header: welcome message, current (Jalali)
+          date, and a short school summary built from data the dashboard
+          query already returns (no new request). */}
+      <div className="mb-6 rounded-xl border border-line bg-white p-5 shadow-card dark:border-white/10 dark:bg-white/[0.03] sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-ink dark:text-paper">
+              خوش آمدید{user?.fullName ? `، ${user.fullName}` : ''}
+            </h1>
+            <p className="mt-1.5 text-sm text-ink/60 dark:text-paper/60">
+              {loading
+                ? 'در حال بارگذاری خلاصه مدرسه...'
+                : `هم‌اکنون ${toPersianDigits(data?.students.total ?? 0)} دانش‌آموز (${toPersianDigits(
+                    data?.students.active ?? 0,
+                  )} فعال) در مدرسه ثبت شده و نرخ حضور امروز ${toPersianDigits(
+                    Math.round(attendance?.attendanceRate ?? 0),
+                  )}٪ است.`}
+            </p>
+          </div>
+          <div className="shrink-0 rounded-lg bg-paper px-3.5 py-2 text-xs font-medium text-ink/60 dark:bg-white/5 dark:text-paper/60">
+            {todayLabel}
+          </div>
+        </div>
+      </div>
 
       {error && (
         <div className="mb-4 rounded-lg bg-overdue/10 px-4 py-3 text-sm text-overdue">
@@ -310,32 +556,93 @@ function SchoolAdminDashboard() {
         </div>
       )}
 
-      {/* Finance summary — exact school-wide totals, no approximation */}
+      {/* Sprint 2.1 — redesigned KPI section: 6 responsive cards */}
       {loading ? (
-        <SkeletonCards count={4} />
+        <SkeletonCards count={6} />
       ) : (
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatCard label="جمع شهریه" value={formatToman(finance?.totalTuition ?? 0)} icon={<TuitionIcon />} />
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           <StatCard
-            label="پرداخت‌شده"
-            value={formatToman(finance?.totalPaid ?? 0)}
+            label="کل دانش‌آموزان"
+            value={toPersianDigits(data?.students.total ?? 0)}
+            icon={<UsersIcon />}
+          />
+          <StatCard
+            label="کل معلمان"
+            value={toPersianDigits(MOCK_TOTAL_TEACHERS)}
+            accent="action"
+            icon={<TeacherIcon />}
+          />
+          <StatCard
+            label="حضور امروز"
+            value={`${toPersianDigits(Math.round(attendance?.attendanceRate ?? 0))}٪`}
             accent="paid"
-            icon={<CheckIcon />}
+            icon={<AttendanceIcon />}
           />
           <StatCard
-            label="پرداخت‌نشده"
+            label="درآمد این ماه"
+            value={formatToman(currentMonthRevenue)}
+            accent="paid"
+            icon={<TuitionIcon />}
+          />
+          <StatCard
+            label="شهریه معوق"
             value={formatToman(finance?.totalUnpaid ?? 0)}
-            accent="warning"
-            icon={<ListIcon />}
-          />
-          <StatCard
-            label="مبلغ معوق"
-            value={formatToman(finance?.overdueAmount ?? 0)}
             accent="overdue"
             icon={<AlertIcon />}
           />
+          <StatCard
+            label="ثبت‌نام‌های جدید"
+            value={toPersianDigits(currentMonthRegistrations)}
+            accent="action"
+            icon={<CalendarIcon />}
+          />
         </div>
       )}
+
+      {/* Sprint 2.2 — Action Center */}
+      <div className="mt-6">
+        <Card title="مرکز اقدامات">
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {ACTION_CENTER_ITEMS.map((item) => (
+              <li
+                key={item.id}
+                className="flex items-start gap-3 rounded-lg border border-line p-3.5 dark:border-white/10"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink/5 text-ink/60 dark:bg-white/10 dark:text-paper/60">
+                  {item.icon}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-ink dark:text-paper">{item.title}</span>
+                    <SeverityBadge severity={item.severity} />
+                  </div>
+                  <p className="mt-1 truncate text-xs text-ink/55 dark:text-paper/55">{item.description}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+
+      {/* Sprint 2.2 — Quick Actions (visual only, not wired to any flow yet) */}
+      <div className="mt-6">
+        <Card title="اقدامات سریع">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {QUICK_ACTIONS.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                className="flex flex-col items-center justify-center gap-2 rounded-lg border border-line px-3 py-4 text-xs font-medium text-ink transition-transform active:scale-[0.97] hover:border-action/30 hover:bg-action-soft/40 dark:border-white/10 dark:text-paper dark:hover:bg-action/10"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-action-soft text-action dark:bg-action/15 dark:text-action-light">
+                  {action.icon}
+                </span>
+                {action.label}
+              </button>
+            ))}
+          </div>
+        </Card>
+      </div>
 
       {/* Attendance summary + Assessments summary */}
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -404,24 +711,137 @@ function SchoolAdminDashboard() {
         </Card>
       </div>
 
-      {/* Monthly payments trend */}
+      {/* Sprint 2.4 — Academic Overview: a separate section from the
+          Attendance/Assessments cards above (those are left untouched).
+          Same Card/StatCard/SectionHeader/badge components as the rest
+          of the page; no new chart. */}
       <div className="mt-6">
-        <SectionHeader title="روند پرداخت‌های ماهانه" />
+        <SectionHeader title="نمای کلی آموزشی" description="خلاصه وضعیت حضور، ارزیابی‌ها، کلاس‌ها و بار کاری معلمان" />
+        {loading ? (
+          <SkeletonCards count={4} />
+        ) : (
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard
+              label="نرخ حضور"
+              value={`${toPersianDigits(Math.round(attendance?.attendanceRate ?? 0))}٪`}
+              accent="paid"
+              icon={<AttendanceIcon />}
+            />
+            <StatCard
+              label="میانگین نمره ارزیابی"
+              value={assessments?.averageScore != null ? toPersianDigits(assessments.averageScore.toFixed(1)) : '—'}
+              accent="action"
+              icon={<ScoreIcon />}
+            />
+            <StatCard
+              label="کلاس‌های فعال امروز"
+              value={toPersianDigits(MOCK_ACTIVE_CLASSES_TODAY)}
+              accent="default"
+              icon={<ClassIcon />}
+            />
+            <StatCard
+              label="بار کاری معلمان"
+              value={`${toPersianDigits(MOCK_TEACHER_WORKLOAD_PERCENT)}٪`}
+              accent="warning"
+              icon={<TeacherIcon />}
+            />
+          </div>
+        )}
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-ink/50 dark:text-paper/50">
+          <SeverityBadge severity="info" />
+          <span>«کلاس‌های فعال امروز» و «بار کاری معلمان» فعلاً داده نمونه هستند تا ماژول مربوطه به بک‌اند وصل شود.</span>
+        </div>
+      </div>
+
+      {/* Sprint 2.3 — Financial Overview (was "Monthly payments trend").
+          Same LineChart as before, just regrouped with a financial
+          summary for clearer hierarchy — no new chart added. */}
+      <div className="mt-6">
+        <SectionHeader title="نمای کلی مالی" description="روند پرداخت‌های ماهانه و خلاصه وضعیت مالی مدرسه" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
+          <Card className="lg:col-span-2">
+            {loading ? (
+              <SkeletonRows rows={3} cols={4} />
+            ) : (
+              <div dir="ltr" className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={paymentTrendPoints}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#E3E6EC" />
+                    <XAxis dataKey="label" fontSize={11} />
+                    <YAxis fontSize={12} tickFormatter={(v) => toPersianDigits(String(v))} />
+                    <Tooltip formatter={(value: number) => formatToman(value)} />
+                    <Line type="monotone" dataKey="totalIncome" stroke="#2563EB" strokeWidth={2} dot={{ r: 3 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </Card>
+
+          {loading ? (
+            <SkeletonCards count={4} />
+          ) : (
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-1">
+              <StatCard label="درآمد این ماه" value={formatToman(currentMonthRevenue)} accent="paid" icon={<TuitionIcon />} />
+              <StatCard label="شهریه وصول‌شده" value={formatToman(finance?.totalPaid ?? 0)} accent="paid" icon={<CheckIcon />} />
+              <StatCard label="مانده معوق" value={formatToman(finance?.totalUnpaid ?? 0)} accent="overdue" icon={<AlertIcon />} />
+              <StatCard
+                label="نرخ وصول"
+                value={
+                  collectionRate !== null
+                    ? `${toPersianDigits(Math.round(collectionRate))}٪`
+                    : `${toPersianDigits(MOCK_COLLECTION_RATE)}٪ (نمونه)`
+                }
+                accent="action"
+                icon={<TargetIcon />}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Sprint 2.5 — Recent Activity: vertical timeline placed below
+          Financial Overview. Payments/attendance rows are real
+          (data.recentActivity — already fetched, simply not shown
+          anywhere until now); registration/teacher-assignment rows are
+          clearly marked mock (see MOCK_ACTIVITY_TEMPLATES above). */}
+      <div className="mt-6">
+        <SectionHeader title="فعالیت‌های اخیر" description="جدیدترین رویدادهای ثبت‌شده در مدرسه" />
         <Card>
           {loading ? (
-            <SkeletonRows rows={3} cols={4} />
+            <SkeletonRows rows={5} cols={1} />
+          ) : recentActivityItems.length === 0 ? (
+            <p className="py-6 text-center text-sm text-ink/45 dark:text-paper/45">
+              هنوز فعالیتی ثبت نشده است.
+            </p>
           ) : (
-            <div dir="ltr" className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={paymentTrendPoints}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#E3E6EC" />
-                  <XAxis dataKey="label" fontSize={11} />
-                  <YAxis fontSize={12} tickFormatter={(v) => toPersianDigits(String(v))} />
-                  <Tooltip formatter={(value: number) => formatToman(value)} />
-                  <Line type="monotone" dataKey="totalIncome" stroke="#2563EB" strokeWidth={2} dot={{ r: 3 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
+            <ul>
+              {recentActivityItems.map((item, index) => (
+                <li key={item.id} className="flex gap-3">
+                  <div className="flex flex-col items-center">
+                    <span
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${ACTIVITY_ICON_BG[item.kind]}`}
+                    >
+                      {item.icon}
+                    </span>
+                    {index < recentActivityItems.length - 1 && (
+                      <span className="mt-1 w-px flex-1 bg-line dark:bg-white/10" />
+                    )}
+                  </div>
+                  <div className={`min-w-0 flex-1 ${index < recentActivityItems.length - 1 ? 'pb-5' : ''}`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-ink dark:text-paper">{item.title}</span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {item.mock && <SeverityBadge severity="info" />}
+                        <span className="tabular text-xs text-ink/40 dark:text-paper/40">
+                          {formatRelativeTime(item.timestamp)}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-ink/55 dark:text-paper/55">{item.description}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
           )}
         </Card>
       </div>

@@ -437,3 +437,27 @@ export const DefaultIcon = (props: IconProps) =>
       <circle cx="12" cy="9.7" r="0.9" fill="currentColor" fillOpacity="0.35" stroke="none" />
     </>
   );
+
+/* ------------------------------------------------------------------ */
+/* ناوبری گروهی (سایدبار)                                              */
+/* ------------------------------------------------------------------ */
+
+/** شورون رو به پایین: برای بازشو/جمع‌شوی گروه‌های ناوبری */
+export const ChevronDownIcon = (props: IconProps) =>
+  base(
+    props,
+    <>
+      <path d="M6 9.5 12 15l6-5.5" />
+    </>
+  );
+
+/** قفل: برای موارد ناوبری غیرفعال/به‌زودی که هنوز صفحه‌ای ندارند */
+export const LockIcon = (props: IconProps) =>
+  base(
+    props,
+    <>
+      <path d="M6.5 10.5h11a1 1 0 0 1 1 1V19a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-7.5a1 1 0 0 1 1-1Z" />
+      <path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7" />
+      <circle cx="12" cy="14.7" r="1.2" fill="currentColor" fillOpacity="0.3" />
+    </>
+  );

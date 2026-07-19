@@ -40,19 +40,36 @@ export function SkeletonTable({
   rows = 5,
   cols = 4,
   className = '',
+  density = 'compact',
 }: {
   rows?: number;
   cols?: number;
   className?: string;
+  /** 'compact' (default) matches this component's original spacing exactly.
+   *  'comfortable' matches Table's opt-in comfortable density (Sprint 3.2)
+   *  so the loading state doesn't visually "jump" once real rows arrive. */
+  density?: 'compact' | 'comfortable';
 }) {
   return (
     <div className={className}>
-      <div className="mb-3 flex gap-4 border-b border-line pb-2 dark:border-white/10">
+      <div
+        className={`mb-3 flex gap-4 border-b border-line dark:border-white/10 ${
+          density === 'comfortable' ? 'pb-3' : 'pb-2'
+        }`}
+      >
         {Array.from({ length: cols }, (_, c) => (
           <div key={c} className="skeleton h-3 flex-1 opacity-60" />
         ))}
       </div>
-      <SkeletonRows rows={rows} cols={cols} />
+      <div className={density === 'comfortable' ? 'space-y-4' : 'space-y-3'}>
+        {Array.from({ length: rows }, (_, r) => (
+          <div key={r} className="flex gap-4">
+            {Array.from({ length: cols }, (_, c) => (
+              <div key={c} className={`skeleton flex-1 ${density === 'comfortable' ? 'h-[1.125rem]' : 'h-4'}`} />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
