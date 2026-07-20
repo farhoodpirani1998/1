@@ -2,20 +2,31 @@ import { PageHeader } from '../../components/PageHeader';
 import { Card } from '../../components/Card';
 import { StatCard } from '../../components/StatCard';
 import { EmptyState } from '../../components/EmptyState';
+import { Button } from '../../components/Button';
 import { SkeletonCards } from '../../components/Skeleton';
-import { StudentSwitcher } from '../../components/StudentSwitcher';
 import { Table, type TableColumn } from '../../components/Table';
 import { toPersianDigits, formatScore, assessmentTermLabels } from '../../lib/format';
-import { useParentStudent } from '../../lib/parentStudent';
-import { useStudentReportCard } from '../../hooks/useParent';
+import { useStudentReportCard } from '../../hooks/useStudentPortal';
 import type { ReportCardSubjectEntry, ReportCardTermSummary } from '../../types/parent.types';
 
-// /parent/report-card — per-term subject scores + overall average for the
-// selected child. Backed by GET /parent/students/:id/report-card, which
-// already existed server-side (AssessmentsService.getReportCardForParent,
-// ownership-checked the same way as tuition/installments/payments) but had
-// no frontend consumer until now — teachers could record assessments via
-// TeacherAssessmentsPage, but parents had no page that called this endpoint.
+// Task 5B-H — /student/report-card. The signed-in student's own report
+// card, backed by GET /student/report-card (useStudentReportCard) only —
+// no other query, no direct API call, no duplicated state/business logic.
+//
+// Design reference: ParentReportCardPage (/parent/report-card) is the
+// closest sibling — same read-only "overall average + per-term StatCards
+// + per-term subject table" shape, same ReportCardView/ReportCardTermSummary/
+// ReportCardSubjectEntry rows and the same formatScore rounding rule (the
+// backend reuses that exact view for the student's own read; see
+// types/studentPortal.types.ts). There's no StudentSwitcher here (unlike
+// Parent) since a student portal session is always exactly one student —
+// that's the only structural difference from ParentReportCardPage.
+//
+// Loading/empty/error states follow the Teacher Portal convention (see
+// TeacherAttendancePage's studentsQuery handling): an explicit
+// EmptyState + "تلاش مجدد" retry action on error, SkeletonCards while the
+// stat row has no data yet, and Table's own built-in empty state for a
+// term with no recorded subjects.
 
 function TermCard({ term }: { term: ReportCardTermSummary }) {
   const columns: TableColumn<ReportCardSubjectEntry>[] = [
@@ -54,11 +65,10 @@ function TermCard({ term }: { term: ReportCardTermSummary }) {
   );
 }
 
-export function ParentReportCardPage() {
-  const { students, selectedStudent, isLoading: studentsLoading } = useParentStudent();
-  const reportCardQuery = useStudentReportCard(selectedStudent?.id);
+export function StudentReportCardPage() {
+  const reportCardQuery = useStudentReportCard();
 
-  if (studentsLoading || !selectedStudent) {
+  if (reportCardQuery.isLoading) {
     return (
       <div className="fade-in">
         <PageHeader title="کارنامه" />
@@ -67,14 +77,19 @@ export function ParentReportCardPage() {
     );
   }
 
-  if (students.length === 0) {
+  if (reportCardQuery.isError) {
     return (
       <div className="fade-in">
         <PageHeader title="کارنامه" />
         <Card>
           <EmptyState
-            message="هیچ دانش‌آموزی به این حساب متصل نیست"
-            description="برای اتصال فرزند خود به این حساب، با مدرسه تماس بگیرید."
+            message="خطا در بارگذاری کارنامه"
+            description="ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید."
+            action={
+              <Button variant="secondary" size="sm" onClick={() => reportCardQuery.refetch()}>
+                تلاش مجدد
+              </Button>
+            }
           />
         </Card>
       </div>
@@ -86,18 +101,12 @@ export function ParentReportCardPage() {
 
   return (
     <div className="fade-in">
-      <PageHeader
-        title="کارنامه"
-        description={`${selectedStudent.fullName} — ${selectedStudent.school.name}`}
-        actions={<StudentSwitcher className="w-56" />}
-      />
+      <PageHeader title="کارنامه" description="نمرات و میانگین شما به تفکیک ترم" />
 
-      {reportCardQuery.isLoading ? (
-        <SkeletonCards count={3} />
-      ) : terms.length === 0 ? (
+      {terms.length === 0 ? (
         <Card>
           <EmptyState
-            message="هنوز نمره‌ای برای این دانش‌آموز ثبت نشده است"
+            message="هنوز نمره‌ای برای شما ثبت نشده است"
             description="به‌محض ثبت نمرات توسط معلم، کارنامه در این صفحه نمایش داده می‌شود."
           />
         </Card>

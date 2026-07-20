@@ -29,6 +29,17 @@ describe('roleHasPermission', () => {
   it('denies an unrecognized role string rather than throwing', () => {
     expect(roleHasPermission('some_made_up_role', Permission.PAYMENT_VOID)).toBe(false);
   });
+
+  // ADR-001: student is a new read-only restricted role (see roles.enum.ts)
+  // and must never hold a financial/administrative permission, same as
+  // PARENT/TEACHER/FOUNDER.
+  it('denies student every fine-grained permission', () => {
+    expect(roleHasPermission(Role.STUDENT, Permission.PAYMENT_VOID)).toBe(false);
+    expect(roleHasPermission(Role.STUDENT, Permission.DISCOUNT_UNLIMITED)).toBe(false);
+    expect(roleHasPermission(Role.STUDENT, Permission.INSTALLMENT_STATUS_OVERRIDE)).toBe(false);
+    expect(roleHasPermission(Role.STUDENT, Permission.INSTALLMENT_WRITE_OFF)).toBe(false);
+    expect(roleHasPermission(Role.STUDENT, Permission.INSTALLMENT_SCHEDULE_EDIT)).toBe(false);
+  });
 });
 
 describe('DISCOUNT_CEILING_RATIO', () => {

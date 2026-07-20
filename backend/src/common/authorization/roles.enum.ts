@@ -43,4 +43,17 @@ export enum Role {
   // modules/founder, same isolation shape as PARENT/TEACHER, except "one
   // owner, many schools" instead of "one login, one school".
   FOUNDER = 'founder',
+  // ADR-001 (Identity Foundation): a read-only portal login for the
+  // student themself, the middle/high/vocational-school counterpart to
+  // PARENT's elementary-school role (see ADR-001 §9). Requires a
+  // schoolId like every non-SUPER_ADMIN/FOUNDER role — already enforced
+  // by JwtStrategy's existing exclusion check, no change needed there.
+  // Scoped to their own record via a future StudentUser 1:1 link (mirror
+  // of ParentStudent/TeacherAssignment), keyed on CurrentUser().id — that
+  // link and its /student/* routes are out of scope for this change; this
+  // is ADR-001 Task 1, adding only the role itself. Never gets a
+  // @Roles() grant on any staff-facing endpoint — only on the dedicated
+  // /student/* routes (ADR-001 §10), same isolation shape as
+  // PARENT/TEACHER/FOUNDER.
+  STUDENT = 'student',
 }

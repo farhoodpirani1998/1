@@ -11,15 +11,23 @@ import { User } from '../../users/entities/user.entity';
 
 // Who an announcement is meant for. 'all' is a broadcast (every
 // authenticated user in the school, across every reader role); the other
-// three narrow it to one reader population. Kept as a small closed enum,
+// values narrow it to one reader population. Kept as a small closed enum,
 // same shape as AttendanceStatus / AssessmentTerm, rather than free text --
 // AnnouncementsService.findForAudience() depends on there being a fixed,
 // known set of values to filter ('all' OR the caller's own audience).
+//
+// ADR-001 Task 4F: STUDENTS added alongside PARENTS/TEACHERS/STAFF -- same
+// closed-set audience, no new filtering concept. findForAudience() and
+// findVisibleForAudience() already key off "ALL or the caller's own
+// audience" generically, so this is the only change needed for those
+// methods to also serve GET /student/announcements; neither method's body
+// changes.
 export enum AnnouncementTargetType {
   ALL = 'all',
   PARENTS = 'parents',
   TEACHERS = 'teachers',
   STAFF = 'staff',
+  STUDENTS = 'students',
 }
 
 // One row per posted announcement. Unlike Attendance/Assessment there is

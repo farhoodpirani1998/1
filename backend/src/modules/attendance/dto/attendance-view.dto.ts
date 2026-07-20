@@ -39,6 +39,12 @@ export function toAttendanceView(attendance: Attendance): AttendanceView {
 // ParentPaymentViewDto -- no recordedById (internal staff user id), no
 // schoolId. A parent only needs to know when and how their child was
 // marked, plus any note left for them.
+//
+// ADR-001 Task 4C: also reused as-is for GET /student/attendance
+// (StudentService.getMyAttendance) -- a student should see at least this
+// narrow, no-internal-ids shape, arguably nothing more, so the name stays
+// "parent" for now rather than forking a byte-identical
+// StudentAttendanceView. Revisit if the two shapes ever need to diverge.
 export interface ParentAttendanceView {
   id: string;
   date: string;

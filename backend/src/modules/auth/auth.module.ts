@@ -6,6 +6,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { User } from '../users/entities/user.entity';
 import { School } from '../schools/entities/school.entity';
+// ADR-001 Task 3A: AuthService resolves a student login's Student record
+// via student_users -- see AuthService.login.
+import { StudentUser } from '../students/entities/student-user.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -13,7 +16,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, School]),
+    TypeOrmModule.forFeature([User, School, StudentUser]),
     NotificationsModule,
     PassportModule,
     JwtModule.registerAsync({

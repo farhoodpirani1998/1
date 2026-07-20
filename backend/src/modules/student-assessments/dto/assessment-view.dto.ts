@@ -43,6 +43,10 @@ export function toAssessmentView(assessment: Assessment): AssessmentView {
 // schoolId, no studentId (the parent already knows which child they
 // asked for). A parent only needs the subject, term, score, and any note
 // left for them.
+//
+// ADR-001 Task 4D: also reused as-is for GET /student/assessments -- same
+// precedent as ParentAttendanceView's reuse for GET /student/attendance in
+// 4C.
 export interface ParentAssessmentView {
   id: string;
   subjectId: string;

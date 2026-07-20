@@ -18,10 +18,16 @@ import { StudentProfileModule } from './profile/student-profile.module';
 // "create-or-reuse the link row" shape of ParentService.link() instead.
 import { User } from '../users/entities/user.entity';
 import { ParentStudent } from '../parent/entities/parent-student.entity';
+// ADR-001 Task 2A: StudentUser is the 1:1 link between a student-role
+// user and their Student record (mirror of ParentStudent above). Only
+// the entity/schema exist so far -- no service or controller consumes
+// it yet, so registering it here is enough for TypeORM to know about
+// the table; nothing else in this module needs to change.
+import { StudentUser } from './entities/student-user.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Student, Guardian, User, ParentStudent]),
+    TypeOrmModule.forFeature([Student, Guardian, User, ParentStudent, StudentUser]),
     StudentProfileModule,
   ],
   controllers: [StudentsController, GuardiansController],

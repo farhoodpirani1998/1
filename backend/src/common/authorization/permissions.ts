@@ -64,6 +64,12 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   // just "for now". Listed explicitly for the same "considered, not
   // missed" reason as PARENT/TEACHER.
   [Role.FOUNDER]: [],
+  // ADR-001: students only ever hit the read-only /student/* routes (not
+  // yet built — see ADR-001 §10 and §13). No financial/administrative
+  // permission from this list applies, or ever should, to a student
+  // login. Listed explicitly for the same "considered, not missed"
+  // reason as PARENT/TEACHER/FOUNDER.
+  [Role.STUDENT]: [],
 };
 
 export function roleHasPermission(role: string, permission: Permission): boolean {

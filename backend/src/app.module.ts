@@ -12,6 +12,9 @@ import { AcademicYearsModule } from './modules/academic-years/academic-years.mod
 import { GradesModule } from './modules/grades/grades.module';
 import { ClassesModule } from './modules/classes/classes.module';
 import { StudentsModule } from './modules/students/students.module';
+// ADR-001 Task 4A-1: self-service foundation for the future /student/*
+// portal -- no controller yet, so this adds no new routes.
+import { StudentModule } from './modules/student/student.module';
 import { ParentModule } from './modules/parent/parent.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
 import { StudentAssessmentsModule } from './modules/student-assessments/student-assessments.module';
@@ -87,6 +90,7 @@ import { validateEnv } from './config/env.validation';
     GradesModule,
     ClassesModule,
     StudentsModule,
+    StudentModule,
     ParentModule,
     AttendanceModule,
     StudentAssessmentsModule,

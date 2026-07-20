@@ -217,16 +217,32 @@ export class HomeworkService {
    */
   async findForParent(studentId: string, parentId: string, schoolId: string): Promise<Homework[]> {
     await this.assertParentLinked(studentId, parentId);
-    const student = await this.studentRepo.findOne({ where: { id: studentId, schoolId } });
-    if (!student) {
-      throw new NotFoundException('دانش‌آموز یافت نشد');
-    }
+    return this.findGradeHomeworkForStudent(studentId, schoolId);
+  }
 
-    return this.homeworkRepo.find({
-      where: { gradeId: student.gradeId, schoolId },
-      relations: HOMEWORK_RELATIONS,
-      order: { dueDate: 'DESC' },
-    });
+  // ---------------------------------------------------------------------
+  // student-side self-service read
+  // ---------------------------------------------------------------------
+
+  /**
+   * ADR-001 Task 4E: student-side access. Same grade-derived homework list
+   * as findForParent() above -- a student doesn't have homework of their
+   * own either, they see whatever's posted for their grade -- minus the
+   * parent-link check, since the caller (StudentService.getMyHomework)
+   * has already resolved "this studentId belongs to this authenticated
+   * user" via StudentService's own resolveMyStudent() (StudentUser ->
+   * Student, schoolId re-checked) before this is ever called, the same
+   * way every other /student/* route's service method skips a redundant
+   * second linkage check once resolveMyStudent() has already run.
+   *
+   * Shares its "look up the student, list their grade's homework" query
+   * with findForParent() above via the private findGradeHomeworkForStudent()
+   * helper below (architecture-review follow-up) rather than repeating it
+   * inline -- the two methods differ only in which access check runs
+   * first (parent-link vs. none), not in what they read afterward.
+   */
+  async findForStudent(studentId: string, schoolId: string): Promise<Homework[]> {
+    return this.findGradeHomeworkForStudent(studentId, schoolId);
   }
 
   /**
@@ -267,6 +283,28 @@ export class HomeworkService {
   // ---------------------------------------------------------------------
   // internal helpers
   // ---------------------------------------------------------------------
+
+  /**
+   * Shared by findForParent() and findForStudent(): resolves the student
+   * (schoolId-scoped, NotFound if it doesn't exist in this school) and
+   * returns every homework row posted for that student's grade, most
+   * recent due date first. Both public callers have already run whatever
+   * access check is theirs to run (parent-link vs. none) before reaching
+   * this -- this helper only ever does the "which grade, which homework"
+   * lookup itself, so that logic exists in exactly one place.
+   */
+  private async findGradeHomeworkForStudent(studentId: string, schoolId: string): Promise<Homework[]> {
+    const student = await this.studentRepo.findOne({ where: { id: studentId, schoolId } });
+    if (!student) {
+      throw new NotFoundException('دانش‌آموز یافت نشد');
+    }
+
+    return this.homeworkRepo.find({
+      where: { gradeId: student.gradeId, schoolId },
+      relations: HOMEWORK_RELATIONS,
+      order: { dueDate: 'DESC' },
+    });
+  }
 
   private async findOneOrThrow(id: string, schoolId: string): Promise<Homework> {
     const homework = await this.homeworkRepo.findOne({

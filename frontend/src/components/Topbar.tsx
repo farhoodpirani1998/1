@@ -10,6 +10,7 @@ const roleLabels: Record<string, string> = {
   parent: 'والد',
   teacher: 'معلم',
   founder: 'مؤسس',
+  student: 'دانش‌آموز',
 };
 
 // GET /search is staff-only on the backend (school_admin/accountant/

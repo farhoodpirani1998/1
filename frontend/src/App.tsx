@@ -59,6 +59,15 @@ import { FounderTeachersPage } from './pages/founder/FounderTeachersPage';
 import { FounderAllTeachersPage } from './pages/founder/FounderAllTeachersPage';
 import { FounderStaffPage } from './pages/founder/FounderStaffPage';
 import { FounderTuitionPage } from './pages/founder/FounderTuitionPage';
+import { StudentLoginPage } from './pages/student/StudentLoginPage';
+import { StudentDashboardPage } from './pages/student/StudentDashboardPage';
+import { StudentAttendancePage } from './pages/student/StudentAttendancePage';
+import { StudentHomeworkPage } from './pages/student/StudentHomeworkPage';
+import { StudentAnnouncementsPage } from './pages/student/StudentAnnouncementsPage';
+import { StudentDocumentsPage } from './pages/student/StudentDocumentsPage';
+import { StudentTimetablePage } from './pages/student/StudentTimetablePage';
+import { StudentAssessmentsPage } from './pages/student/StudentAssessmentsPage';
+import { StudentReportCardPage } from './pages/student/StudentReportCardPage';
 
 // This is a school back-office / accounting tool, not a realtime feed:
 // refetch-on-focus would just add flicker when switching tabs, and
@@ -99,6 +108,9 @@ export function App() {
               <Route path="/parent/forgot-password" element={<ParentForgotPasswordPage />} />
               <Route path="/teacher/login" element={<TeacherLoginPage />} />
               <Route path="/teacher/forgot-password" element={<TeacherForgotPasswordPage />} />
+              {/* Student Portal foundation (ADR-001). No /student/forgot-password
+                  route — see StudentLoginPage's doc comment for why. */}
+              <Route path="/student/login" element={<StudentLoginPage />} />
               <Route path="/print/receipt/:paymentId" element={<PrintReceiptPage />} />
 
               <Route element={<AppLayout />}>
@@ -358,6 +370,34 @@ export function App() {
                   <Route path="homework" element={<TeacherHomeworkPage />} />
                   <Route path="timetable" element={<TeacherTimetablePage />} />
                   <Route path="announcements" element={<TeacherAnnouncementsPage />} />
+                </Route>
+              </Route>
+
+              {/* Student Portal — Task 5B-A added dashboard, 5B-B added
+                  attendance, 5B-C added homework, 5B-D added
+                  announcements, 5B-E added documents, 5B-F added
+                  timetable, 5B-G added assessments, 5B-H adds the report
+                  card. Same AppLayout-with-loginPath /
+                  RequireRole('student') / Outlet shape as the Parent and
+                  Teacher route groups above. Every /student/* view this
+                  portal offers is now registered. */}
+              <Route element={<AppLayout loginPath="/student/login" />}>
+                <Route
+                  path="/student"
+                  element={
+                    <RequireRole roles={['student']}>
+                      <Outlet />
+                    </RequireRole>
+                  }
+                >
+                  <Route path="dashboard" element={<StudentDashboardPage />} />
+                  <Route path="attendance" element={<StudentAttendancePage />} />
+                  <Route path="homework" element={<StudentHomeworkPage />} />
+                  <Route path="announcements" element={<StudentAnnouncementsPage />} />
+                  <Route path="documents" element={<StudentDocumentsPage />} />
+                  <Route path="timetable" element={<StudentTimetablePage />} />
+                  <Route path="assessments" element={<StudentAssessmentsPage />} />
+                  <Route path="report-card" element={<StudentReportCardPage />} />
                 </Route>
               </Route>
 

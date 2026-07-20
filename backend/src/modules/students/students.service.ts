@@ -15,10 +15,15 @@ import { Class } from '../classes/entities/class.entity';
 import { AcademicYear } from '../academic-years/entities/academic-year.entity';
 import { User } from '../users/entities/user.entity';
 import { ParentStudent } from '../parent/entities/parent-student.entity';
+// ADR-001 Task 3B-1: StudentUser is the 1:1 link a provisioned student
+// login needs (see entity file for why this is a join table rather than
+// fields on User or Student).
+import { StudentUser } from './entities/student-user.entity';
 import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
 import { CreateStudentParentDto } from './dto/create-student-parent.dto';
+import { ProvisionStudentAccountDto } from './dto/provision-student-account.dto';
 import {
   StudentParentView,
   toStudentParentView,
@@ -380,5 +385,76 @@ export class StudentsService {
       relations: ['parent'],
     });
     return links.map(toStudentParentView);
+  }
+
+  /**
+   * ADR-001 Task 3B-1 (service layer only -- no controller/route yet):
+   * provisions the student-role login a Student needs to use the future
+   * /student/* portal. Creates a new User(role=student) carrying the
+   * given username/password, plus the StudentUser row that links it to
+   * exactly this Student -- the same pair AuthService.login's username
+   * path and studentId resolution already expect (see
+   * StudentUser entity + AuthService.login).
+   *
+   * Tenant enforcement: the student must belong to the caller's own
+   * school, same 404-on-cross-school shape as findOne()/addParent()
+   * elsewhere in this service. The new User's schoolId always comes from
+   * that authenticated caller, never the request body.
+   *
+   * Duplicate checks, both enforced by a real unique constraint as a
+   * backstop (uq_student_users_student / users.username unique) and
+   * pre-checked here first so the caller gets a clear Persian
+   * ConflictException instead of a raw DB error:
+   *   - one student account per Student (a Student already linked via
+   *     StudentUser can't be provisioned a second time);
+   *   - one user per username (global, same as `phone` uniqueness for
+   *     every other role).
+   *
+   * User + StudentUser are created together in one transaction: either
+   * both rows exist afterward, or neither does -- never a User with no
+   * matching link, or vice versa.
+   */
+  async provisionStudentAccount(
+    studentId: string,
+    dto: ProvisionStudentAccountDto,
+    schoolId: string,
+  ): Promise<{ user: Omit<User, 'passwordHash'>; studentUserId: string }> {
+    // Ensures the student exists and belongs to this school before any
+    // user/link is created -- same check addParent() runs first.
+    const student = await this.findOne(studentId, schoolId);
+
+    return this.dataSource.transaction(async (manager) => {
+      const userRepo = manager.getRepository(User);
+      const studentUserRepo = manager.getRepository(StudentUser);
+
+      const existingLink = await studentUserRepo.findOne({ where: { studentId } });
+      if (existingLink) {
+        throw new ConflictException('این دانش‌آموز قبلاً دارای حساب کاربری است');
+      }
+
+      const existingUsername = await userRepo.findOne({ where: { username: dto.username } });
+      if (existingUsername) {
+        throw new ConflictException('این نام کاربری قبلاً استفاده شده است');
+      }
+
+      const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+      const user = await userRepo.save(
+        userRepo.create({
+          schoolId,
+          fullName: student.fullName,
+          username: dto.username,
+          passwordHash,
+          role: Role.STUDENT,
+          isActive: true,
+        }),
+      );
+
+      const studentUser = await studentUserRepo.save(
+        studentUserRepo.create({ studentId, userId: user.id }),
+      );
+
+      const { passwordHash: _drop, ...safeUser } = user;
+      return { user: safeUser, studentUserId: studentUser.id };
+    });
   }
 }

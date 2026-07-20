@@ -262,7 +262,7 @@ export function TeacherAssessmentsPage() {
   }
 
   function toggleSelectAll() {
-    setSelectedIds((prev) => {
+    setSelectedIds(() => {
       if (allSelected) return new Set();
       return new Set(students.map((s) => s.id));
     });

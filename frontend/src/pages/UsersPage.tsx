@@ -36,6 +36,13 @@ const roleLabels: Record<UserRole, string> = {
   // (schoolId is always null, like super_admin — see CreateUserForm's
   // schoolId condition) and are created from this page's role Select too.
   founder: 'مؤسس',
+  // Student Portal foundation (ADR-001). Not added to ROLE_FILTER_OPTIONS
+  // or the create-role Select below — same as 'parent' above, student
+  // accounts aren't created from this generic user-management page (they
+  // go through the student provisioning flow — see
+  // provision-student-account.dto.ts on the backend). This label exists
+  // only so this Record<UserRole, string> stays exhaustive.
+  student: 'دانش‌آموز',
 };
 
 const ROLE_FILTER_OPTIONS: { value: UserRole | 'all'; label: string }[] = [

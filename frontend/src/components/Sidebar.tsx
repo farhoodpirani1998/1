@@ -189,6 +189,22 @@ const founderNavItems: NavLeaf[] = [
   { to: '/founder/teachers', label: 'معلمان', icon: StudentsIcon, roles: ['founder'] },
 ];
 
+// Student Portal — Task 5B-A added dashboard, 5B-B added attendance,
+// 5B-C added homework, 5B-D added announcements, 5B-E added documents,
+// 5B-F added timetable, 5B-G added assessments, 5B-H adds the report
+// card. Every /student/* view this portal offers is now registered
+// (see App.tsx).
+const studentNavItems: NavLeaf[] = [
+  { to: '/student/dashboard', label: 'داشبورد', icon: DashboardIcon, roles: ['student'] },
+  { to: '/student/attendance', label: 'حضور و غیاب', icon: AttendanceIcon, roles: ['student'] },
+  { to: '/student/homework', label: 'تکالیف', icon: AssignmentsIcon, roles: ['student'] },
+  { to: '/student/timetable', label: 'برنامه هفتگی', icon: CalendarIcon, roles: ['student'] },
+  { to: '/student/assessments', label: 'ارزیابی‌ها', icon: ScoreIcon, roles: ['student'] },
+  { to: '/student/report-card', label: 'کارنامه', icon: ReportsIcon, roles: ['student'] },
+  { to: '/student/announcements', label: 'اطلاعیه‌ها', icon: SettingsIcon, roles: ['student'] },
+  { to: '/student/documents', label: 'مدارک', icon: ListIcon, roles: ['student'] },
+];
+
 const roleLabels: Record<string, string> = {
   super_admin: 'مدیر کل',
   school_admin: 'مدیر مدرسه',
@@ -197,6 +213,7 @@ const roleLabels: Record<string, string> = {
   parent: 'والد',
   teacher: 'معلم',
   founder: 'مؤسس',
+  student: 'دانش‌آموز',
 };
 
 const COLLAPSED_GROUPS_STORAGE_KEY = 'admin-sidebar-collapsed-groups';
@@ -262,6 +279,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const isParent = user?.role === 'parent';
   const isTeacher = user?.role === 'teacher';
   const isFounder = user?.role === 'founder';
+  const isStudent = user?.role === 'student';
   const isAdminPortal = !!user && ADMIN_ROLES.includes(user.role);
 
   // GET /settings is school_admin-only on the backend — useSchoolSettings
@@ -311,7 +329,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
                 ? 'پنل معلمان'
                 : isFounder
                   ? 'پنل مؤسسان'
-                  : 'مجتمع آموزشی'}
+                  : isStudent
+                    ? 'پنل دانش‌آموزان'
+                    : 'مجتمع آموزشی'}
           </div>
         </div>
       </div>
@@ -385,7 +405,15 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
           </div>
         ) : (
           <div className="space-y-0.5">
-            {(isParent ? parentNavItems : isTeacher ? teacherNavItems : isFounder ? founderNavItems : [])
+            {(isParent
+              ? parentNavItems
+              : isTeacher
+                ? teacherNavItems
+                : isFounder
+                  ? founderNavItems
+                  : isStudent
+                    ? studentNavItems
+                    : [])
               .filter((item) => user && item.roles.includes(user.role))
               .map((item) => (
                 <NavRow

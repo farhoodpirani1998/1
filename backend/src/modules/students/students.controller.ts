@@ -15,6 +15,7 @@ import { CreateStudentDto } from './dto/create-student.dto';
 import { UpdateStudentDto } from './dto/update-student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
 import { CreateStudentParentDto } from './dto/create-student-parent.dto';
+import { ProvisionStudentAccountDto } from './dto/provision-student-account.dto';
 import { BulkImportStudentsDto } from './dto/bulk-import-students.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -121,6 +122,23 @@ export class StudentsController {
     @CurrentUser('schoolId') schoolId: string,
   ) {
     return this.studentsService.getParents(id, schoolId);
+  }
+
+  // ADR-001 Task 3B-2: provisions the student-role login this student
+  // needs for the future /student/* portal (see
+  // StudentsService.provisionStudentAccount for the tenant/duplicate
+  // rules). Restricted to school_admin only — narrower than
+  // addParent()/create() above, since unlike a parent contact this
+  // creates a direct login for the student themself, a more sensitive
+  // action than 'staff' is granted elsewhere in this controller.
+  @Post(':id/account')
+  @Roles('school_admin')
+  provisionAccount(
+    @Param('id') id: string,
+    @Body() dto: ProvisionStudentAccountDto,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    return this.studentsService.provisionStudentAccount(id, dto, schoolId);
   }
 
   @Patch(':id')

@@ -11,6 +11,10 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { User } from '../users/entities/user.entity';
 import { School } from '../schools/entities/school.entity';
+// ADR-001 Task 3A: resolves a student-role login's Student record via the
+// student_users link table -- see StudentUser entity for why this is a
+// join table rather than fields on either User or Student.
+import { StudentUser } from '../students/entities/student-user.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
@@ -35,6 +39,8 @@ export class AuthService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(School)
     private readonly schoolRepo: Repository<School>,
+    @InjectRepository(StudentUser)
+    private readonly studentUserRepo: Repository<StudentUser>,
     private readonly jwtService: JwtService,
     private readonly smsProviderService: SmsProviderService,
   ) {}
@@ -72,18 +78,49 @@ export class AuthService {
     return safeUser;
   }
 
-  async login(dto: LoginDto): Promise<{ accessToken: string; user: Omit<User, 'passwordHash'> }> {
-    const user = await this.userRepo.findOne({ where: { phone: dto.phone } });
+  async login(
+    dto: LoginDto,
+  ): Promise<{
+    accessToken: string;
+    user: Omit<User, 'passwordHash'>;
+    // Present only for a student-role login, resolved via StudentUser —
+    // see the block below. Every other role gets undefined, same as
+    // today.
+    studentId?: string;
+  }> {
+    // Belt-and-suspenders alongside LoginDto's ValidateIf pair, which
+    // only catches "neither field" (both @IsString run against
+    // undefined). A request sending both is otherwise ambiguous about
+    // which identifier should win, so it's rejected here rather than
+    // silently preferring one.
+    if (dto.phone && dto.username) {
+      throw new BadRequestException('فقط یکی از شماره تلفن یا نام کاربری را وارد کنید');
+    }
+
+    // Username is a student-only login path today (see AddUsernameToUsers
+    // migration), but this lookup doesn't hardcode that — it just resolves
+    // whichever identifier the request supplied, same as the phone path
+    // always has. Phone lookup below is byte-for-byte what it was before
+    // this task; nothing about it changed.
+    const user = dto.username
+      ? await this.userRepo.findOne({ where: { username: dto.username } })
+      : await this.userRepo.findOne({ where: { phone: dto.phone } });
 
     // Same error for "not found" and "wrong password" — avoids leaking
-    // which phone numbers are registered.
+    // which phone numbers/usernames are registered. One generic message
+    // regardless of which field was used to look the user up, for the
+    // same reason.
+    const invalidCredentialsError = new UnauthorizedException(
+      dto.username ? 'نام کاربری یا رمز عبور اشتباه است' : 'شماره تلفن یا رمز عبور اشتباه است',
+    );
+
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('شماره تلفن یا رمز عبور اشتباه است');
+      throw invalidCredentialsError;
     }
 
     const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordMatches) {
-      throw new UnauthorizedException('شماره تلفن یا رمز عبور اشتباه است');
+      throw invalidCredentialsError;
     }
 
     // super_admin and founder have no single school (founder's schools
@@ -108,8 +145,27 @@ export class AuthService {
     };
     const accessToken = this.jwtService.sign(payload);
 
+    // ADR-001 Task 3A: a student-role login is resolved to the single
+    // Student record it's allowed to see via student_users -- the same
+    // "look the link up per request, don't bake it into the token" shape
+    // ParentService/TeacherService already use for their own portals (see
+    // ParentController.findMyStudents). JwtPayload and AuthenticatedUser
+    // stay exactly as they were before this task; the resolved id is
+    // returned alongside the token instead, for the caller to use however
+    // /student/* routes end up needing it once they exist.
+    //
+    // A student user with no student_users row yet (e.g. provisioned but
+    // not linked) still logs in successfully -- studentId is simply
+    // omitted, the same "no linked record" shape ParentService returns an
+    // empty list for rather than failing the login itself.
+    let studentId: string | undefined;
+    if (user.role === Role.STUDENT) {
+      const studentUser = await this.studentUserRepo.findOne({ where: { userId: user.id } });
+      studentId = studentUser?.studentId;
+    }
+
     const { passwordHash: _drop, ...safeUser } = user;
-    return { accessToken, user: safeUser };
+    return { accessToken, user: safeUser, ...(studentId ? { studentId } : {}) };
   }
 
   async changePassword(userId: string, dto: ChangePasswordDto): Promise<{ success: true }> {

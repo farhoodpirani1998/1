@@ -1,10 +1,15 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
-import { login as loginApi } from '../api/auth.api';
-import type { AuthUser } from '../types/auth.types';
+import { login as loginApi, loginWithUsername as loginWithUsernameApi } from '../api/auth.api';
+import type { AuthUser, LoginResponse } from '../types/auth.types';
 
 interface AuthContextValue {
   user: AuthUser | null;
   login: (phone: string, password: string) => Promise<void>;
+  // Student Portal foundation (ADR-001) — student-role logins use a
+  // username rather than a phone number. Separate method rather than an
+  // overload of login() above, so every existing caller of
+  // login(phone, password) is unaffected.
+  loginWithUsername: (username: string, password: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -25,8 +30,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   });
 
-  async function login(phone: string, password: string) {
-    const { data } = await loginApi(phone, password);
+  // Shared by login() and loginWithUsername() below — both resolve the
+  // same LoginResponse shape, just via a different identifier field.
+  function applyLoginResponse(data: LoginResponse) {
     const authUser: AuthUser = {
       id: data.user.id,
       schoolId: data.user.schoolId ?? '',
@@ -38,13 +44,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(authUser);
   }
 
+  async function login(phone: string, password: string) {
+    const { data } = await loginApi(phone, password);
+    applyLoginResponse(data);
+  }
+
+  // Student Portal foundation (ADR-001).
+  async function loginWithUsername(username: string, password: string) {
+    const { data } = await loginWithUsernameApi(username, password);
+    applyLoginResponse(data);
+  }
+
   function logout() {
     localStorage.removeItem('accessToken');
     localStorage.removeItem('authUser');
     setUser(null);
   }
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ user, login, loginWithUsername, logout }}>{children}</AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

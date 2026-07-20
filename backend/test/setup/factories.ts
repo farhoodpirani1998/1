@@ -13,6 +13,7 @@ import { Installment, InstallmentStatus } from '../../src/modules/tuition/entiti
 import { Payment, PaymentMethod } from '../../src/modules/tuition/entities/payment.entity';
 import { ParentStudent } from '../../src/modules/parent/entities/parent-student.entity';
 import { FounderSchool } from '../../src/modules/founder/entities/founder-school.entity';
+import { StudentUser } from '../../src/modules/students/entities/student-user.entity';
 import { LedgerEntry, LedgerEntryType, LedgerReferenceType } from '../../src/modules/ledger/entities/ledger-entry.entity';
 import {
   Notification,
@@ -77,6 +78,11 @@ export async function createUser(
     schoolId: overrides.schoolId ?? null,
     fullName: overrides.fullName ?? 'Test User',
     phone: overrides.phone ?? uniquePhone(),
+    // ADR-001 Task 3A: only set when a test explicitly passes one (e.g. a
+    // student-login fixture) — every other factory call keeps getting
+    // NULL, same as a real school_admin/accountant/staff/parent/teacher/
+    // founder user always has.
+    username: overrides.username ?? null,
     passwordHash,
     role: overrides.role,
     isActive: overrides.isActive ?? true,
@@ -246,6 +252,20 @@ export async function linkFounderSchool(
   const ds = getDataSource(app);
   const repo = ds.getRepository(FounderSchool);
   const link = repo.create({ founderId, schoolId });
+  return repo.save(link);
+}
+
+// ADR-001 Task 3A: links a student-role user to the single Student record
+// their login resolves to via AuthService.login. Same shape as
+// linkParentStudent/linkFounderSchool above.
+export async function linkStudentUser(
+  app: INestApplication,
+  userId: string,
+  studentId: string,
+): Promise<StudentUser> {
+  const ds = getDataSource(app);
+  const repo = ds.getRepository(StudentUser);
+  const link = repo.create({ userId, studentId });
   return repo.save(link);
 }
 

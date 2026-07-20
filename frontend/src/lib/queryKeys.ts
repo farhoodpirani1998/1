@@ -246,6 +246,27 @@ export const queryKeys = {
     tuition: (schoolId: string) => [...queryKeys.founder.all(), 'tuition', schoolId] as const,
   },
 
+  // Student Portal foundation (ADR-001). Named studentPortal rather than
+  // `student` — `students` above is already the admin-side domain for
+  // the Student entity, and a `student`/`students` pair sitting next to
+  // each other invites exactly the kind of mix-up queryKeys is meant to
+  // prevent. Every key here is a single-shot "my own record" read, same
+  // shape as `teacher` above minus the mutation-backed keys (this portal
+  // is read-only) and minus any id param (every /student/* route
+  // resolves from the token, never a client-supplied id).
+  studentPortal: {
+    all: () => ['studentPortal'] as const,
+    profile: () => [...queryKeys.studentPortal.all(), 'profile'] as const,
+    attendance: () => [...queryKeys.studentPortal.all(), 'attendance'] as const,
+    assessments: () => [...queryKeys.studentPortal.all(), 'assessments'] as const,
+    reportCard: () => [...queryKeys.studentPortal.all(), 'reportCard'] as const,
+    homework: () => [...queryKeys.studentPortal.all(), 'homework'] as const,
+    announcements: () => [...queryKeys.studentPortal.all(), 'announcements'] as const,
+    documents: () => [...queryKeys.studentPortal.all(), 'documents'] as const,
+    timetable: () => [...queryKeys.studentPortal.all(), 'timetable'] as const,
+    dashboard: () => [...queryKeys.studentPortal.all(), 'dashboard'] as const,
+  },
+
   // Phase 5N: Global Search (GET /search) — single-shot, keyed by the
   // exact query text + limit, same "params or {}" shape as every other
   // list(params) above.

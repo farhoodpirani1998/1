@@ -14,7 +14,23 @@ import type { ManagedUser } from './user.types';
 // read-only access to aggregated + per-school data under /founder/*
 // (see founder-frontend-prompt.md). schoolId is always null for this
 // role, same as super_admin (a founder isn't scoped to one school).
-export type UserRole = 'super_admin' | 'school_admin' | 'accountant' | 'staff' | 'parent' | 'teacher' | 'founder';
+//
+// 'student' — Student Portal foundation (ADR-001). Mirrors Role.STUDENT
+// on the backend. Logs in with `username` + password rather than
+// `phone` (see LoginDto — username is a student-only identifier), and
+// always owns a schoolId like every non-super_admin/founder role. Same
+// isolation shape as parent/teacher/founder: never granted on
+// staff-facing endpoints, only on its own dedicated /student/* route
+// group (see App.tsx).
+export type UserRole =
+  | 'super_admin'
+  | 'school_admin'
+  | 'accountant'
+  | 'staff'
+  | 'parent'
+  | 'teacher'
+  | 'founder'
+  | 'student';
 
 export interface AuthUser {
   id: string;
@@ -33,4 +49,11 @@ export interface AuthUser {
 export interface LoginResponse {
   accessToken: string;
   user: ManagedUser;
+  // Present only for a student-role login, resolved server-side via the
+  // student_users link table (see AuthService.login). Not needed by any
+  // /student/* request today — every one of those routes resolves the
+  // caller's own student record from the token's user id, never from a
+  // client-supplied id — but typed here so the login response shape is
+  // complete and doesn't silently drop a field the backend actually sends.
+  studentId?: string;
 }

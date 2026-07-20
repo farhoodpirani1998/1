@@ -1,4 +1,5 @@
 import type { PaymentMethod } from '../types/payment.types';
+import type { AssessmentTerm } from '../types/parent.types';
 
 const persianDigits = ['۰', '۱', '۲', '۳', '۴', '۵', '۶', '۷', '۸', '۹'];
 
@@ -69,4 +70,21 @@ export const paymentMethodLabels: Record<PaymentMethod, string> = {
   cash: 'نقدی',
   card_to_card: 'کارت‌به‌کارت',
   cheque: 'چک',
+};
+
+// Was previously duplicated identically across ParentReportCardPage,
+// StudentDashboardPage, StudentAssessmentsPage and StudentReportCardPage —
+// moved here so every page shares one source instead of each redefining
+// the same score-rounding rule and term labels (same "was duplicated,
+// now shared" move as paymentMethodLabels above). Scores can be
+// fractional (e.g. 17.5); this avoids a trailing ".00" for whole numbers
+// while still showing decimals when they matter.
+export function formatScore(value: number): string {
+  const rounded = Math.round(value * 100) / 100;
+  return toPersianDigits(Number.isInteger(rounded) ? rounded : rounded.toFixed(2));
+}
+
+export const assessmentTermLabels: Record<AssessmentTerm, string> = {
+  first_term: 'ترم اول',
+  second_term: 'ترم دوم',
 };

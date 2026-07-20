@@ -26,6 +26,19 @@ export class User {
   @Column({ type: 'varchar', length: 20, unique: true })
   phone: string;
 
+  // ADR-001 Task 3A: second login identifier, alongside (not instead of)
+  // `phone` -- used by student-role logins today, but not restricted to
+  // that role at the schema level, same way `phone` isn't restricted to
+  // any particular role. NULL for every user who has no username set,
+  // which Postgres allows any number of under the unique constraint (see
+  // migration 1738400000000-AddUsernameToUsers). Lives here and not on
+  // Student: per the architecture rule that User is the only identity
+  // entity, Student stays academic-only, and a login reaches its Student
+  // record through StudentUser, never through login fields on Student
+  // itself.
+  @Column({ type: 'varchar', length: 50, unique: true, nullable: true })
+  username: string | null;
+
   @Column({ name: 'password_hash', type: 'varchar', length: 255 })
   passwordHash: string;
 

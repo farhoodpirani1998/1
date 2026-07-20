@@ -162,6 +162,30 @@ export class HomeworkSubmissionService {
   }
 
   /**
+   * ADR-001 Task 4E (architecture review follow-up): every submission
+   * recorded for one student, across every homework, in a single query --
+   * scoped directly by (studentId, schoolId) rather than by resolving each
+   * homework individually. Unlike findForHomeworkAndStudent() above, this
+   * does NOT call HomeworkService.findOneForSchool() per row: it doesn't
+   * need to, since HomeworkSubmission already carries its own schoolId
+   * column (see the entity's header comment on why every tenant-scoped
+   * table here does), and the caller (StudentService.getMyHomework) has
+   * already resolved "this studentId belongs to this authenticated user"
+   * before calling.
+   *
+   * Exists specifically so a caller building a per-student homework list
+   * (GET /student/homework) can fetch every submission once and map it
+   * in memory by homeworkId, instead of calling
+   * findForHomeworkAndStudent() once per homework row -- which would
+   * re-run findOneForSchool() N times for homework the caller has already
+   * fetched. Same "one list read, look things up in memory" shape
+   * getSummary() above already uses over four separate COUNT queries.
+   */
+  async findAllForStudent(studentId: string, schoolId: string): Promise<HomeworkSubmission[]> {
+    return this.submissionRepo.find({ where: { studentId, schoolId } });
+  }
+
+  /**
    * Every submission recorded for one homework, most recently updated
    * first. The homework itself is resolved through
    * HomeworkService.findOneForSchool() first, so a cross-tenant
@@ -177,6 +201,7 @@ export class HomeworkSubmissionService {
       order: { updatedAt: 'DESC' },
     });
   }
+
 
   /**
    * Per-status counts for one homework, derived from a single list read
