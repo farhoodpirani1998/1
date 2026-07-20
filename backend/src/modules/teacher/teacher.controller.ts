@@ -2,6 +2,9 @@ import { Controller, Post, Get, Put, Delete, Body, Param, Query, UseGuards, Http
 import { TeacherService } from './teacher.service';
 import { CreateTeacherAssignmentDto } from './dto/create-teacher-assignment.dto';
 import { QueryTeacherStudentsDto } from './dto/query-teacher-students.dto';
+import { QueryTeacherAttendanceDto } from './dto/query-teacher-attendance.dto';
+import { QueryTeacherAttendanceStatusDto } from './dto/query-teacher-attendance-status.dto';
+import { QueryTeacherAssessmentsDto } from './dto/query-teacher-assessments.dto';
 import { CreateAttendanceDto } from '../attendance/dto/create-attendance.dto';
 import { toAttendanceView } from '../attendance/dto/attendance-view.dto';
 import { CreateAssessmentDto } from '../student-assessments/dto/create-assessment.dto';
@@ -9,7 +12,7 @@ import { toAssessmentView } from '../student-assessments/dto/assessment-view.dto
 import { toTeacherProfileView, toTeacherAssignmentView, toTeacherListItemView } from './dto/teacher-view.dto';
 import { AnnouncementsService } from '../announcements/announcements.service';
 import { AnnouncementTargetType } from '../announcements/entities/announcement.entity';
-import { toRecipientAnnouncementView } from '../announcements/dto/announcement-view.dto';
+import { toTeacherAnnouncementView } from '../announcements/dto/announcement-view.dto';
 import { TimetableService } from '../timetable/timetable.service';
 import { toTimetableEntryView } from '../timetable/dto/timetable-entry-view.dto';
 import { HomeworkService } from '../homework/homework.service';
@@ -17,6 +20,8 @@ import { CreateHomeworkDto } from '../homework/dto/create-homework.dto';
 import { UpdateHomeworkDto } from '../homework/dto/update-homework.dto';
 import { QueryHomeworkDto } from '../homework/dto/query-homework.dto';
 import { toHomeworkView } from '../homework/dto/homework-view.dto';
+import { QueryTeacherHomeworkSubmissionsDto } from './dto/query-teacher-homework-submissions.dto';
+import { toTeacherHomeworkSubmissionView } from './dto/teacher-homework-submission-view.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -141,6 +146,45 @@ export class TeacherController {
     return toAttendanceView(attendance);
   }
 
+  // Sprint A.1: read-only attendance views scoped to the teacher's own
+  // assigned classes. TeacherService resolves the same (whole-grade,
+  // class) scope getMyStudents() uses and delegates the actual record
+  // lookup to AttendanceService.findByDateForScope() -- no attendance
+  // business logic is reimplemented here.
+
+  @Get('attendance/today')
+  @Roles('teacher')
+  async getMyAttendanceToday(
+    @Query() query: QueryTeacherAttendanceDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const records = await this.teacherService.getMyAttendanceToday(user.id, user.schoolId, query);
+    return records.map(toAttendanceView);
+  }
+
+  @Get('attendance/date/:date')
+  @Roles('teacher')
+  async getMyAttendanceByDate(
+    @Param('date') date: string,
+    @Query() query: QueryTeacherAttendanceDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const records = await this.teacherService.getMyAttendanceByDate(user.id, user.schoolId, date, query);
+    return records.map(toAttendanceView);
+  }
+
+  // Per-class attendance status (roster size + present/absent/late/
+  // excused counts) for one calendar day, defaulting to today -- the
+  // "which of my classes still need attendance taken" summary.
+  @Get('attendance/status')
+  @Roles('teacher')
+  async getMyAttendanceStatus(
+    @Query() query: QueryTeacherAttendanceStatusDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.teacherService.getMyAttendanceStatus(user.id, user.schoolId, query);
+  }
+
   // Recording/correcting an assessment score for one of the teacher's own
   // assigned grade+subject combinations. TeacherService.recordAssessment()
   // checks the assignment before delegating to AssessmentsService.record(),
@@ -152,20 +196,66 @@ export class TeacherController {
     return toAssessmentView(assessment);
   }
 
+  // Sprint A.2: read-only assessment views scoped to the teacher's own
+  // assigned (grade, class, subject) combinations. TeacherService
+  // resolves that scope (see resolveAssessmentScope()) and delegates the
+  // actual record lookup to AssessmentsService.findForScope() -- no
+  // assessment business logic is reimplemented here, same shape as the
+  // Sprint A.1 attendance-read routes above.
+  @Get('assessments')
+  @Roles('teacher')
+  async getMyAssessments(@Query() query: QueryTeacherAssessmentsDto, @CurrentUser() user: AuthenticatedUser) {
+    const assessments = await this.teacherService.getMyAssessments(user.id, user.schoolId, query);
+    return assessments.map(toAssessmentView);
+  }
+
   // Phase 5H: School Announcements. Read-only, teacher-scoped: only
   // announcements targeted at 'all' or 'teachers', within the caller's
   // own school -- AnnouncementsService.findForAudience() enforces both,
   // the audience is hardcoded here (never taken from the request), same
   // "caller can't widen their own view" reasoning as every other
   // audience-scoped read in this codebase.
+  //
+  // Sprint A.4: extended (not replaced) with each announcement's isRead
+  // /readAt for the calling teacher -- every field this route already
+  // returned is unchanged, see toTeacherAnnouncementView()'s own
+  // comment. findForAudienceWithReadStatus() applies the exact same
+  // audience/school scoping findForAudience() always has; this is
+  // strictly additive.
   @Get('announcements')
   @Roles('teacher')
-  async getMyAnnouncements(@CurrentUser('schoolId') schoolId: string) {
-    const announcements = await this.announcementsService.findForAudience(
-      schoolId,
+  async getMyAnnouncements(@CurrentUser() user: AuthenticatedUser) {
+    const results = await this.announcementsService.findForAudienceWithReadStatus(
+      user.schoolId,
+      AnnouncementTargetType.TEACHERS,
+      user.id,
+    );
+    return results.map(({ announcement, isRead, readAt }) =>
+      toTeacherAnnouncementView(announcement, isRead, readAt),
+    );
+  }
+
+  // Sprint A.4: marks one announcement as read for the calling teacher.
+  // AnnouncementsService.markAsRead() re-checks the same audience/school
+  // visibility getMyAnnouncements() above enforces (never taken from the
+  // request) -- a teacher can only ever mark-as-read an announcement
+  // they could already see through that route, same "caller can't act
+  // outside their own visible scope" reasoning as every other
+  // teacher-facing write in this controller. Idempotent: a repeat call
+  // for an already-read announcement returns the original readAt
+  // unchanged rather than erroring or bumping it (see markAsRead()'s own
+  // comment).
+  @Post('announcements/:id/read')
+  @Roles('teacher')
+  @HttpCode(200)
+  async markAnnouncementRead(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    const read = await this.announcementsService.markAsRead(
+      id,
+      user.id,
+      user.schoolId,
       AnnouncementTargetType.TEACHERS,
     );
-    return announcements.map(toRecipientAnnouncementView);
+    return { id: read.announcementId, isRead: true, readAt: read.readAt };
   }
 
   // Phase 5K: Timetable Foundation. Read-only, teacher-scoped: every
@@ -217,6 +307,44 @@ export class TeacherController {
   @HttpCode(204)
   async deleteHomework(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     await this.homeworkService.remove(id, user.id, user.schoolId);
+  }
+
+  // Sprint A.3.3: teacher-facing homework submission reads. Access is
+  // gated by TeacherService.assertHomeworkAccessible() -- the homework
+  // must exist in the caller's school AND the teacher must hold an
+  // assignment covering its (gradeId, subjectId), not necessarily the
+  // teacher who posted it (see that method's own comment). Grading and
+  // file uploads are not implemented -- every route below is read-only.
+
+  @Get('homework/:id/submissions')
+  @Roles('teacher')
+  async getMyHomeworkSubmissions(
+    @Param('id') id: string,
+    @Query() query: QueryTeacherHomeworkSubmissionsDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const submissions = await this.teacherService.getMyHomeworkSubmissions(user.id, user.schoolId, id, query);
+    return submissions.map(toTeacherHomeworkSubmissionView);
+  }
+
+  // Roster-aware per-status breakdown -- totalStudents is the teacher's
+  // actual assigned roster for the homework's grade (via
+  // TeacherService.getMyStudents()), not a count of submission rows, so
+  // a student with no row yet still counts toward missingCount. See
+  // TeacherService.buildRosterAwareSubmissionSummary() for why this
+  // differs from HomeworkSubmissionService.getSummary().
+  @Get('homework/:id/submissions/summary')
+  @Roles('teacher')
+  getMyHomeworkSubmissionSummary(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.teacherService.getMyHomeworkSubmissionSummary(user.id, user.schoolId, id);
+  }
+
+  // Same roster-aware counts as the summary route above, plus the
+  // percentage rates derived from them.
+  @Get('homework/:id/submissions/statistics')
+  @Roles('teacher')
+  getMyHomeworkSubmissionStatistics(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.teacherService.getMyHomeworkSubmissionStatistics(user.id, user.schoolId, id);
   }
 
   // ---------------------------------------------------------------------

@@ -182,6 +182,40 @@ export function recordAttendance(dto: RecordAttendanceInput) {
 }
 
 // ---------------------------------------------------------------------
+// Sprint F.1: read-only "which of my classes still need attendance taken"
+// status. Mirrors backend TeacherClassAttendanceStatusView
+// (TeacherService.getMyAttendanceStatus) — one row per (grade, class) the
+// teacher is assigned to, with the roster size for that group plus how
+// many of those students already have an attendance row for the date.
+// `date` defaults to today server-side when omitted, same convention as
+// GET /teacher/attendance/today vs .../date/:date.
+// ---------------------------------------------------------------------
+
+export interface TeacherClassAttendanceStatusView {
+  gradeId: string;
+  gradeTitle?: string;
+  classId: string | null;
+  classTitle: string;
+  totalStudents: number;
+  recordedCount: number;
+  notRecordedCount: number;
+  present: number;
+  absent: number;
+  late: number;
+  excused: number;
+}
+
+export interface QueryAttendanceStatusParams {
+  date?: string;
+  gradeId?: string;
+  classId?: string;
+}
+
+export function getMyAttendanceStatus(params?: QueryAttendanceStatusParams) {
+  return api.get<TeacherClassAttendanceStatusView[]>('/teacher/attendance/status', { params });
+}
+
+// ---------------------------------------------------------------------
 // Teacher Assessments. POST /teacher/assessments — @Roles('teacher').
 // Same "one call per student, no bulk endpoint" shape as attendance
 // above (see CreateAssessmentDto/TeacherController.recordAssessment).
@@ -313,6 +347,31 @@ export function deleteHomework(id: string) {
 }
 
 // ---------------------------------------------------------------------
+// Sprint F.1: roster-aware submission summary for one homework. Mirrors
+// backend TeacherHomeworkSubmissionSummaryView (see
+// teacher-homework-submission-view.dto.ts) — totalStudents is the
+// teacher's actual assigned roster for the homework's grade, not a count
+// of submission rows, so a student who never got a row still counts
+// toward missingCount instead of vanishing from every total.
+// submittedCount and lateCount are mutually exclusive (a submission is
+// either on-time or late, never both) — both mean the student actually
+// turned something in, so "awaiting review" is their sum.
+// ---------------------------------------------------------------------
+
+export interface TeacherHomeworkSubmissionSummaryView {
+  homeworkId: string;
+  totalStudents: number;
+  submittedCount: number;
+  pendingCount: number;
+  missingCount: number;
+  lateCount: number;
+}
+
+export function getMyHomeworkSubmissionSummary(homeworkId: string) {
+  return api.get<TeacherHomeworkSubmissionSummaryView>(`/teacher/homework/${homeworkId}/submissions/summary`);
+}
+
+// ---------------------------------------------------------------------
 // Teacher Timetable (Phase 5K). GET /teacher/timetable — @Roles('teacher').
 // Read-only: every scheduled period for the caller, within their own
 // school (TeacherController.getMyTimetable takes no query params, unlike
@@ -355,18 +414,35 @@ export function getTimetable() {
 // existed server-side with no frontend consumer until now; the sidebar's
 // "اطلاعیه‌ها" item pointed at a placeholder page instead.
 //
-// Mirrors backend RecipientAnnouncementView (announcements/dto/announcement-view.dto.ts).
-// ---------------------------------------------------------------------
-
+// Mirrors backend TeacherAnnouncementView (announcements/dto/announcement-view.dto.ts)
+// — this is now the only shape GET /teacher/announcements returns.
+// Sprint F.1: isRead/readAt added — every field this route already
+// returned is unchanged, purely additive.
 export interface TeacherAnnouncementView {
   id: string;
   title: string;
   message: string;
   targetType: string;
   createdAt: string;
+  isRead: boolean;
+  readAt: string | null;
 }
 
 export function getMyAnnouncements() {
   return api.get<TeacherAnnouncementView[]>('/teacher/announcements');
+}
+
+// POST /teacher/announcements/:id/read — @Roles('teacher'). Idempotent
+// on the backend: marking an already-read announcement again returns the
+// original readAt unchanged rather than erroring or bumping it (see
+// AnnouncementsService.markAsRead on the backend).
+export interface MarkAnnouncementReadResult {
+  id: string;
+  isRead: true;
+  readAt: string;
+}
+
+export function markAnnouncementRead(id: string) {
+  return api.post<MarkAnnouncementReadResult>(`/teacher/announcements/${id}/read`);
 }
 

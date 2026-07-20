@@ -200,6 +200,15 @@ export const queryKeys = {
     // always returns the caller's full audience-filtered feed (see
     // TeacherController.getMyAnnouncements).
     announcements: () => [...queryKeys.teacher.all(), 'announcements'] as const,
+    // Sprint F.1: per-day attendance-taken status for the teacher's own
+    // assigned classes (GET /teacher/attendance/status) — same
+    // "params or {}" shape as homework(params) above.
+    attendanceStatus: (params?: { date?: string; gradeId?: string; classId?: string }) =>
+      [...queryKeys.teacher.all(), 'attendanceStatus', params ?? {}] as const,
+    // Sprint F.1: roster-aware submission summary for one homework (GET
+    // /teacher/homework/:id/submissions/summary).
+    homeworkSubmissionSummary: (homeworkId: string) =>
+      [...queryKeys.teacher.all(), 'homeworkSubmissionSummary', homeworkId] as const,
   },
 
   // Admin/staff-facing homework reads (GET /homework, GET /homework/:id —

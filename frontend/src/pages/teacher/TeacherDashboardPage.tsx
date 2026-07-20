@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/PageHeader';
 import { Card } from '../../components/Card';
@@ -13,8 +14,11 @@ import {
   useTeacherSubjects,
   useTeacherStudents,
   useTeacherTimetable,
+  useTeacherAttendanceStatus,
   useTeacherHomework,
+  useTeacherHomeworkSubmissionSummaries,
   useTeacherAnnouncements,
+  useMarkAnnouncementRead,
 } from '../../hooks/useTeacher';
 import {
   TeacherIcon,
@@ -117,16 +121,14 @@ function ClassStatusBadge({ status }: { status: ClassStatus }) {
 }
 
 // --- Pending Tasks ------------------------------------------------------
-// Backend reality check (see teacher.api.ts / homework.entity.ts /
-// announcements.entity.ts):
-// - Attendance: POST-only, no read endpoint — "not yet submitted" can only
-//   be approximated by today's class count (same proxy the summary cards
-//   above already use), not a true submitted/missing count.
-// - Homework review, assessment completion, parent messages: there is no
-//   submission-tracking table, no assessment read endpoint, and no
-//   parent<->teacher messaging module anywhere in the backend at all — see
-//   the TODOs inline below. These render as clearly-marked "not available
-//   yet" items rather than an invented number.
+// Sprint F.1: attendance and homework-review are now backed by real
+// backend reads (GET /teacher/attendance/status,
+// GET /teacher/homework/:id/submissions/summary — see useTeacher.ts).
+// Assessment completion and parent messages remain unsupported: only
+// POST /teacher/assessments exists (no read route the Dashboard can use
+// for "still ungraded"), and there is no parent<->teacher messaging
+// module anywhere in the backend. Both still render as clearly-marked
+// "به‌زودی" placeholders rather than an invented count.
 
 type TaskPriority = 'high' | 'medium' | 'low';
 
@@ -156,32 +158,26 @@ interface PendingTask {
   icon: typeof AttendanceIcon;
   title: string;
   description: string;
-  /** null = not backed by real data yet (see TODOs above each one below) */
+  /** null = not backed by real data yet (see comment above) */
   priority: TaskPriority | null;
   to?: string;
 }
 
-// TODO(backend): homework review needs a submission-tracking table (the
-// Homework entity has no per-student submission concept at all today —
-// see homework.entity.ts); assessment completion needs a GET read route
-// (only POST /teacher/assessments exists, see teacher.api.ts); parent
-// messages need an actual parent<->teacher messaging module, which does
-// not exist anywhere in this backend. None of these get an invented
-// count — they render as "به‌زودی" placeholders until the backend work
-// above lands.
+// TODO(backend): assessment completion needs a "still ungraded" read —
+// GET /teacher/assessments (Sprint A.2) returns recorded scores, not a
+// roster-aware pending count, and building one client-side would mean
+// re-deriving roster-vs-recorded logic the backend already owns for
+// attendance/homework (see TeacherService.getMyAttendanceStatus /
+// buildRosterAwareSubmissionSummary) — out of scope for this sprint.
+// Parent messages need an actual parent<->teacher messaging module,
+// which does not exist anywhere in this backend. Neither gets an
+// invented count — both render as "به‌زودی" placeholders.
 const UNSUPPORTED_PENDING_TASKS: PendingTask[] = [
-  {
-    key: 'homework-review',
-    icon: AssignmentsIcon,
-    title: 'بررسی تکالیف',
-    description: 'نیازمند افزودن ردیابی ارسال تکلیف دانش‌آموزان در بک‌اند',
-    priority: null,
-  },
   {
     key: 'assessments',
     icon: ScoreIcon,
     title: 'تکمیل ارزشیابی',
-    description: 'نیازمند افزودن مسیر خواندن نمرات ثبت‌شده در بک‌اند',
+    description: 'نیازمند افزودن مسیر خلاصه ارزشیابی ثبت‌نشده در بک‌اند',
     priority: null,
   },
   {
@@ -208,8 +204,6 @@ function getGreeting(hour: number): string {
   return 'شب بخیر';
 }
 
-const RECENT_ANNOUNCEMENT_MS = 3 * 24 * 60 * 60 * 1000; // 3 days
-
 // Sprint 1 scope originally covered profile + assigned classes/subjects
 // only. The teacher portal has since grown attendance, homework,
 // timetable, and announcement endpoints (see useTeacher.ts) — this page
@@ -222,14 +216,17 @@ export function TeacherDashboardPage() {
   const subjectsQuery = useTeacherSubjects();
   const studentsQuery = useTeacherStudents();
   const timetableQuery = useTeacherTimetable();
+  const attendanceStatusQuery = useTeacherAttendanceStatus();
   const homeworkQuery = useTeacherHomework();
   const announcementsQuery = useTeacherAnnouncements();
+  const markAnnouncementReadMutation = useMarkAnnouncementRead();
 
   const profile = profileQuery.data;
   const classes = classesQuery.data ?? [];
   const subjects = subjectsQuery.data ?? [];
   const students = studentsQuery.data ?? [];
   const timetable = timetableQuery.data ?? [];
+  const attendanceStatus = attendanceStatusQuery.data ?? [];
   const homework = homeworkQuery.data ?? [];
   const announcements = announcementsQuery.data ?? [];
 
@@ -238,22 +235,25 @@ export function TeacherDashboardPage() {
   const todayClasses = timetable.filter((entry) => entry.weekday === todayWeekday);
 
   // "Pending" homework: due date hasn't passed yet, so students can
-  // still submit it — the closest read-only proxy for "active
-  // assignments" without a submissions-tracking endpoint.
+  // still submit it.
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const pendingAssignments = homework.filter((h) => new Date(h.dueDate) >= startOfToday);
 
-  // There's no attendance-history read endpoint yet (POST-only, see
-  // teacher.api.ts), so there's no way to know which of today's classes
-  // already had attendance recorded. Today's class count is used as the
-  // best available stand-in for "attendance that may still be pending".
-  const pendingAttendanceCount = todayClasses.length;
+  // Sprint F.1: real "not yet recorded" count, replacing the former
+  // today's-class-count proxy. GET /teacher/attendance/status returns one
+  // row per (grade, class) the teacher is assigned to, regardless of
+  // whether that grade meets today — narrowed here to just the grades on
+  // today's timetable (todayGradeIds), then summed, so this reads
+  // "how much of today's attendance is still outstanding", not the
+  // teacher's entire roster's status for the day.
+  const todayGradeIds = new Set(todayClasses.map((c) => c.gradeId));
+  const todayAttendanceGroups = attendanceStatus.filter((g) => todayGradeIds.has(g.gradeId));
+  const notRecordedToday = todayAttendanceGroups.reduce((sum, g) => sum + g.notRecordedCount, 0);
 
-  // No read/unread tracking on announcements either — recency is the
-  // best available signal for "new".
-  const newAnnouncements = announcements.filter(
-    (a) => now.getTime() - new Date(a.createdAt).getTime() <= RECENT_ANNOUNCEMENT_MS,
-  );
+  // Sprint F.1: real unread count, replacing the former "created within
+  // the last 3 days" recency heuristic — GET /teacher/announcements now
+  // returns each announcement's isRead for the calling teacher.
+  const unreadAnnouncements = announcements.filter((a) => !a.isRead);
 
   // --- Today's Schedule ------------------------------------------------
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
@@ -305,16 +305,22 @@ export function TeacherDashboardPage() {
   });
 
   // --- Recent Activity ---------------------------------------------------
-  // Homework is the only teacher-authored resource with a real GET
-  // endpoint (POST /teacher/attendance and /teacher/assessments have no
-  // corresponding list route — see teacher.api.ts), so it's the only
-  // source this timeline can honestly build from today. TODO: once
-  // GET /teacher/attendance and GET /teacher/assessments (read) exist,
-  // merge those events in here instead of homework being the only source.
-  const recentActivity = [...homework]
+  // Homework is still the only teacher-authored resource with a real
+  // list/CRUD endpoint (POST /teacher/attendance and /teacher/assessments
+  // have no corresponding list route), so it remains the timeline's event
+  // source. Sprint F.1: each item is now enriched with its real
+  // submission summary (GET /teacher/homework/:id/submissions/summary)
+  // via useTeacherHomeworkSubmissionSummaries — batched once for exactly
+  // the 5 homework ids shown here, not a query per rendered row.
+  const recentActivityHomeworks = [...homework]
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    .slice(0, 5)
-    .map((h) => ({
+    .slice(0, 5);
+  const recentActivitySummaries = useTeacherHomeworkSubmissionSummaries(
+    recentActivityHomeworks.map((h) => h.id),
+  );
+  const recentActivity = recentActivityHomeworks.map((h, idx) => {
+    const summary = recentActivitySummaries[idx]?.data;
+    return {
       id: h.id,
       // updatedAt is set equal to createdAt on insert (see Homework
       // entity's @UpdateDateColumn), so a small tolerance distinguishes an
@@ -327,49 +333,100 @@ export function TeacherDashboardPage() {
       title: h.title,
       subtitle: `${h.gradeTitle ?? '—'} · ${h.subjectTitle ?? '—'}`,
       at: h.updatedAt,
-    }));
+      submissionLabel: summary
+        ? `${toPersianDigits(summary.submittedCount + summary.lateCount)}/${toPersianDigits(summary.totalStudents)} ارسال شده`
+        : null,
+    };
+  });
 
-  // --- Notifications widget ----------------------------------------------
+  // --- Announcements widget ------------------------------------------------
   // Same GET /teacher/announcements data the summary card's
-  // newAnnouncements count already reads — just the 5 most recent, newest
-  // first. TODO: no per-user read/unread column exists on the
-  // announcements table yet, so no unread indicator is rendered (spec:
-  // "only if supported by the backend").
+  // unreadAnnouncements count already reads — just the 5 most recent,
+  // newest first. Sprint F.1: each item now carries its real isRead
+  // state (unread dot), and opening one marks it read (see
+  // handleAnnouncementClick below and the widget's JSX).
   const recentAnnouncements = [...announcements]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5);
 
-  // Attendance is the one Pending Task item backed by real (if
-  // approximate) data — see the TODO block above UNSUPPORTED_PENDING_TASKS
-  // for why the other three are placeholders instead.
+  // --- Pending Tasks -------------------------------------------------------
+  // Sprint F.1: both attendance and homework-review are now backed by
+  // real backend reads — see UNSUPPORTED_PENDING_TASKS above for why
+  // assessments/parent-messages remain placeholders.
+  const pendingHomeworkSummaries = useTeacherHomeworkSubmissionSummaries(
+    pendingAssignments.map((h) => h.id),
+  );
+  // submittedCount and lateCount both mean "the student actually turned
+  // it in" — summed, this is "submissions awaiting the teacher's review"
+  // (there is no separate graded/reviewed flag on a submission yet, so
+  // every submitted/late row counts as needing a look).
+  const needsReviewCount = pendingHomeworkSummaries.reduce(
+    (sum, q) => sum + (q.data ? q.data.submittedCount + q.data.lateCount : 0),
+    0,
+  );
+
   const pendingTasks: PendingTask[] = [
     {
       key: 'attendance',
       icon: AttendanceIcon,
       title: 'ثبت حضور و غیاب',
       description:
-        pendingAttendanceCount > 0
-          ? `${toPersianDigits(pendingAttendanceCount)} کلاس امروز هنوز حضور و غیاب ثبت نشده`
-          : 'امروز کلاسی برای ثبت حضور ندارید',
-      priority: pendingAttendanceCount > 0 ? 'high' : 'low',
+        todayClasses.length === 0
+          ? 'امروز کلاسی برای ثبت حضور ندارید'
+          : notRecordedToday > 0
+            ? `${toPersianDigits(notRecordedToday)} کلاس امروز هنوز حضور و غیاب ثبت نشده`
+            : 'حضور و غیاب همه کلاس‌های امروز ثبت شده',
+      priority: todayClasses.length === 0 || notRecordedToday === 0 ? 'low' : 'high',
       to: '/teacher/attendance',
+    },
+    {
+      key: 'homework-review',
+      icon: AssignmentsIcon,
+      title: 'بررسی تکالیف',
+      description:
+        pendingAssignments.length === 0
+          ? 'تکلیف فعالی برای بررسی ندارید'
+          : needsReviewCount > 0
+            ? `${toPersianDigits(needsReviewCount)} ارسال دانش‌آموز در انتظار بررسی`
+            : 'هنوز ارسالی برای بررسی ثبت نشده',
+      priority: needsReviewCount > 0 ? 'medium' : 'low',
+      to: '/teacher/homework',
     },
     ...UNSUPPORTED_PENDING_TASKS,
   ];
 
   // Contextual welcome-section line: a clear day beats everything else,
   // then an actionable nudge (attendance still pending) beats a plain
-  // count. Only shown once the timetable has actually loaded — while
-  // loading/erroring, the generic subtitle below is used instead so this
-  // never flashes a wrong "no classes" message before data arrives.
+  // count. Only shown once the timetable AND attendance status have
+  // actually loaded — while loading/erroring, the generic subtitle below
+  // is used instead so this never flashes a wrong "no classes" message
+  // before data arrives.
   let contextMessage: string | null = null;
-  if (!timetableQuery.isLoading && !timetableQuery.isError) {
+  if (
+    !timetableQuery.isLoading &&
+    !timetableQuery.isError &&
+    !attendanceStatusQuery.isLoading &&
+    !attendanceStatusQuery.isError
+  ) {
     if (todayClasses.length === 0) {
       contextMessage = 'امروز کلاسی ندارید.';
-    } else if (pendingAttendanceCount > 0) {
-      contextMessage = `${toPersianDigits(pendingAttendanceCount)} حضور و غیاب ثبت نشده است.`;
+    } else if (notRecordedToday > 0) {
+      contextMessage = `${toPersianDigits(notRecordedToday)} حضور و غیاب ثبت نشده است.`;
     } else {
       contextMessage = `امروز ${toPersianDigits(todayClasses.length)} کلاس برای شما برنامه‌ریزی شده است.`;
+    }
+  }
+
+  // Sprint F.1: expand-in-place for the Announcements widget — clicking
+  // an item shows its full message and marks it read (POST
+  // /teacher/announcements/:id/read) if it wasn't already. Re-clicking an
+  // already-expanded item just collapses it again without re-firing the
+  // mutation (isRead is already true by then).
+  const [expandedAnnouncementId, setExpandedAnnouncementId] = useState<string | null>(null);
+  function handleAnnouncementClick(a: (typeof announcements)[number]) {
+    setExpandedAnnouncementId((prev) => (prev === a.id ? null : a.id));
+    if (!a.isRead) {
+      markAnnouncementReadMutation.mutate(a.id);
     }
   }
 
@@ -457,8 +514,14 @@ export function TeacherDashboardPage() {
         <Link to="/teacher/attendance" className="block rounded-xl">
           <StatCard
             label="حضور و غیاب معلق"
-            value={timetableQuery.isLoading ? '—' : timetableQuery.isError ? '؟' : String(pendingAttendanceCount)}
-            accent={timetableQuery.isError ? 'overdue' : 'warning'}
+            value={
+              timetableQuery.isLoading || attendanceStatusQuery.isLoading
+                ? '—'
+                : timetableQuery.isError || attendanceStatusQuery.isError
+                  ? '؟'
+                  : String(notRecordedToday)
+            }
+            accent={timetableQuery.isError || attendanceStatusQuery.isError ? 'overdue' : 'warning'}
             icon={<AttendanceIcon size={22} />}
             className="transition-shadow duration-200 hover:shadow-card-hover"
           />
@@ -474,9 +537,13 @@ export function TeacherDashboardPage() {
         </Link>
         <Link to="/teacher/announcements" className="block rounded-xl">
           <StatCard
-            label="اعلان‌های جدید"
+            label="اعلان‌های نخوانده"
             value={
-              announcementsQuery.isLoading ? '—' : announcementsQuery.isError ? '؟' : String(newAnnouncements.length)
+              announcementsQuery.isLoading
+                ? '—'
+                : announcementsQuery.isError
+                  ? '؟'
+                  : String(unreadAnnouncements.length)
             }
             accent={announcementsQuery.isError ? 'overdue' : 'action'}
             icon={<NotificationIcon size={22} />}
@@ -574,41 +641,62 @@ export function TeacherDashboardPage() {
             action={<TargetIcon size={18} className="text-ink/30 dark:text-paper/30" />}
           />
           <Card>
-            <ul className="divide-y divide-line dark:divide-white/10">
-              {pendingTasks.map((task) => (
-                <li key={task.key} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                      task.priority
-                        ? 'bg-action-soft text-action dark:bg-action/15 dark:text-action-light'
-                        : 'bg-ink/5 text-ink/30 dark:bg-white/5 dark:text-paper/30'
-                    }`}
+            {attendanceStatusQuery.isLoading || homeworkQuery.isLoading ? (
+              <SkeletonRows rows={4} cols={1} />
+            ) : attendanceStatusQuery.isError || homeworkQuery.isError ? (
+              <EmptyState
+                message="خطا در بارگذاری کارهای در انتظار"
+                description="ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید."
+                action={
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      attendanceStatusQuery.refetch();
+                      homeworkQuery.refetch();
+                    }}
                   >
-                    <task.icon size={18} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span
-                        className={`text-sm font-medium ${
-                          task.priority ? 'text-ink dark:text-paper' : 'text-ink/50 dark:text-paper/50'
-                        }`}
-                      >
-                        {task.title}
-                      </span>
-                      {task.priority ? (
-                        <PriorityBadge priority={task.priority} />
-                      ) : (
-                        <span className="badge border-ink/10 bg-ink/5 text-ink/40 dark:border-white/10 dark:bg-white/5 dark:text-paper/40">
-                          <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                          به‌زودی
-                        </span>
-                      )}
+                    تلاش مجدد
+                  </Button>
+                }
+              />
+            ) : (
+              <ul className="divide-y divide-line dark:divide-white/10">
+                {pendingTasks.map((task) => (
+                  <li key={task.key} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
+                        task.priority
+                          ? 'bg-action-soft text-action dark:bg-action/15 dark:text-action-light'
+                          : 'bg-ink/5 text-ink/30 dark:bg-white/5 dark:text-paper/30'
+                      }`}
+                    >
+                      <task.icon size={18} />
                     </div>
-                    <p className="mt-0.5 text-xs leading-5 text-ink/45 dark:text-paper/45">{task.description}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span
+                          className={`text-sm font-medium ${
+                            task.priority ? 'text-ink dark:text-paper' : 'text-ink/50 dark:text-paper/50'
+                          }`}
+                        >
+                          {task.title}
+                        </span>
+                        {task.priority ? (
+                          <PriorityBadge priority={task.priority} />
+                        ) : (
+                          <span className="badge border-ink/10 bg-ink/5 text-ink/40 dark:border-white/10 dark:bg-white/5 dark:text-paper/40">
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                            به‌زودی
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 text-xs leading-5 text-ink/45 dark:text-paper/45">{task.description}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </Card>
         </div>
 
@@ -639,19 +727,42 @@ export function TeacherDashboardPage() {
             ) : (
               <>
                 <ul className="divide-y divide-line dark:divide-white/10">
-                  {recentAnnouncements.map((a) => (
-                    <li key={a.id} className="py-3 first:pt-0 last:pb-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="truncate text-sm font-medium text-ink dark:text-paper">{a.title}</span>
-                        <span className="shrink-0 text-xs text-ink/40 dark:text-paper/40">
-                          {formatRelativeTime(a.createdAt)}
-                        </span>
-                      </div>
-                    </li>
-                  ))}
+                  {recentAnnouncements.map((a) => {
+                    const isExpanded = expandedAnnouncementId === a.id;
+                    return (
+                      <li key={a.id} className="py-3 first:pt-0 last:pb-0">
+                        <button
+                          type="button"
+                          onClick={() => handleAnnouncementClick(a)}
+                          className="flex w-full items-start justify-between gap-2 text-right"
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            {!a.isRead && (
+                              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-action" aria-hidden="true" />
+                            )}
+                            <span
+                              className={`truncate text-sm ${
+                                a.isRead
+                                  ? 'font-normal text-ink/70 dark:text-paper/70'
+                                  : 'font-medium text-ink dark:text-paper'
+                              }`}
+                            >
+                              {a.title}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-xs text-ink/40 dark:text-paper/40">
+                            {formatRelativeTime(a.createdAt)}
+                          </span>
+                        </button>
+                        {isExpanded && (
+                          <p className="mt-2 whitespace-pre-line text-xs leading-6 text-ink/60 dark:text-paper/60">
+                            {a.message}
+                          </p>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
-                {/* TODO(backend): no per-user read/unread column exists on
-                    announcements yet, so no unread dot/count is shown here. */}
                 <Link
                   to="/teacher/announcements"
                   className="mt-3 block text-center text-xs font-medium text-action hover:underline"
@@ -688,9 +799,12 @@ export function TeacherDashboardPage() {
                 description="تکالیفی که تعریف می‌کنید در این‌جا نمایش داده می‌شود."
               />
             ) : (
-              // TODO(backend): once GET /teacher/attendance and a read
-              // endpoint for /teacher/assessments exist, merge those
-              // events into this timeline alongside homework.
+              // Homework CRUD events remain the only source of this
+              // timeline (POST /teacher/attendance still has no list
+              // route). Sprint F.1: each row's subtitle line is now
+              // enriched with its real submission count where the
+              // summary has loaded (see recentActivitySummaries above) —
+              // no invented figure when it hasn't.
               <ul className="space-y-4">
                 {recentActivity.map((item, idx) => (
                   <li key={item.id} className="relative flex gap-3">
@@ -707,6 +821,7 @@ export function TeacherDashboardPage() {
                       </p>
                       <p className="mt-0.5 text-xs text-ink/45 dark:text-paper/45">
                         {item.subtitle} · {formatRelativeTime(item.at)}
+                        {item.submissionLabel && <> · {item.submissionLabel}</>}
                       </p>
                     </div>
                   </li>

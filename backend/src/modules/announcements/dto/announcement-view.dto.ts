@@ -46,3 +46,28 @@ export function toRecipientAnnouncementView(announcement: Announcement): Recipie
     createdAt: announcement.createdAt,
   };
 }
+
+// Sprint A.4 — Teacher Announcement Read Tracking.
+//
+// Every existing RecipientAnnouncementView field, unchanged, plus the
+// caller's own read status. This is the *only* shape GET
+// /teacher/announcements returns from now on -- ParentController's own
+// GET /parent/announcements still returns plain RecipientAnnouncementView
+// (via toRecipientAnnouncementView() above, untouched), since read
+// tracking in this sprint is teacher-only.
+export interface TeacherAnnouncementView extends RecipientAnnouncementView {
+  isRead: boolean;
+  readAt: Date | null;
+}
+
+export function toTeacherAnnouncementView(
+  announcement: Announcement,
+  isRead: boolean,
+  readAt: Date | null,
+): TeacherAnnouncementView {
+  return {
+    ...toRecipientAnnouncementView(announcement),
+    isRead,
+    readAt,
+  };
+}

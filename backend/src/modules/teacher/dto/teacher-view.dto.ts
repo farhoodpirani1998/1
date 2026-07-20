@@ -111,3 +111,24 @@ export function toTeacherListItemView(
     isActive: user.isActive,
   };
 }
+
+// Sprint A.1: GET /teacher/attendance/status -- one row per class the
+// teacher is scoped to (their own class-scoped assignments, plus one row
+// per class within a whole-grade assignment), for one calendar day. This
+// has no single ORM entity to reshape (it's an aggregate over Student +
+// Attendance, built in TeacherService.getMyAttendanceStatus), so unlike
+// the views above there's no toXView() mapper -- the service constructs
+// this shape directly.
+export interface TeacherClassAttendanceStatusView {
+  gradeId: string;
+  gradeTitle?: string;
+  classId: string | null;
+  classTitle: string;
+  totalStudents: number;
+  recordedCount: number;
+  notRecordedCount: number;
+  present: number;
+  absent: number;
+  late: number;
+  excused: number;
+}

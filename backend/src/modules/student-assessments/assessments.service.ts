@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Brackets } from 'typeorm';
 import { Assessment } from './entities/assessment.entity';
 import { Subject } from './entities/subject.entity';
 import { Student } from '../students/entities/student.entity';
@@ -109,6 +109,87 @@ export class AssessmentsService {
       relations: ['subject'],
       order: { createdAt: 'DESC' },
     });
+  }
+
+  /**
+   * Sprint A.2: assessments across an arbitrary set of (grade, class,
+   * subject) scopes, most recent first -- backs GET /teacher/assessments.
+   * `entries` is pre-resolved by the caller (TeacherService, mirroring
+   * the same "start from the caller's own assignments" shape
+   * AttendanceService.findByDateForScope's `scope` param is fed by) into
+   * one tuple per distinct assignment: a null `classId` means "every
+   * section of that grade" (matches assignmentCoversStudent's
+   * whole-grade rule), a null `subjectId` means "every subject" (the
+   * elementary-teacher case already handled by recordAssessment above).
+   * Each entry is its own AND-bracket (grade/class match AND, if given,
+   * subject match), OR'd together, so a teacher with several distinct
+   * assignments sees the union of what each one covers -- never more.
+   *
+   * fromDate/toDate filter on Assessment.createdAt: the entity has no
+   * date column of its own (only `term`, a two-value enum, see
+   * AssessmentTerm), so createdAt -- already indexed via
+   * @CreateDateColumn -- is the only timestamp available to filter a
+   * date range against, same reasoning AttendanceService.findByDateForScope
+   * has for using Attendance.date, the equivalent column on that entity.
+   */
+  async findForScope(
+    schoolId: string,
+    entries: { gradeId: string; classId: string | null; subjectId: string | null }[],
+    filters: { studentId?: string; fromDate?: string; toDate?: string } = {},
+  ): Promise<Assessment[]> {
+    if (entries.length === 0) {
+      return [];
+    }
+
+    const qb = this.assessmentRepo
+      .createQueryBuilder('assessment')
+      .leftJoinAndSelect('assessment.subject', 'subject')
+      .leftJoinAndSelect('assessment.student', 'student')
+      .where('assessment.schoolId = :schoolId', { schoolId })
+      .andWhere(
+        new Brackets((outer) => {
+          entries.forEach((entry, idx) => {
+            outer.orWhere(
+              new Brackets((inner) => {
+                if (entry.classId) {
+                  inner.andWhere(`student.classId = :classId${idx}`, {
+                    [`classId${idx}`]: entry.classId,
+                  });
+                } else {
+                  inner.andWhere(`student.gradeId = :gradeId${idx}`, {
+                    [`gradeId${idx}`]: entry.gradeId,
+                  });
+                }
+                if (entry.subjectId) {
+                  inner.andWhere(`assessment.subjectId = :subjectId${idx}`, {
+                    [`subjectId${idx}`]: entry.subjectId,
+                  });
+                }
+              }),
+            );
+          });
+        }),
+      );
+
+    if (filters.studentId) {
+      qb.andWhere('assessment.studentId = :studentId', { studentId: filters.studentId });
+    }
+    // Both bounds compare directly against the (already ISO-validated,
+    // see QueryTeacherAssessmentsDto's @IsDateString()) filter value --
+    // a bare YYYY-MM-DD is interpreted by Postgres as that day's
+    // midnight, same as comparing any other timestamptz column against a
+    // date literal elsewhere in this codebase, so a toDate of just a
+    // date (no time) is the *start* of that day, not its end. Callers
+    // that want an inclusive same-day upper bound should pass a full
+    // ISO timestamp (e.g. end-of-day) rather than a bare date.
+    if (filters.fromDate) {
+      qb.andWhere('assessment.createdAt >= :fromDate', { fromDate: filters.fromDate });
+    }
+    if (filters.toDate) {
+      qb.andWhere('assessment.createdAt <= :toDate', { toDate: filters.toDate });
+    }
+
+    return qb.orderBy('assessment.createdAt', 'DESC').getMany();
   }
 
   /**

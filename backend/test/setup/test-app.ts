@@ -83,6 +83,7 @@ export async function truncateAll(app: INestApplication): Promise<void> {
     'school_settings',
     'homework',
     'timetable_entries',
+    'announcement_reads',
     'announcements',
     'attendance',
     'teacher_assignments',

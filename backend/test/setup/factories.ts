@@ -23,13 +23,19 @@ import { Attendance, AttendanceStatus } from '../../src/modules/attendance/entit
 import { Subject } from '../../src/modules/student-assessments/entities/subject.entity';
 import { Assessment, AssessmentTerm } from '../../src/modules/student-assessments/entities/assessment.entity';
 import { TeacherAssignment } from '../../src/modules/teacher/entities/teacher-assignment.entity';
+import { Class } from '../../src/modules/classes/entities/class.entity';
 import { Announcement, AnnouncementTargetType } from '../../src/modules/announcements/entities/announcement.entity';
+import { AnnouncementRead } from '../../src/modules/announcements/entities/announcement-read.entity';
 import {
   StudentDocument,
   StudentDocumentType,
 } from '../../src/modules/student-documents/entities/student-document.entity';
 import { TimetableEntry, Weekday } from '../../src/modules/timetable/entities/timetable-entry.entity';
 import { Homework } from '../../src/modules/homework/entities/homework.entity';
+import {
+  HomeworkSubmission,
+  HomeworkSubmissionStatus,
+} from '../../src/modules/homework/entities/homework-submission.entity';
 import { SchoolSettings } from '../../src/modules/school-settings/entities/school-settings.entity';
 import { Role } from '../../src/common/authorization/roles.enum';
 import { getDataSource } from './test-app';
@@ -110,6 +116,26 @@ export async function createGrade(
   return repo.save(grade);
 }
 
+/**
+ * Sprint A.1: creates a class/section row directly, same convention as
+ * createGrade. Needed to test class-scoped (as opposed to whole-grade,
+ * classId null) teacher assignments and attendance reads.
+ */
+export async function createClass(
+  app: INestApplication,
+  opts: { schoolId: string; gradeId: string; academicYearId: string; title?: string },
+): Promise<Class> {
+  const ds = getDataSource(app);
+  const repo = ds.getRepository(Class);
+  const klass = repo.create({
+    schoolId: opts.schoolId,
+    gradeId: opts.gradeId,
+    academicYearId: opts.academicYearId,
+    title: opts.title ?? `Class ${Math.floor(Math.random() * 1000)}`,
+  });
+  return repo.save(klass);
+}
+
 export async function createGuardian(
   app: INestApplication,
   schoolId: string,
@@ -134,6 +160,7 @@ export async function createStudent(
     gradeId?: string;
     guardianId?: string;
     fullName?: string;
+    classId?: string | null;
   } = {},
 ): Promise<Student> {
   const ds = getDataSource(app);
@@ -148,6 +175,7 @@ export async function createStudent(
     gradeId,
     guardianId,
     fullName: opts.fullName ?? 'Test Student',
+    classId: opts.classId ?? null,
   });
   return repo.save(student);
 }
@@ -434,6 +462,7 @@ export async function createTeacherAssignment(
     teacherId: string;
     gradeId: string;
     subjectId: string;
+    classId?: string | null;
   },
 ): Promise<TeacherAssignment> {
   const ds = getDataSource(app);
@@ -443,6 +472,7 @@ export async function createTeacherAssignment(
     teacherId: opts.teacherId,
     gradeId: opts.gradeId,
     subjectId: opts.subjectId,
+    classId: opts.classId ?? null,
   });
   return repo.save(assignment);
 }
@@ -475,6 +505,32 @@ export async function createAnnouncement(
 }
 
 export { AnnouncementTargetType };
+
+/**
+ * Sprint A.4: creates an announcement_reads row directly, bypassing
+ * AnnouncementsService.markAsRead(), so tests can seed an
+ * already-read fixture without one POST per row -- same reasoning
+ * createAnnouncement() above bypasses AnnouncementsService.create().
+ */
+export async function createAnnouncementRead(
+  app: INestApplication,
+  opts: {
+    announcementId: string;
+    userId: string;
+    schoolId: string;
+    readAt?: Date;
+  },
+): Promise<AnnouncementRead> {
+  const ds = getDataSource(app);
+  const repo = ds.getRepository(AnnouncementRead);
+  const read = repo.create({
+    announcementId: opts.announcementId,
+    userId: opts.userId,
+    schoolId: opts.schoolId,
+    ...(opts.readAt ? { readAt: opts.readAt } : {}),
+  });
+  return repo.save(read);
+}
 
 /**
  * Phase 5I: creates a student_documents row directly, bypassing
@@ -582,6 +638,35 @@ export async function createHomework(
   });
   return repo.save(homework);
 }
+
+export async function createHomeworkSubmission(
+  app: INestApplication,
+  opts: {
+    schoolId: string;
+    homeworkId: string;
+    studentId: string;
+    status?: HomeworkSubmissionStatus;
+    submittedAt?: Date | null;
+  },
+): Promise<HomeworkSubmission> {
+  const ds = getDataSource(app);
+  const repo = ds.getRepository(HomeworkSubmission);
+  const status = opts.status ?? HomeworkSubmissionStatus.PENDING;
+  const defaultSubmittedAt =
+    status === HomeworkSubmissionStatus.SUBMITTED || status === HomeworkSubmissionStatus.LATE
+      ? new Date()
+      : null;
+  const submission = repo.create({
+    schoolId: opts.schoolId,
+    homeworkId: opts.homeworkId,
+    studentId: opts.studentId,
+    status,
+    submittedAt: opts.submittedAt !== undefined ? opts.submittedAt : defaultSubmittedAt,
+  });
+  return repo.save(submission);
+}
+
+export { HomeworkSubmissionStatus };
 
 export async function createSchoolSettings(
   app: INestApplication,

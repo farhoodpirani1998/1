@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   getProfile,
   getClasses,
@@ -11,19 +11,24 @@ import {
   getTeacherList,
   getTeacherById,
   recordAttendance,
+  getMyAttendanceStatus,
   recordAssessment,
   getHomework,
   createHomework,
   updateHomework,
   deleteHomework,
+  getMyHomeworkSubmissionSummary,
   getTimetable,
   getMyAnnouncements,
+  markAnnouncementRead,
   type CreateTeacherAssignmentInput,
   type RecordAttendanceInput,
+  type QueryAttendanceStatusParams,
   type RecordAssessmentInput,
   type QueryHomeworkParams,
   type CreateHomeworkInput,
   type UpdateHomeworkInput,
+  type TeacherAnnouncementView,
 } from '../api/teacher.api';
 import { queryKeys } from '../lib/queryKeys';
 
@@ -141,6 +146,19 @@ export function useRecordAttendance() {
 }
 
 // ---------------------------------------------------------------------
+// Sprint F.1: real "which of my classes still need attendance taken"
+// status, replacing the Dashboard's former today's-class-count proxy.
+// GET /teacher/attendance/status — read-only, no mutations (same
+// "query only, nothing to invalidate" shape as useTeacherTimetable).
+// ---------------------------------------------------------------------
+export function useTeacherAttendanceStatus(params?: QueryAttendanceStatusParams) {
+  return useQuery({
+    queryKey: queryKeys.teacher.attendanceStatus(params),
+    queryFn: () => getMyAttendanceStatus(params).then((res) => res.data),
+  });
+}
+
+// ---------------------------------------------------------------------
 // Teacher Assessments. POST /teacher/assessments — @Roles('teacher').
 // Same "no read query yet, so nothing to invalidate" shape as
 // useRecordAttendance above — assessment history is out of scope for
@@ -200,6 +218,36 @@ export function useDeleteHomework() {
 }
 
 // ---------------------------------------------------------------------
+// Sprint F.1: roster-aware submission summary for one homework. GET
+// /teacher/homework/:id/submissions/summary — read-only, no mutations.
+// ---------------------------------------------------------------------
+export function useTeacherHomeworkSubmissionSummary(homeworkId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.teacher.homeworkSubmissionSummary(homeworkId ?? ''),
+    queryFn: () => getMyHomeworkSubmissionSummary(homeworkId as string).then((res) => res.data),
+    enabled: !!homeworkId,
+  });
+}
+
+// Same query as above, batched across several homework ids at once —
+// used by the Dashboard's Pending Tasks / Recent Activity widgets, which
+// each need the summary for more than one homework and can't call
+// useQuery in a loop (against the rules of hooks). Each entry in the
+// returned array mirrors what useTeacherHomeworkSubmissionSummary(id)
+// would return for that id, in the same order as homeworkIds — callers
+// zip it back against their own id list. Shares its cache with the
+// single-id hook above (same query key), so calling both for the same
+// homeworkId never issues a duplicate request.
+export function useTeacherHomeworkSubmissionSummaries(homeworkIds: string[]) {
+  return useQueries({
+    queries: homeworkIds.map((id) => ({
+      queryKey: queryKeys.teacher.homeworkSubmissionSummary(id),
+      queryFn: () => getMyHomeworkSubmissionSummary(id).then((res) => res.data),
+    })),
+  });
+}
+
+// ---------------------------------------------------------------------
 // Teacher Timetable (Phase 5K). GET /teacher/timetable — @Roles('teacher').
 // Read-only, no mutations — same "query only, nothing to invalidate"
 // shape as useTeacherStudents.
@@ -222,6 +270,35 @@ export function useTeacherAnnouncements() {
   return useQuery({
     queryKey: queryKeys.teacher.announcements(),
     queryFn: () => getMyAnnouncements().then((res) => res.data),
+  });
+}
+
+// Sprint F.1: marks one announcement as read for the signed-in teacher.
+// POST /teacher/announcements/:id/read. Updates the
+// queryKeys.teacher.announcements() cache optimistically (isRead/readAt
+// flipped immediately, restored on error) rather than waiting on a
+// round trip — the Dashboard's Announcements widget needs its unread
+// indicator to disappear the instant an item is opened.
+export function useMarkAnnouncementRead() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => markAnnouncementRead(id).then((res) => res.data),
+    onMutate: async (id: string) => {
+      await queryClient.cancelQueries({ queryKey: queryKeys.teacher.announcements() });
+      const previous = queryClient.getQueryData<TeacherAnnouncementView[]>(queryKeys.teacher.announcements());
+      queryClient.setQueryData<TeacherAnnouncementView[]>(queryKeys.teacher.announcements(), (old) =>
+        old?.map((a) => (a.id === id ? { ...a, isRead: true, readAt: a.readAt ?? new Date().toISOString() } : a)),
+      );
+      return { previous };
+    },
+    onError: (_err, _id, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.teacher.announcements(), context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.teacher.announcements() });
+    },
   });
 }
 

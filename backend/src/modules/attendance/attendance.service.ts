@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Brackets } from 'typeorm';
 import { Attendance } from './entities/attendance.entity';
 import { Student } from '../students/entities/student.entity';
 import { ParentStudent } from '../parent/entities/parent-student.entity';
@@ -113,6 +113,52 @@ export class AttendanceService {
         academicYearId: query.academicYearId,
       });
     }
+
+    return qb.orderBy('student.fullName', 'ASC').getMany();
+  }
+
+  /**
+   * Sprint A.1: every attendance record for the caller's school on one
+   * calendar day, narrowed to an explicit set of whole-grade ids and/or
+   * class ids -- the multi-scope shape TeacherService.getMyStudents()
+   * already resolves from a teacher's own teacher_assignments rows
+   * (several assignments, mixing whole-grade and class-scoped coverage),
+   * which QueryAttendanceByDateDto's single optional gradeId can't
+   * express. findByDate() above is left untouched -- this is an
+   * additive sibling for the multi-scope caller, not a replacement.
+   *
+   * Same "empty scope is a caller bug, not an empty day" contract as
+   * TeacherService.getMyStudents(): an empty gradeIds+classIds pair
+   * returns [] without ever touching the database, since there is
+   * nothing meaningful to scope the query to.
+   */
+  async findByDateForScope(
+    date: string,
+    schoolId: string,
+    scope: { gradeIds: string[]; classIds: string[] },
+  ): Promise<Attendance[]> {
+    if (!DATE_ONLY.test(date)) {
+      throw new BadRequestException('فرمت تاریخ نامعتبر است (مورد انتظار: YYYY-MM-DD)');
+    }
+    if (scope.gradeIds.length === 0 && scope.classIds.length === 0) {
+      return [];
+    }
+
+    const qb = this.attendanceRepo
+      .createQueryBuilder('attendance')
+      .leftJoinAndSelect('attendance.student', 'student')
+      .where('attendance.schoolId = :schoolId', { schoolId })
+      .andWhere('attendance.date = :date', { date })
+      .andWhere(
+        new Brackets((sub) => {
+          if (scope.gradeIds.length > 0) {
+            sub.orWhere('student.gradeId IN (:...gradeIds)', { gradeIds: scope.gradeIds });
+          }
+          if (scope.classIds.length > 0) {
+            sub.orWhere('student.classId IN (:...classIds)', { classIds: scope.classIds });
+          }
+        }),
+      );
 
     return qb.orderBy('student.fullName', 'ASC').getMany();
   }
