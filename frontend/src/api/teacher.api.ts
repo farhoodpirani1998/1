@@ -39,9 +39,9 @@ export function getSubjects() {
 // /students) and parent.api.ts already exports getMyStudents() (GET
 // /parent/students) — all three are re-exported from the same
 // api/index.ts barrel, so this avoids both name collisions.
-export function getTeacherStudents(gradeId?: string) {
+export function getTeacherStudents(gradeId?: string, classId?: string) {
   return api.get<Student[]>('/teacher/students', {
-    params: gradeId ? { gradeId } : undefined,
+    params: { ...(gradeId ? { gradeId } : {}), ...(classId ? { classId } : {}) },
   });
 }
 
@@ -74,6 +74,13 @@ export interface TeacherAssignmentView {
   teacherName?: string;
   gradeId: string;
   gradeTitle?: string;
+  // Nullable: null means this assignment covers the entire grade (every
+  // section) -- the pre-existing behavior. A real classId scopes the
+  // assignment to just that one section -- see AddClassIdToTeacherAssignments
+  // on the backend for why this was added (two sections of one grade
+  // previously had no way to be told apart).
+  classId: string | null;
+  classTitle?: string;
   subjectId: string | null;
   subjectTitle?: string;
   createdAt: string;
@@ -82,10 +89,14 @@ export interface TeacherAssignmentView {
 // subjectId is optional — leaving it out means the teacher covers every
 // subject for the grade (the elementary-grade case, where one teacher
 // teaches all subjects to their class rather than one subject each).
+// classId is optional — leaving it out means the teacher covers every
+// section of the grade (also the pre-existing behavior for schools that
+// don't split a grade into sections).
 export interface CreateTeacherAssignmentInput {
   teacherId: string;
   gradeId: string;
   subjectId?: string;
+  classId?: string;
 }
 
 // POST /teacher/assignments — @Roles('school_admin'). Idempotent on the

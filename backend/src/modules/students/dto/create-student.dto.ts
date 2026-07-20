@@ -16,6 +16,14 @@ export class CreateStudentDto {
   @IsUUID()
   gradeId: string;
 
+  // Optional: which section/class of the grade this student is placed
+  // in. Omitted means "not yet placed in a section" -- see
+  // StudentsService.create() for the (grade, academicYear) consistency
+  // check this must pass when given.
+  @IsOptional()
+  @IsUUID()
+  classId?: string;
+
   @IsString()
   @MaxLength(150)
   fullName: string;

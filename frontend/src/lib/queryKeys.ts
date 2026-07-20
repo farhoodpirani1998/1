@@ -71,6 +71,15 @@ export const queryKeys = {
     list: () => [...queryKeys.grades.all(), 'list'] as const,
   },
 
+  // Class/section reference data (GET /classes) -- scoped by
+  // (gradeId, academicYearId), unlike grades/academicYears which are
+  // small unscoped lists. See api/classes.api.ts.
+  classes: {
+    all: () => ['classes'] as const,
+    list: (params?: { gradeId?: string; academicYearId?: string }) =>
+      [...queryKeys.classes.all(), 'list', params ?? {}] as const,
+  },
+
   // Sprint 2B: academic subjects (GET /subjects), same shape/reasoning
   // as `grades` above — a small, rarely-changing per-school reference
   // list. Distinct from `teacher.subjects` below, which is the signed-in

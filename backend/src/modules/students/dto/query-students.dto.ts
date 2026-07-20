@@ -13,6 +13,10 @@ export class QueryStudentsDto {
 
   @IsOptional()
   @IsUUID()
+  classId?: string;
+
+  @IsOptional()
+  @IsUUID()
   academicYearId?: string;
 
   @IsOptional()

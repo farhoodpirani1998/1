@@ -29,6 +29,15 @@ import {
   type CreateAcademicYearInput,
   type UpdateAcademicYearInput,
 } from '../api/academic-years.api';
+import {
+  getClasses,
+  createClass,
+  updateClass,
+  deleteClass,
+  type QueryClassesParams,
+  type CreateClassInput,
+  type UpdateClassInput,
+} from '../api/classes.api';
 import { queryKeys } from '../lib/queryKeys';
 
 // ---- Students -------------------------------------------------------
@@ -198,6 +207,59 @@ export function useUpdateAcademicYear() {
       // (see student.types.ts) — its isCurrent flag would otherwise go
       // stale in any already-cached student list.
       queryClient.invalidateQueries({ queryKey: queryKeys.students.lists() });
+    },
+  });
+}
+
+// ---- Classes (sections) -----------------------------------------------
+
+// Unlike Grades/AcademicYears, class rows are scoped to
+// (gradeId, academicYearId) -- a school with 12 grades across several
+// years could have dozens of rows, so this always takes a params filter
+// rather than always fetching every class in the school. staleTime kept
+// short (unlike useGrades' 5min) since a school_admin actively managing
+// classes in SettingsPage expects a freshly-created class to show up in
+// the StudentsPage/TeacherAssignmentsPage pickers right away.
+export function useClasses(params?: QueryClassesParams) {
+  return useQuery({
+    queryKey: queryKeys.classes.list(params),
+    queryFn: () => getClasses(params).then((res) => res.data),
+    // gradeId narrows further but isn't required -- academicYearId alone
+    // is enough to list every section across every grade for that year
+    // (used by TeacherAssignmentsPage's title-lookup map); without any
+    // academicYearId this would fetch the whole school's classes across
+    // every year at once, which no caller in this app actually wants.
+    enabled: Boolean(params?.academicYearId),
+  });
+}
+
+export function useCreateClass() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: CreateClassInput) => createClass(dto).then((res) => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.classes.all() });
+    },
+  });
+}
+
+export function useUpdateClass() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, dto }: { id: string; dto: UpdateClassInput }) =>
+      updateClass(id, dto).then((res) => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.classes.all() });
+    },
+  });
+}
+
+export function useDeleteClass() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteClass(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.classes.all() });
     },
   });
 }

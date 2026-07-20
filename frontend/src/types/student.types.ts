@@ -1,8 +1,6 @@
 // Student domain types.
 // Mirrors the actual backend models 1:1 (see modules/students/* entities
-// and dto). Do NOT add fields/concepts here that don't exist on the
-// backend (no Class, no Student.birthDate/address) — see Audit-Phase0
-// report for why those were removed.
+// and dto).
 
 export type StudentStatus = 'active' | 'withdrawn' | 'graduated';
 
@@ -26,6 +24,19 @@ export interface AcademicYear {
   isCurrent: boolean;
 }
 
+// One section/class of a Grade, for one AcademicYear -- e.g. two
+// SchoolClass rows "الف"/"ب" under the same Grade for the same year. See
+// backend/src/modules/classes/entities/class.entity.ts. Named
+// SchoolClass rather than Class here since `class` is a reserved word
+// for a TS *identifier* (it's still fine as an object property name --
+// see Student.class below, matching the backend's own relation name).
+export interface SchoolClass {
+  id: string;
+  gradeId: string;
+  academicYearId: string;
+  title: string;
+}
+
 export interface Student {
   id: string;
   fullName: string;
@@ -34,9 +45,14 @@ export interface Student {
   enrollmentDate: string | null;
   gradeId: string;
   academicYearId: string;
+  // Nullable: which section of the grade this student is placed in.
+  // Not every school splits a grade into sections -- see
+  // AddClassIdToStudents migration.
+  classId: string | null;
   guardianId: string | null;
   deletedAt?: string | null;
   guardian?: Guardian | null;
   grade?: Grade | null;
+  class?: SchoolClass | null;
   academicYear?: AcademicYear | null;
 }

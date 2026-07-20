@@ -23,6 +23,7 @@ import {
   useCreateStudent,
   useGrades,
   useAcademicYears,
+  useClasses,
 } from '../hooks/useStudents';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useAuth } from '../lib/auth';
@@ -96,14 +97,12 @@ export function StudentsPage() {
   const debouncedSearch = useDebouncedValue(search, SEARCH_DEBOUNCE_MS);
   const [gradeId, setGradeId] = useState('');
   const [academicYearId, setAcademicYearId] = useState('');
-  // Sprint 3.1 — toolbar shell only. These two are intentionally NOT part
-  // of filterParams below: per the Sprint 3.1 spec, Status and Class are
-  // visual placeholders with no filtering logic yet. Class in particular
-  // has no backing field on Student today (only `grade`), so it can't be
-  // wired to a real query param until that data model question is settled
-  // — left for Sprint 3.2.
+  const [classId, setClassId] = useState('');
+  // Sprint 3.1 — toolbar shell only for status. Status is a visual
+  // placeholder with no filtering logic yet (see original Sprint 3.1
+  // notes); class *did* have this same placeholder note, but now has a
+  // real backing field (Student.classId) and a real filter below.
   const [statusFilterDisplay, setStatusFilterDisplay] = useState('');
-  const [classFilterDisplay, setClassFilterDisplay] = useState('');
   const [page, setPage] = useState(1);
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -124,6 +123,7 @@ export function StudentsPage() {
   const filterParams = {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
     ...(gradeId ? { gradeId } : {}),
+    ...(classId ? { classId } : {}),
     ...(academicYearId ? { academicYearId } : {}),
   };
 
@@ -153,6 +153,20 @@ export function StudentsPage() {
   const grades = gradesQuery.data ?? [];
   const academicYears = academicYearsQuery.data ?? [];
   const loading = studentsQuery.isLoading;
+
+  // Class filter options: scoped to whichever grade/year the admin has
+  // already picked; if no year is picked yet, fall back to the current
+  // year (classes are always scoped to one academicYearId — see
+  // Class entity on the backend — so "همه‌ی کلاس‌ها" across every year at
+  // once isn't a query the backend supports, and isn't a distinction
+  // most admins care about day-to-day anyway).
+  const currentAcademicYearId = academicYears.find((y) => y.isCurrent)?.id;
+  const classesQuery = useClasses({
+    ...(gradeId ? { gradeId } : {}),
+    academicYearId: academicYearId || currentAcademicYearId,
+  });
+  const classesForFilter = classesQuery.data ?? [];
+
 
   // Sprint 3.3 — selection state derived from the current page + selectedIds.
   // "Select all" only ever acts on the rows currently on screen (matches
@@ -195,7 +209,7 @@ export function StudentsPage() {
   // left pointing at a page that no longer exists under the new results.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, gradeId, academicYearId]);
+  }, [debouncedSearch, gradeId, classId, academicYearId]);
 
   async function handleExport() {
     setExporting(true);
@@ -209,6 +223,7 @@ export function StudentsPage() {
         allStudents.map((s) => ({
           نام: s.fullName,
           پایه: s.grade?.title ?? '',
+          کلاس: s.class?.title ?? '',
           والد: s.guardian?.fullName ?? '',
           'تلفن والد': s.guardian?.phone ?? '',
           وضعیت: statusLabels[s.status],
@@ -224,7 +239,7 @@ export function StudentsPage() {
   // Distinguishes "the roster is genuinely empty" (show an inviting
   // add-student CTA) from "a search/filter just happens to match nothing"
   // (show a plain no-results message instead).
-  const isFiltered = Boolean(debouncedSearch || gradeId || academicYearId);
+  const isFiltered = Boolean(debouncedSearch || gradeId || classId || academicYearId);
 
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   // Sprint 3.2 — presentational only, for the "نمایش X–Y از Z" pagination
@@ -282,6 +297,12 @@ export function StudentsPage() {
       header: 'پایه',
       cellClassName: 'text-ink/70 dark:text-paper/70',
       render: (s) => s.grade?.title ?? '—',
+    },
+    {
+      key: 'class',
+      header: 'کلاس',
+      cellClassName: 'text-ink/70 dark:text-paper/70',
+      render: (s) => s.class?.title ?? '—',
     },
     {
       key: 'guardian',
@@ -457,7 +478,10 @@ export function StudentsPage() {
             />
             <Select
               value={gradeId}
-              onChange={(e) => setGradeId(e.target.value)}
+              onChange={(e) => {
+                setGradeId(e.target.value);
+                setClassId(''); // a class from the previous grade no longer applies
+              }}
               options={[{ value: '', label: 'همه‌ی پایه‌ها' }, ...grades.map((g) => ({ value: g.id, label: g.title }))]}
               containerClassName="w-auto"
               aria-label="فیلتر پایه تحصیلی"
@@ -489,15 +513,17 @@ export function StudentsPage() {
               containerClassName="w-auto"
               aria-label="فیلتر وضعیت (به‌زودی)"
             />
-            {/* Sprint 3.1 — visual-only placeholder. Student has no `class`/
-                section field yet (only `grade`), so there is no real data
-                to filter by until that's added — see Sprint 3.2 notes. */}
+            {/* Real filter, wired to Student.classId — see
+                classesForFilter above for how the option list is scoped. */}
             <Select
-              value={classFilterDisplay}
-              onChange={(e) => setClassFilterDisplay(e.target.value)}
-              options={[{ value: '', label: 'همه‌ی کلاس‌ها' }]}
+              value={classId}
+              onChange={(e) => setClassId(e.target.value)}
+              options={[
+                { value: '', label: 'همه‌ی کلاس‌ها' },
+                ...classesForFilter.map((c) => ({ value: c.id, label: c.title })),
+              ]}
               containerClassName="w-auto"
-              aria-label="فیلتر کلاس (به‌زودی)"
+              aria-label="فیلتر کلاس"
             />
             <Button variant="ghost" leftIcon={<MoreFiltersIcon />}>
               فیلترهای بیشتر
@@ -585,10 +611,10 @@ export function StudentsPage() {
                   setSearch('');
                   setGradeId('');
                   setAcademicYearId('');
-                  // Visual-only placeholders from Sprint 3.1 — reset for
-                  // consistency even though they don't drive the query.
+                  setClassId('');
+                  // Visual-only placeholder from Sprint 3.1 — reset for
+                  // consistency even though it doesn't drive the query.
                   setStatusFilterDisplay('');
-                  setClassFilterDisplay('');
                 }}
               >
                 پاک کردن فیلترها
@@ -774,6 +800,7 @@ function CreateStudentForm({
   onSubmit: (dto: {
     academicYearId: string;
     gradeId: string;
+    classId?: string;
     fullName: string;
     nationalId?: string;
     enrollmentDate?: string;
@@ -783,6 +810,7 @@ function CreateStudentForm({
   const [fullName, setFullName] = useState('');
   const [gradeId, setGradeId] = useState('');
   const [academicYearId, setAcademicYearId] = useState(() => academicYears.find((y) => y.isCurrent)?.id ?? '');
+  const [classId, setClassId] = useState('');
   const [nationalId, setNationalId] = useState('');
   const [enrollmentDate, setEnrollmentDate] = useState('');
   const [guardianName, setGuardianName] = useState('');
@@ -795,14 +823,27 @@ function CreateStudentForm({
     }
   }, [academicYears]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Sections of the selected grade for the selected year -- a class
+  // belongs to exactly one (grade, academicYear) pair (see
+  // CreateStudentDto's validation on the backend), so both must be
+  // picked before this list means anything.
+  const classesQuery = useClasses(gradeId && academicYearId ? { gradeId, academicYearId } : undefined);
+  const classes = classesQuery.data ?? [];
+
+  function handleGradeChange(value: string) {
+    setGradeId(value);
+    setClassId(''); // a class from the previous grade no longer applies
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     // Matches CreateStudentDto exactly: academicYearId + gradeId are
-    // required; nationalId/enrollmentDate are optional; guardian is
-    // either an existing guardianId OR a newGuardian object, never both.
+    // required; classId/nationalId/enrollmentDate are optional; guardian
+    // is either an existing guardianId OR a newGuardian object, never both.
     onSubmit({
       academicYearId,
       gradeId,
+      classId: classId || undefined,
       fullName,
       nationalId: nationalId || undefined,
       enrollmentDate: enrollmentDate || undefined,
@@ -818,7 +859,7 @@ function CreateStudentForm({
         </Field>
 
         <Field label="پایه تحصیلی">
-          <select required value={gradeId} onChange={(e) => setGradeId(e.target.value)} className="input">
+          <select required value={gradeId} onChange={(e) => handleGradeChange(e.target.value)} className="input">
             <option value="">انتخاب کنید</option>
             {grades.map((g) => (
               <option key={g.id} value={g.id}>
@@ -837,6 +878,27 @@ function CreateStudentForm({
               </option>
             ))}
           </select>
+        </Field>
+
+        <Field label="کلاس (اختیاری)">
+          <select
+            value={classId}
+            onChange={(e) => setClassId(e.target.value)}
+            disabled={!gradeId || !academicYearId}
+            className="input"
+          >
+            <option value="">بدون کلاس مشخص</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.title}
+              </option>
+            ))}
+          </select>
+          {gradeId && academicYearId && classes.length === 0 && (
+            <p className="mt-1 text-xs text-ink/50 dark:text-paper/50">
+              برای این پایه و سال تحصیلی هنوز کلاسی ثبت نشده — از بخش تنظیمات می‌توانید کلاس اضافه کنید.
+            </p>
+          )}
         </Field>
 
         <Field label="کد ملی (اختیاری)">

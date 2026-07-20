@@ -15,6 +15,8 @@ export interface TeacherProfileView {
     id: string;
     gradeId: string;
     gradeTitle?: string;
+    classId: string | null;
+    classTitle?: string;
     subjectId: string | null;
     subjectTitle?: string;
   }>;
@@ -34,6 +36,8 @@ export function toTeacherProfileView(
       id: a.id,
       gradeId: a.gradeId,
       gradeTitle: a.grade?.title,
+      classId: a.classId,
+      classTitle: a.classId ? a.class?.title : 'کل پایه',
       subjectId: a.subjectId,
       subjectTitle: a.subject?.title,
     })),
@@ -57,6 +61,8 @@ export interface TeacherAssignmentView {
   teacherName?: string;
   gradeId: string;
   gradeTitle?: string;
+  classId: string | null;
+  classTitle?: string;
   subjectId: string | null;
   subjectTitle?: string;
   createdAt: Date;
@@ -69,6 +75,11 @@ export function toTeacherAssignmentView(assignment: TeacherAssignment): TeacherA
     teacherName: assignment.teacher?.fullName,
     gradeId: assignment.gradeId,
     gradeTitle: assignment.grade?.title,
+    classId: assignment.classId,
+    // A NULL classId means "the entire grade, every section" (see
+    // TeacherService.assign) -- give the frontend table a real label
+    // instead of leaving it to fall back to the raw id/undefined.
+    classTitle: assignment.classId ? assignment.class?.title : 'کل پایه',
     subjectId: assignment.subjectId,
     // A NULL subjectId means "all subjects" (see TeacherService.assign) --
     // give the frontend table a real label instead of leaving it to fall

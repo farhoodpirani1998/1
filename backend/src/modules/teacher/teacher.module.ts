@@ -5,6 +5,7 @@ import { User } from '../users/entities/user.entity';
 import { Student } from '../students/entities/student.entity';
 import { Grade } from '../grades/entities/grade.entity';
 import { Subject } from '../student-assessments/entities/subject.entity';
+import { Class } from '../classes/entities/class.entity';
 import { TeacherController } from './teacher.controller';
 import { TeacherService } from './teacher.service';
 import { AttendanceModule } from '../attendance/attendance.module';
@@ -32,7 +33,7 @@ import { StudentProfileModule } from '../students/profile/student-profile.module
 // those need TeacherService and a two-way import isn't needed here.
 @Module({
   imports: [
-    TypeOrmModule.forFeature([TeacherAssignment, User, Student, Grade, Subject]),
+    TypeOrmModule.forFeature([TeacherAssignment, User, Student, Grade, Subject, Class]),
     AttendanceModule,
     StudentAssessmentsModule,
     AnnouncementsModule,

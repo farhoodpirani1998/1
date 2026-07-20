@@ -29,7 +29,7 @@ import { FormError } from '../components/FormError';
 import { useToast } from '../lib/toast';
 import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
 import { formatDate } from '../lib/format';
-import { useGrades } from '../hooks/useStudents';
+import { useGrades, useClasses, useAcademicYears } from '../hooks/useStudents';
 import { useSubjects } from '../hooks/useSubjects';
 import {
   useTeacherAssignments,
@@ -46,6 +46,7 @@ export function TeacherAssignmentsPage() {
   const gradesQuery = useGrades();
   const subjectsQuery = useSubjects();
   const teachersQuery = useTeacherList();
+  const academicYearsQuery = useAcademicYears();
   const createAssignment = useCreateTeacherAssignment();
   const deleteAssignment = useDeleteTeacherAssignment();
 
@@ -53,8 +54,20 @@ export function TeacherAssignmentsPage() {
   const grades = gradesQuery.data ?? [];
   const subjects = subjectsQuery.data ?? [];
   const teachers = teachersQuery.data ?? [];
+  const academicYears = academicYearsQuery.data ?? [];
   const loading = assignmentsQuery.isLoading;
   const isError = assignmentsQuery.isError;
+
+  // TeacherAssignment itself carries no academicYearId (see the entity
+  // on the backend) -- assignments are implicitly "for the current
+  // year", the same assumption every other year-less admin surface in
+  // this app already makes. Classes are picked from the current year's
+  // sections accordingly.
+  const currentAcademicYearId = academicYears.find((y) => y.isCurrent)?.id;
+  const classesQuery = useClasses(
+    currentAcademicYearId ? { academicYearId: currentAcademicYearId } : undefined,
+  );
+  const classes = classesQuery.data ?? [];
 
   const gradeTitleById = useMemo(() => {
     const map = new Map<string, string>();
@@ -68,6 +81,12 @@ export function TeacherAssignmentsPage() {
     return map;
   }, [subjects]);
 
+  const classTitleById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of classes) map.set(c.id, c.title);
+    return map;
+  }, [classes]);
+
   const teacherNameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const t of teachers) map.set(t.id, t.fullName);
@@ -78,10 +97,10 @@ export function TeacherAssignmentsPage() {
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TeacherAssignmentView | null>(null);
 
-  function handleCreate(dto: { teacherId: string; gradeId: string; subjectId: string }) {
+  function handleCreate(dto: { teacherId: string; gradeId: string; subjectId: string; classId: string }) {
     setCreateError(null);
     createAssignment.mutate(
-      { ...dto, subjectId: dto.subjectId || undefined },
+      { ...dto, subjectId: dto.subjectId || undefined, classId: dto.classId || undefined },
       {
         onSuccess: () => {
           setShowForm(false);
@@ -119,6 +138,12 @@ export function TeacherAssignmentsPage() {
       key: 'grade',
       header: 'پایه',
       render: (a) => a.gradeTitle ?? gradeTitleById.get(a.gradeId) ?? a.gradeId,
+    },
+    {
+      key: 'classId',
+      header: 'کلاس',
+      render: (a) =>
+        a.classTitle ?? (a.classId ? classTitleById.get(a.classId) ?? a.classId : 'کل پایه'),
     },
     {
       key: 'subjectId',
@@ -161,6 +186,7 @@ export function TeacherAssignmentsPage() {
           teachers={teachers}
           grades={grades}
           subjects={subjects}
+          currentAcademicYearId={currentAcademicYearId}
           saving={createAssignment.isPending}
           error={createError}
           onSubmit={handleCreate}
@@ -209,6 +235,7 @@ function CreateAssignmentForm({
   teachers,
   grades,
   subjects,
+  currentAcademicYearId,
   saving,
   error,
   onSubmit,
@@ -216,17 +243,33 @@ function CreateAssignmentForm({
   teachers: { id: string; fullName: string }[];
   grades: { id: string; title: string }[];
   subjects: { id: string; title: string }[];
+  currentAcademicYearId?: string;
   saving: boolean;
   error: ParsedApiError | null;
-  onSubmit: (dto: { teacherId: string; gradeId: string; subjectId: string }) => void;
+  onSubmit: (dto: { teacherId: string; gradeId: string; subjectId: string; classId: string }) => void;
 }) {
   const [teacherId, setTeacherId] = useState('');
   const [gradeId, setGradeId] = useState('');
+  const [classId, setClassId] = useState('');
   const [subjectId, setSubjectId] = useState('');
+
+  // Sections of the selected grade, for the current academic year --
+  // TeacherAssignment has no academicYearId of its own (see
+  // TeacherAssignmentsPage's comment on currentAcademicYearId), so this
+  // always picks from the current year's sections.
+  const classesQuery = useClasses(
+    gradeId && currentAcademicYearId ? { gradeId, academicYearId: currentAcademicYearId } : undefined,
+  );
+  const classes = classesQuery.data ?? [];
+
+  function handleGradeChange(value: string) {
+    setGradeId(value);
+    setClassId(''); // a class from the previous grade no longer applies
+  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    onSubmit({ teacherId, gradeId, subjectId });
+    onSubmit({ teacherId, gradeId, subjectId, classId });
   }
 
   return (
@@ -245,9 +288,24 @@ function CreateAssignmentForm({
           required
           label="پایه تحصیلی"
           value={gradeId}
-          onChange={(e) => setGradeId(e.target.value)}
+          onChange={(e) => handleGradeChange(e.target.value)}
           placeholder="انتخاب پایه"
           options={grades.map((g) => ({ value: g.id, label: g.title }))}
+        />
+        <Select
+          label="کلاس"
+          value={classId}
+          onChange={(e) => setClassId(e.target.value)}
+          placeholder="کل پایه (همه کلاس‌ها)"
+          disabled={!gradeId}
+          options={classes.map((c) => ({ value: c.id, label: c.title }))}
+          helperText={
+            !gradeId
+              ? 'ابتدا پایه را انتخاب کنید.'
+              : classes.length === 0
+                ? 'برای این پایه هنوز کلاسی ثبت نشده — معلم روی کل پایه تخصیص می‌گیرد.'
+                : 'برای تخصیص روی یک بخش خاص از پایه (مثلاً هفتم-الف)، کلاس را انتخاب کنید. اگر این پایه چند کلاس دارد و هر کدام معلم جدا دارند، حتماً این فیلد را پر کنید — در غیر این صورت معلم روی تمام کلاس‌های این پایه دسترسی می‌گیرد.'
+          }
         />
         <Select
           label="درس"

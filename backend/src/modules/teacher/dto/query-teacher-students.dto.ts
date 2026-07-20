@@ -10,4 +10,10 @@ export class QueryTeacherStudentsDto {
   @IsOptional()
   @IsUUID()
   gradeId?: string;
+
+  // Same "rejected if it isn't one of the teacher's own assignments"
+  // rule as gradeId above -- see TeacherService.getMyStudents().
+  @IsOptional()
+  @IsUUID()
+  classId?: string;
 }

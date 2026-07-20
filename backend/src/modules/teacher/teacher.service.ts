@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In, IsNull } from 'typeorm';
+import { Repository, IsNull, Brackets } from 'typeorm';
 import { TeacherAssignment } from './entities/teacher-assignment.entity';
 import { User } from '../users/entities/user.entity';
 import { Student } from '../students/entities/student.entity';
 import { Grade } from '../grades/entities/grade.entity';
 import { Subject } from '../student-assessments/entities/subject.entity';
+import { Class } from '../classes/entities/class.entity';
 import { Attendance } from '../attendance/entities/attendance.entity';
 import { Assessment } from '../student-assessments/entities/assessment.entity';
 import { CreateTeacherAssignmentDto } from './dto/create-teacher-assignment.dto';
@@ -23,7 +24,7 @@ import { StudentProfileView } from '../students/profile/student-profile-view.dto
 // gradeTitle/subjectTitle. Used by both assign() and listAssignments()
 // below -- every admin-facing assignment read now carries all three
 // relations, never just grade/subject.
-const ASSIGNMENT_RELATIONS = ['teacher', 'grade', 'subject'];
+const ASSIGNMENT_RELATIONS = ['teacher', 'grade', 'subject', 'class'];
 
 @Injectable()
 export class TeacherService {
@@ -38,6 +39,8 @@ export class TeacherService {
     private readonly gradeRepo: Repository<Grade>,
     @InjectRepository(Subject)
     private readonly subjectRepo: Repository<Subject>,
+    @InjectRepository(Class)
+    private readonly classRepo: Repository<Class>,
     // AttendanceService/AssessmentsService already own every tenant check
     // and the upsert-on-resubmit business logic for their respective
     // tables -- this module only adds the extra "is this teacher actually
@@ -104,11 +107,30 @@ export class TeacherService {
       }
     }
 
+    // classId is optional -- see CreateTeacherAssignmentDto. Left out,
+    // it means this teacher covers every section of the grade (the
+    // pre-existing behavior). Given, it must be a class of this exact
+    // grade -- otherwise a class from a different grade (or a different
+    // school) could silently scope the assignment to the wrong roster.
+    if (dto.classId) {
+      const klass = await this.classRepo.findOne({ where: { id: dto.classId } });
+      if (!klass) {
+        throw new NotFoundException('کلاس یافت نشد');
+      }
+      if (klass.schoolId !== schoolId) {
+        throw new ForbiddenException('این کلاس متعلق به مدرسه دیگری است');
+      }
+      if (klass.gradeId !== dto.gradeId) {
+        throw new BadRequestException('این کلاس متعلق به این پایه نیست');
+      }
+    }
+
     const existing = await this.assignmentRepo.findOne({
       where: {
         teacherId: dto.teacherId,
         gradeId: dto.gradeId,
         subjectId: dto.subjectId ?? IsNull(),
+        classId: dto.classId ?? IsNull(),
       },
       relations: ASSIGNMENT_RELATIONS,
     });
@@ -121,6 +143,7 @@ export class TeacherService {
       teacherId: dto.teacherId,
       gradeId: dto.gradeId,
       subjectId: dto.subjectId ?? null,
+      classId: dto.classId ?? null,
     });
     const saved = await this.assignmentRepo.save(assignment);
     // save() only returns the columns TypeORM just wrote, not the
@@ -231,47 +254,93 @@ export class TeacherService {
   }
 
   /**
-   * Every student in one of the teacher's assigned grades (all of them,
-   * or one -- see QueryTeacherStudentsDto). A gradeId filter that isn't
-   * one of the teacher's own assignments is rejected the same way an
-   * out-of-tenant id is rejected elsewhere in the app (Forbidden), never
-   * silently returning an empty list that could be mistaken for "this
-   * class has no students".
+   * Every student in one of the teacher's assigned (grade, class) scopes
+   * -- all of them, or narrowed to one grade/class via
+   * QueryTeacherStudentsDto. An assignment with classId === null covers
+   * every section of that grade (the pre-existing behavior); an
+   * assignment with a real classId covers only that one section -- this
+   * is the actual fix for the bug where two teachers of two different
+   * sections of the same grade both saw the entire grade's roster.
+   *
+   * A gradeId/classId filter that isn't covered by one of the teacher's
+   * own assignments is rejected the same way an out-of-tenant id is
+   * rejected elsewhere in the app (Forbidden), never silently returning
+   * an empty list that could be mistaken for "this class has no
+   * students".
    */
   async getMyStudents(
     teacherId: string,
     schoolId: string,
     query: QueryTeacherStudentsDto,
   ): Promise<Student[]> {
-    const assignedGradeIds = await this.assignedGradeIds(teacherId, schoolId);
+    let assignments = await this.getMyAssignments(teacherId, schoolId);
 
-    let gradeIds = assignedGradeIds;
     if (query.gradeId) {
-      if (!assignedGradeIds.includes(query.gradeId)) {
+      assignments = assignments.filter((a) => a.gradeId === query.gradeId);
+      if (assignments.length === 0) {
         throw new ForbiddenException('شما به این کلاس دسترسی ندارید');
       }
-      gradeIds = [query.gradeId];
+    }
+    if (query.classId) {
+      // A whole-grade assignment (classId null) also covers a specific
+      // class filter within that grade -- it just means "every class",
+      // this one included.
+      assignments = assignments.filter(
+        (a) => a.classId === query.classId || a.classId === null,
+      );
+      if (assignments.length === 0) {
+        throw new ForbiddenException('شما به این کلاس دسترسی ندارید');
+      }
     }
 
-    if (gradeIds.length === 0) {
+    if (assignments.length === 0) {
       return [];
     }
 
-    return this.studentRepo.find({
-      where: { schoolId, gradeId: In(gradeIds) },
-      relations: ['grade'],
-      order: { fullName: 'ASC' },
-    });
+    // Whole-grade assignments (classId null) pull in every student of
+    // that grade; class-scoped assignments pull in only their own
+    // class's students. A grade already covered whole is not
+    // additionally narrowed by a class-scoped row for the same grade.
+    const wholeGradeIds = [...new Set(assignments.filter((a) => a.classId === null).map((a) => a.gradeId))];
+    const classIds = [
+      ...new Set(
+        assignments.filter((a) => a.classId !== null && !wholeGradeIds.includes(a.gradeId)).map((a) => a.classId as string),
+      ),
+    ];
+
+    if (wholeGradeIds.length === 0 && classIds.length === 0) {
+      return [];
+    }
+
+    const qb = this.studentRepo
+      .createQueryBuilder('student')
+      .leftJoinAndSelect('student.grade', 'grade')
+      .leftJoinAndSelect('student.class', 'class')
+      .where('student.schoolId = :schoolId', { schoolId })
+      .andWhere(
+        new Brackets((sub) => {
+          if (wholeGradeIds.length > 0) {
+            sub.orWhere('student.gradeId IN (:...wholeGradeIds)', { wholeGradeIds });
+          }
+          if (classIds.length > 0) {
+            sub.orWhere('student.classId IN (:...classIds)', { classIds });
+          }
+        }),
+      )
+      .orderBy('student.fullName', 'ASC');
+
+    return qb.getMany();
   }
 
   /**
    * Backs GET /teacher/students/:id/profile — the same profile card
    * (photo/info/parent phone/attendance/average/progress/homework) the
    * school_admin portal sees, scoped to a teacher's own assigned
-   * students. Same "attendance has no subject of its own" reasoning as
-   * recordAttendance() above: a teacher may open the profile of any
-   * student in any grade they're assigned to, not just grades they
-   * teach a specific subject in.
+   * students. Same (grade, class) scoping rule as recordAttendance()
+   * below: a teacher may open the profile of any student covered by one
+   * of their assignments, not just grades they teach a specific subject
+   * in -- and, for a class-scoped assignment, only students actually
+   * placed in that exact section.
    */
   async getStudentProfile(
     teacherId: string,
@@ -283,8 +352,10 @@ export class TeacherService {
       throw new NotFoundException('دانش‌آموز یافت نشد');
     }
 
-    const assignedGradeIds = await this.assignedGradeIds(teacherId, schoolId);
-    if (!assignedGradeIds.includes(student.gradeId)) {
+    const assignments = await this.assignmentRepo.find({
+      where: { teacherId, schoolId, gradeId: student.gradeId },
+    });
+    if (!assignments.some((a) => this.assignmentCoversStudent(a, student))) {
       throw new ForbiddenException('شما به کلاس این دانش‌آموز دسترسی ندارید');
     }
 
@@ -298,10 +369,16 @@ export class TeacherService {
 
   /**
    * Attendance has no subject of its own (see Attendance entity), so a
-   * teacher may take attendance for any student in any grade they're
-   * assigned to, regardless of which subject that assignment is for --
-   * matches how attendance is recorded in every other role (per class,
-   * not per subject).
+   * teacher may take attendance for any student in any (grade, class)
+   * scope they're assigned to, regardless of which subject that
+   * assignment is for -- matches how attendance is recorded in every
+   * other role (per class, not per subject).
+   *
+   * A whole-grade assignment (classId null) covers every student of that
+   * grade, same as before this fix; a class-scoped assignment covers
+   * only students placed in that exact class -- this is the gate that
+   * stops a teacher of one section from marking attendance for a
+   * different section of the same grade.
    */
   async recordAttendance(
     dto: CreateAttendanceDto,
@@ -313,8 +390,10 @@ export class TeacherService {
       throw new NotFoundException('دانش‌آموز یافت نشد');
     }
 
-    const assignedGradeIds = await this.assignedGradeIds(teacherId, schoolId);
-    if (!assignedGradeIds.includes(student.gradeId)) {
+    const assignments = await this.assignmentRepo.find({
+      where: { teacherId, schoolId, gradeId: student.gradeId },
+    });
+    if (!assignments.some((a) => this.assignmentCoversStudent(a, student))) {
       throw new ForbiddenException('شما به کلاس این دانش‌آموز دسترسی ندارید');
     }
 
@@ -326,10 +405,11 @@ export class TeacherService {
   }
 
   /**
-   * Assessments are per-subject, so the teacher must hold the exact
-   * (grade, subject) assignment matching the student's current grade and
-   * the subject in the request body -- not just any assignment for that
-   * grade like attendance above.
+   * Assessments are per-subject, so the teacher must hold an assignment
+   * matching the student's current (grade, class) scope *and* either the
+   * subject in the request body or a NULL subject ("all subjects",
+   * elementary case) -- not just any assignment for that grade/class
+   * like attendance above.
    */
   async recordAssessment(
     dto: CreateAssessmentDto,
@@ -341,17 +421,15 @@ export class TeacherService {
       throw new NotFoundException('دانش‌آموز یافت نشد');
     }
 
-    // A matching row with subjectId === dto.subjectId covers the normal
-    // case; a row with subjectId IS NULL means the teacher was assigned
-    // "all subjects" for this grade (elementary), which covers any
-    // subject too.
-    const assignment = await this.assignmentRepo.findOne({
-      where: [
-        { teacherId, schoolId, gradeId: student.gradeId, subjectId: dto.subjectId },
-        { teacherId, schoolId, gradeId: student.gradeId, subjectId: IsNull() },
-      ],
+    const assignments = await this.assignmentRepo.find({
+      where: { teacherId, schoolId, gradeId: student.gradeId },
     });
-    if (!assignment) {
+    const covered = assignments.some(
+      (a) =>
+        this.assignmentCoversStudent(a, student) &&
+        (a.subjectId === dto.subjectId || a.subjectId === null),
+    );
+    if (!covered) {
       throw new ForbiddenException('شما برای این کلاس و درس تخصیص ندارید');
     }
 
@@ -378,10 +456,22 @@ export class TeacherService {
     return result;
   }
 
-  private async assignedGradeIds(teacherId: string, schoolId: string): Promise<string[]> {
-    const assignments = await this.assignmentRepo.find({
-      where: { teacherId, schoolId },
-    });
-    return [...new Set(assignments.map((a) => a.gradeId))];
+  /**
+   * The single rule every class-scoping check in this service reduces
+   * to: a whole-grade assignment (classId null) covers any student of
+   * that grade regardless of section; a class-scoped assignment covers
+   * only a student actually placed in that exact class. A student with
+   * no classId of their own (not yet placed in a section) can only ever
+   * be covered by a whole-grade assignment, never by a specific one --
+   * there's no section to match against.
+   */
+  private assignmentCoversStudent(assignment: TeacherAssignment, student: Student): boolean {
+    if (assignment.gradeId !== student.gradeId) {
+      return false;
+    }
+    if (assignment.classId === null) {
+      return true;
+    }
+    return assignment.classId === student.classId;
   }
 }

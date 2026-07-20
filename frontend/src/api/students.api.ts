@@ -6,6 +6,7 @@ export interface QueryStudentsParams {
   search?: string;
   status?: StudentStatus;
   gradeId?: string;
+  classId?: string;
   academicYearId?: string;
   page?: number;
   limit?: number;
@@ -55,6 +56,9 @@ export function getStudent(id: string) {
 export interface CreateStudentInput {
   academicYearId: string;
   gradeId: string;
+  // Optional: which section of the grade this student is placed in --
+  // see CreateStudentDto on the backend.
+  classId?: string;
   fullName: string;
   nationalId?: string;
   enrollmentDate?: string;
@@ -65,9 +69,12 @@ export function createStudent(dto: CreateStudentInput) {
   return api.post<Student>('/students', dto);
 }
 
-// Matches UpdateStudentDto: only gradeId/status/fullName are accepted.
+// Matches UpdateStudentDto: gradeId/classId/status/fullName are the only
+// accepted fields. classId: pass null to clear a student's section, omit
+// to leave it unchanged.
 export interface UpdateStudentInput {
   gradeId?: string;
+  classId?: string | null;
   status?: StudentStatus;
   fullName?: string;
 }

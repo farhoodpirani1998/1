@@ -11,6 +11,7 @@ import * as bcrypt from 'bcrypt';
 import { Student } from './entities/student.entity';
 import { Guardian } from './entities/guardian.entity';
 import { Grade } from '../grades/entities/grade.entity';
+import { Class } from '../classes/entities/class.entity';
 import { AcademicYear } from '../academic-years/entities/academic-year.entity';
 import { User } from '../users/entities/user.entity';
 import { ParentStudent } from '../parent/entities/parent-student.entity';
@@ -110,11 +111,30 @@ export class StudentsService {
         throw new ForbiddenException('این پایه متعلق به مدرسه دیگری است');
       }
 
+      // classId is optional -- see CreateStudentDto. When given, it must
+      // be the same (grade, academicYear) pair this student is being
+      // created with, not just the same school -- otherwise a student
+      // could be placed in "هفتم-الف" while being enrolled in پایه
+      // هشتم, or in a class from a different academic year.
+      if (dto.classId) {
+        const klass = await manager.findOne(Class, { where: { id: dto.classId } });
+        if (!klass) {
+          throw new NotFoundException('کلاس یافت نشد');
+        }
+        if (klass.schoolId !== schoolId) {
+          throw new ForbiddenException('این کلاس متعلق به مدرسه دیگری است');
+        }
+        if (klass.gradeId !== dto.gradeId || klass.academicYearId !== dto.academicYearId) {
+          throw new BadRequestException('این کلاس متعلق به این پایه یا سال تحصیلی نیست');
+        }
+      }
+
       const student = manager.getRepository(Student).create({
         schoolId,
         guardianId,
         academicYearId: dto.academicYearId,
         gradeId: dto.gradeId,
+        classId: dto.classId ?? null,
         fullName: dto.fullName,
         nationalId: dto.nationalId ?? null,
         enrollmentDate: dto.enrollmentDate ?? null,
@@ -172,6 +192,7 @@ export class StudentsService {
       .createQueryBuilder('student')
       .leftJoinAndSelect('student.guardian', 'guardian')
       .leftJoinAndSelect('student.grade', 'grade')
+      .leftJoinAndSelect('student.class', 'class')
       .where('student.schoolId = :schoolId', { schoolId });
 
     if (query.status) {
@@ -179,6 +200,9 @@ export class StudentsService {
     }
     if (query.gradeId) {
       qb.andWhere('student.gradeId = :gradeId', { gradeId: query.gradeId });
+    }
+    if (query.classId) {
+      qb.andWhere('student.classId = :classId', { classId: query.classId });
     }
     if (query.academicYearId) {
       qb.andWhere('student.academicYearId = :academicYearId', {
@@ -220,7 +244,7 @@ export class StudentsService {
   async findOne(id: string, schoolId: string): Promise<Student> {
     const student = await this.studentRepo.findOne({
       where: { id, schoolId },
-      relations: ['guardian', 'grade', 'academicYear'],
+      relations: ['guardian', 'grade', 'class', 'academicYear'],
     });
     if (!student) {
       throw new NotFoundException('دانش‌آموز یافت نشد');
@@ -246,6 +270,27 @@ export class StudentsService {
       }
       if (grade.schoolId !== schoolId) {
         throw new ForbiddenException('این پایه متعلق به مدرسه دیگری است');
+      }
+    }
+
+    // classId can be set, changed, or cleared (null) -- see
+    // UpdateStudentDto. When set to a real id, it must belong to the
+    // student's resulting grade/academicYear (using dto.gradeId if this
+    // same request is also changing the grade, otherwise the student's
+    // existing grade), same consistency check create() runs.
+    if (dto.classId !== undefined && dto.classId !== null) {
+      const klass = await this.dataSource
+        .getRepository(Class)
+        .findOne({ where: { id: dto.classId } });
+      if (!klass) {
+        throw new NotFoundException('کلاس یافت نشد');
+      }
+      if (klass.schoolId !== schoolId) {
+        throw new ForbiddenException('این کلاس متعلق به مدرسه دیگری است');
+      }
+      const effectiveGradeId = dto.gradeId ?? student.gradeId;
+      if (klass.gradeId !== effectiveGradeId || klass.academicYearId !== student.academicYearId) {
+        throw new BadRequestException('این کلاس متعلق به این پایه یا سال تحصیلی نیست');
       }
     }
 

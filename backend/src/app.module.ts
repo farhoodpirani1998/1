@@ -10,6 +10,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { SchoolsModule } from './modules/schools/schools.module';
 import { AcademicYearsModule } from './modules/academic-years/academic-years.module';
 import { GradesModule } from './modules/grades/grades.module';
+import { ClassesModule } from './modules/classes/classes.module';
 import { StudentsModule } from './modules/students/students.module';
 import { ParentModule } from './modules/parent/parent.module';
 import { AttendanceModule } from './modules/attendance/attendance.module';
@@ -84,6 +85,7 @@ import { validateEnv } from './config/env.validation';
     SchoolsModule,
     AcademicYearsModule,
     GradesModule,
+    ClassesModule,
     StudentsModule,
     ParentModule,
     AttendanceModule,

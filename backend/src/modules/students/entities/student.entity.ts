@@ -11,6 +11,7 @@ import { School } from '../../schools/entities/school.entity';
 import { Guardian } from './guardian.entity';
 import { AcademicYear } from '../../academic-years/entities/academic-year.entity';
 import { Grade } from '../../grades/entities/grade.entity';
+import { Class } from '../../classes/entities/class.entity';
 
 export enum StudentStatus {
   ACTIVE = 'active',
@@ -50,6 +51,19 @@ export class Student {
 
   @Column({ name: 'grade_id' })
   gradeId: string;
+
+  // Nullable: which section/class of the grade this student is placed
+  // in, for the same academicYearId this row already carries. NULL means
+  // "not yet placed in a section" -- schools that don't split a grade
+  // into sections at all simply never set this. See migration
+  // AddClassIdToStudents for the reasoning (fixing the bug where two
+  // sections of one grade had no way to be told apart).
+  @ManyToOne(() => Class, { nullable: true })
+  @JoinColumn({ name: 'class_id' })
+  class: Class | null;
+
+  @Column({ name: 'class_id', nullable: true })
+  classId: string | null;
 
   @Column({ name: 'full_name', length: 150 })
   fullName: string;

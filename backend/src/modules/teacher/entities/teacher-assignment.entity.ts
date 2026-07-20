@@ -10,19 +10,21 @@ import { School } from '../../schools/entities/school.entity';
 import { User } from '../../users/entities/user.entity';
 import { Grade } from '../../grades/entities/grade.entity';
 import { Subject } from '../../student-assessments/entities/subject.entity';
+import { Class } from '../../classes/entities/class.entity';
 
-// One row per (teacher, grade, subject) the teacher has been assigned to
-// teach — see migration 1737000000000-TeacherAssignments for the table
-// definition and the reasoning behind this granularity. A teacher may
-// have several rows (multiple subjects, multiple grades, or both); every
-// /teacher/* read or write is scoped to only the rows that belong to the
-// caller (see TeacherService), the same way ParentStudent scopes
-// /parent/* to only a parent's own linked children.
-// No @Unique() decorator here: enforcement is via the two partial unique
-// indexes created in TeacherAssignmentSubjectOptional1737800000000
-// (uq_teacher_assignment_subject / uq_teacher_assignment_no_subject) --
-// a single column-list UNIQUE can't express "unique only when subject_id
-// IS NULL" vs "...IS NOT NULL" the way a partial index can.
+// One row per (teacher, grade, subject, class) the teacher has been
+// assigned to teach — see migration 1737000000000-TeacherAssignments for
+// the original table definition and the reasoning behind this
+// granularity. A teacher may have several rows (multiple subjects,
+// multiple grades, multiple classes, or any mix); every /teacher/* read
+// or write is scoped to only the rows that belong to the caller (see
+// TeacherService), the same way ParentStudent scopes /parent/* to only a
+// parent's own linked children.
+// No @Unique() decorator here: enforcement is via the four partial
+// unique indexes created in AddClassIdToTeacherAssignments1738000000002
+// (one per (subject_id IS NULL, class_id IS NULL) combination) -- a
+// single column-list UNIQUE can't express "unique only when X IS NULL"
+// vs "...IS NOT NULL" the way a partial index can.
 @Entity('teacher_assignments')
 export class TeacherAssignment {
   @PrimaryGeneratedColumn('uuid')
@@ -59,6 +61,19 @@ export class TeacherAssignment {
 
   @Column({ name: 'subject_id', nullable: true })
   subjectId: string | null;
+
+  // Nullable, same convention as subjectId above: a NULL class means
+  // "this teacher covers the entire grade" (the pre-existing behavior),
+  // a real classId means "this teacher is scoped to just that one
+  // section" -- the actual fix for the bug where two teachers of the
+  // same grade's two sections both saw the entire grade's roster. See
+  // migration AddClassIdToTeacherAssignments1738000000002.
+  @ManyToOne(() => Class, { nullable: true })
+  @JoinColumn({ name: 'class_id' })
+  class: Class | null;
+
+  @Column({ name: 'class_id', nullable: true })
+  classId: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

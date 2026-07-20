@@ -127,3 +127,66 @@ into this archive's `backend/.env` blindly — **set your own values in
 `backend/.env` before starting the server** (see `backend/.env.example`
 for the full list of required variables and the production-boot checks
 in `src/config/env.validation.ts`).
+
+---
+
+## Merge 2: Class/Section feature (Tuition-class-section-fix → Tuition)
+
+Merged the "کلاس" (class/section) feature from the `Tuition-class-section-fix`
+branch into this (feature-ahead) `Tuition` codebase. The class-fix branch
+was behind on frontend features (no HomeworkSubmissionsModal,
+StudentProfileModal, homework/attendance extras, error boundary, etc.),
+so this was a manual field-by-field merge rather than a file overwrite,
+to avoid losing anything already in this codebase.
+
+### Backend — added
+- New `classes` module (controller/service/module/dto/entity)
+- 3 migrations: `CreateClasses`, `AddClassIdToStudents`,
+  `AddClassIdToTeacherAssignments`
+- `app.module.ts`: registers `ClassesModule`
+- `Student` entity/DTOs: nullable `classId` + `class` relation, with
+  (grade, academicYear) consistency checks in `StudentsService`
+- `TeacherAssignment` entity/DTOs: nullable `classId` (NULL = whole
+  grade, same as before; a real id scopes the assignment to one section)
+- `TeacherService`: `assign()`, `getMyStudents()`, `recordAttendance()`,
+  `recordAssessment()` now section-aware (`assignmentCoversStudent()`
+  helper). **`getStudentProfile()` — a feature that only existed in this
+  branch, not in class-fix — was preserved and its access check updated
+  to use the same section-aware rule**, instead of being dropped.
+
+### Frontend — added
+- `api/classes.api.ts`, `hooks/useStudents.ts` (`useClasses` +
+  create/update/delete), `queryKeys.classes`
+- `types/student.types.ts`: `SchoolClass`, `Student.classId`/`Student.class`
+- `SettingsPage.tsx`: new `ClassesPanel` (scoped to grade+academicYear)
+- `StudentsPage.tsx`: class column, class filter (real, replacing the old
+  Sprint 3.1 visual-only placeholder), class picker in the create-student
+  form — merged around the existing `StudentProfileModal`/`canViewProfile`
+  feature rather than removing it
+- `TeacherAssignmentsPage.tsx`: class picker when assigning a teacher to
+  a grade (no divergent Tuition-only content in this file — copied as-is
+  from class-fix)
+- `api/teacher.api.ts`: `classId` on assignment create/view,
+  `getTeacherStudents(gradeId, classId)`
+
+### Explicitly NOT touched (verified no class-related changes existed)
+- `TeacherAssessmentsPage.tsx`, `TeacherAttendancePage.tsx`,
+  `TeacherHomeworkPage.tsx`, `TeacherStudentsPage.tsx` — the class-fix
+  branch made no class-scoping changes to these four pages; their
+  differences vs. this branch are all pre-existing Tuition-only features
+  (bulk score entry/undo-redo, previous-session copy, homework extras,
+  profile modal) and were left as-is.
+- `App.tsx`, `index.html`, `lib/auth.tsx`, `lib/theme.tsx` — differences
+  here are an unrelated error-boundary/localStorage-hardening feature
+  already in this branch; not part of the class feature, left as-is.
+
+### Verification performed
+- Manual `diff -rq` of every backend and frontend file against the
+  class-fix source after merging: remaining diffs are exclusively the
+  Tuition-only features listed above (confirmed line-by-line), nothing
+  class-related was missed.
+- Brace/paren balance check on every hand-edited file.
+- **Not run** (no network / no `node_modules` in this environment):
+  `tsc -b`, `vite build`, `nest build`. Recommend running the full build
+  + typecheck before deploying — this merge was done via careful manual
+  diffing, not a compiler-verified merge.

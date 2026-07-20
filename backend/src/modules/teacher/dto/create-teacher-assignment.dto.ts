@@ -18,4 +18,13 @@ export class CreateTeacherAssignmentDto {
   @IsOptional()
   @IsUUID()
   subjectId?: string;
+
+  // Optional: scopes this assignment to one section of the grade
+  // instead of the entire grade. Left out, TeacherService.assign() then
+  // stores classId as NULL, meaning "this teacher covers every section
+  // of this grade" -- the pre-existing behavior, unchanged for any
+  // school that doesn't split a grade into sections.
+  @IsOptional()
+  @IsUUID()
+  classId?: string;
 }
