@@ -41,6 +41,11 @@ export const queryKeys = {
     // (photo/info/parent phone/attendance/average/progress/homework)
     // shown via <StudentProfileModal/>, school_admin/accountant side.
     profile: (id: string) => [...queryKeys.students.all(), 'profile', id] as const,
+    // GET /students/:id/account — the student's own portal-login status
+    // (hasAccount/username/isActive), shown in the "حساب پرتال
+    // دانش‌آموز" section on StudentDetailPage. Distinct from `parents`
+    // above, which is parent-portal logins linked to this student.
+    account: (id: string) => [...queryKeys.students.all(), 'account', id] as const,
   },
 
   guardians: {

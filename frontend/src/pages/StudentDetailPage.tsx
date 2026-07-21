@@ -33,6 +33,9 @@ import {
   useStudentDocuments,
   useCreateStudentDocument,
   useDeleteStudentDocument,
+  useStudentAccount,
+  useProvisionStudentAccount,
+  useUpdateStudentAccount,
 } from '../hooks/useStudent';
 import { useUpdateStudent, useGrades, useAcademicYears } from '../hooks/useStudents';
 import { useStudentStatement } from '../hooks/useReports';
@@ -271,6 +274,17 @@ export function StudentDetailPage() {
       {student && (canEditStatus || user?.role === 'school_admin') && (
         <div className="mb-6">
           <StudentParentsSection studentId={student.id} canManage={canEditStatus} canDelete={user?.role === 'school_admin'} />
+        </div>
+      )}
+
+      {/* The student's own portal login (Student -> StudentUser -> User,
+          role=student) — distinct from the parent-portal logins above.
+          Matches the backend's @Roles('school_admin') on
+          GET/POST/PATCH /students/:id/account exactly (tighter than
+          canEditStatus, which also allows staff). */}
+      {student && user?.role === 'school_admin' && (
+        <div className="mb-6">
+          <StudentAccountSection studentId={student.id} />
         </div>
       )}
 
@@ -942,6 +956,203 @@ function StudentParentsSection({
         onConfirm={handleConfirmRemove}
         onCancel={() => setRemovingLinkId(null)}
       />
+    </Card>
+  );
+}
+
+// "حساب پرتال دانش‌آموز" section on StudentDetailPage: shows whether
+// this student has a portal login yet (GET /students/:id/account), a
+// form to create one (POST /students/:id/account) when they don't, and
+// — once one exists — actions to reset the password or toggle portal
+// access (PATCH /students/:id/account). All three routes are
+// @Roles('school_admin') only, so this section is only ever rendered
+// for that role (see the render call in the parent component above).
+function StudentAccountSection({ studentId }: { studentId: string }) {
+  const { showSuccess, showError } = useToast();
+  const accountQuery = useStudentAccount(studentId);
+  const provisionAccount = useProvisionStudentAccount();
+  const updateAccount = useUpdateStudentAccount();
+  const account = accountQuery.data;
+
+  const [showProvisionForm, setShowProvisionForm] = useState(false);
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [provisionError, setProvisionError] = useState<ParsedApiError | null>(null);
+  // Same "only ever available right after the mutation that set it"
+  // shape as StudentParentsSection's justCreated above — the backend
+  // never returns a plaintext password after this moment, so it only
+  // ever lives in local state.
+  const [revealedPassword, setRevealedPassword] = useState<{ username: string; password: string } | null>(null);
+
+  const [showResetForm, setShowResetForm] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetError, setResetError] = useState<ParsedApiError | null>(null);
+
+  function handleProvisionSubmit(e: FormEvent) {
+    e.preventDefault();
+    setProvisionError(null);
+    provisionAccount.mutate(
+      { studentId, dto: { username, password } },
+      {
+        onSuccess: () => {
+          showSuccess('حساب پرتال دانش‌آموز ایجاد شد');
+          setRevealedPassword({ username, password });
+          setUsername('');
+          setPassword('');
+          setShowProvisionForm(false);
+        },
+        onError: (err) => {
+          setProvisionError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
+      },
+    );
+  }
+
+  function handleResetSubmit(e: FormEvent) {
+    e.preventDefault();
+    setResetError(null);
+    updateAccount.mutate(
+      { studentId, dto: { newPassword } },
+      {
+        onSuccess: (data) => {
+          showSuccess('رمز عبور دانش‌آموز تغییر کرد');
+          setRevealedPassword({ username: data.username ?? '', password: newPassword });
+          setNewPassword('');
+          setShowResetForm(false);
+        },
+        onError: (err) => {
+          setResetError(parseApiError(err));
+          showError(getErrorMessage(err));
+        },
+      },
+    );
+  }
+
+  function toggleActive() {
+    if (!account) return;
+    updateAccount.mutate(
+      { studentId, dto: { isActive: !account.isActive } },
+      {
+        onSuccess: () => showSuccess(account.isActive ? 'دسترسی پرتال غیرفعال شد' : 'دسترسی پرتال فعال شد'),
+        onError: (err) => showError(getErrorMessage(err)),
+      },
+    );
+  }
+
+  return (
+    <Card title="حساب پرتال دانش‌آموز">
+      {revealedPassword && (
+        <div className="mb-4 rounded-lg border border-paid/30 bg-paid/10 px-3 py-2.5 text-sm text-ink dark:text-paper">
+          <div className="mb-1 font-medium">این رمز را به دانش‌آموز بدهید — بعد از این پیام دیگر قابل مشاهده نیست</div>
+          <div className="tabular">
+            نام کاربری: <span className="font-bold">{revealedPassword.username}</span> — رمز عبور:{' '}
+            <span className="font-bold">{revealedPassword.password}</span>
+          </div>
+        </div>
+      )}
+
+      {accountQuery.isLoading ? (
+        <SkeletonRows rows={2} cols={2} />
+      ) : !account?.hasAccount ? (
+        <>
+          <EmptyState message="این دانش‌آموز هنوز حساب کاربری پرتال ندارد." />
+          {showProvisionForm ? (
+            <form onSubmit={handleProvisionSubmit} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Input
+                label="نام کاربری"
+                required
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="مثال: sara.ahmadi"
+              />
+              <Input
+                label="رمز عبور"
+                required
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <div className="flex items-end gap-2 sm:col-span-1">
+                <Button type="submit" loading={provisionAccount.isPending}>
+                  ایجاد حساب
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => setShowProvisionForm(false)}>
+                  انصراف
+                </Button>
+              </div>
+              <div className="sm:col-span-3">
+                <FormError error={provisionError} />
+              </div>
+            </form>
+          ) : (
+            <div className="mt-4">
+              <Button variant="ghost" size="sm" onClick={() => setShowProvisionForm(true)}>
+                ایجاد حساب پرتال
+              </Button>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="divide-y divide-line dark:divide-white/10">
+            <InfoRow label="نام کاربری" value={account.username ?? '—'} />
+            <InfoRow
+              label="وضعیت دسترسی"
+              value={
+                <span
+                  className={`badge ${
+                    account.isActive
+                      ? 'bg-paid/10 text-paid border-paid/25'
+                      : 'bg-overdue/10 text-overdue border-overdue/25'
+                  }`}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                  {account.isActive ? 'فعال' : 'غیرفعال'}
+                </span>
+              }
+            />
+            {account.createdAt && <InfoRow label="تاریخ ایجاد" value={formatDate(account.createdAt)} />}
+          </div>
+
+          {showResetForm ? (
+            <form onSubmit={handleResetSubmit} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <Input
+                label="رمز عبور جدید"
+                required
+                minLength={8}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <div className="flex items-end gap-2 sm:col-span-2">
+                <Button type="submit" loading={updateAccount.isPending}>
+                  تنظیم رمز
+                </Button>
+                <Button type="button" variant="secondary" onClick={() => setShowResetForm(false)}>
+                  انصراف
+                </Button>
+              </div>
+              <div className="sm:col-span-3">
+                <FormError error={resetError} />
+              </div>
+            </form>
+          ) : (
+            <div className="mt-4 flex gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setShowResetForm(true)}>
+                تنظیم رمز جدید
+              </Button>
+              <Button
+                variant={account.isActive ? 'secondary' : 'primary'}
+                size="sm"
+                loading={updateAccount.isPending}
+                onClick={toggleActive}
+              >
+                {account.isActive ? 'غیرفعال کردن دسترسی' : 'فعال کردن دسترسی'}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
     </Card>
   );
 }

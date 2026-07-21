@@ -52,7 +52,7 @@ export function toParentSearchResult(guardian: Guardian): ParentSearchResult {
 export interface TeacherSearchResult {
   id: string;
   fullName: string;
-  phone: string;
+  phone: string | null;
 }
 
 export function toTeacherSearchResult(teacher: User): TeacherSearchResult {

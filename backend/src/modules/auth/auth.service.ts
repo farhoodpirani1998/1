@@ -205,7 +205,7 @@ export class AuthService {
       await this.userRepo.save(user);
 
       await this.smsProviderService.send({
-        to: user.phone,
+        to: dto.phone,
         text: `کد بازیابی رمز عبور شما: ${code}\nاین کد تا ${RESET_CODE_TTL_MINUTES} دقیقه معتبر است.`,
       });
     }

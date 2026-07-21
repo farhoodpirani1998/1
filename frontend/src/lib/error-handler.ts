@@ -42,6 +42,8 @@ const FIELD_LABELS: Record<string, string> = {
   fullName: 'نام و نام خانوادگی',
   phone: 'شماره تلفن',
   password: 'رمز عبور',
+  username: 'نام کاربری',
+  newPassword: 'رمز عبور جدید',
   nationalId: 'کد ملی',
   enrollmentDate: 'تاریخ ثبت‌نام',
   gradeId: 'پایه تحصیلی',

@@ -8,7 +8,7 @@ import { User } from '../../users/entities/user.entity';
 export interface FounderStaffMemberView {
   id: string;
   fullName: string;
-  phone: string;
+  phone: string | null;
   role: string;
   isActive: boolean;
   createdAt: Date;

@@ -23,8 +23,13 @@ export class User {
   @Column({ name: 'full_name', type: 'varchar', length: 150 })
   fullName: string;
 
-  @Column({ type: 'varchar', length: 20, unique: true })
-  phone: string;
+  // Nullable as of MakeUserPhoneNullable migration: every non-student role
+  // still requires and sets this at the application layer (see
+  // RegisterDto, CreateStudentParentDto, UpdateUserDto), but a
+  // student-role login (see `username` below) authenticates without a
+  // phone number, so the DB itself can no longer demand one.
+  @Column({ type: 'varchar', length: 20, unique: true, nullable: true })
+  phone: string | null;
 
   // ADR-001 Task 3A: second login identifier, alongside (not instead of)
   // `phone` -- used by student-role logins today, but not restricted to

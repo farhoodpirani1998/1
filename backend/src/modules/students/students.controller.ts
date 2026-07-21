@@ -16,6 +16,7 @@ import { UpdateStudentDto } from './dto/update-student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
 import { CreateStudentParentDto } from './dto/create-student-parent.dto';
 import { ProvisionStudentAccountDto } from './dto/provision-student-account.dto';
+import { UpdateStudentAccountDto } from './dto/update-student-account.dto';
 import { BulkImportStudentsDto } from './dto/bulk-import-students.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -139,6 +140,34 @@ export class StudentsController {
     @CurrentUser('schoolId') schoolId: string,
   ) {
     return this.studentsService.provisionStudentAccount(id, dto, schoolId);
+  }
+
+  // Read-only status behind the "حساب پرتال دانش‌آموز" card on
+  // StudentDetailPage — same role gate as provisionAccount() above,
+  // since account existence/username/active-state is the same
+  // sensitivity class as creating the account in the first place.
+  @Get(':id/account')
+  @Roles('school_admin')
+  getAccount(
+    @Param('id') id: string,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    return this.studentsService.getAccountStatus(id, schoolId);
+  }
+
+  // Resets the student's portal password and/or toggles portal access —
+  // same role gate as provisionAccount()/getAccount() above. Both
+  // fields are optional on UpdateStudentAccountDto so this one route
+  // serves the "تنظیم رمز جدید" and "فعال/غیرفعال کردن دسترسی" actions
+  // in the admin UI without needing two separate routes.
+  @Patch(':id/account')
+  @Roles('school_admin')
+  updateAccount(
+    @Param('id') id: string,
+    @Body() dto: UpdateStudentAccountDto,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    return this.studentsService.updateAccount(id, dto, schoolId);
   }
 
   @Patch(':id')

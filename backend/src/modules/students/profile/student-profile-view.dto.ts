@@ -31,7 +31,7 @@ import { Homework } from '../../homework/entities/homework.entity';
 export interface StudentProfileParent {
   id: string;
   fullName: string;
-  phone: string;
+  phone: string | null;
   /**
    * 'guardian' — the contact-of-record captured on the student record
    * itself (students.guardian_id), used for admin/billing purposes.

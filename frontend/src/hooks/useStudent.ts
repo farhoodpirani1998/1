@@ -7,7 +7,12 @@ import {
   addStudentParent,
   getStudentParents,
   getStudentProfile,
+  getStudentAccount,
+  provisionStudentAccount,
+  updateStudentAccount,
   type AddStudentParentInput,
+  type ProvisionStudentAccountInput,
+  type UpdateStudentAccountInput,
 } from '../api/students.api';
 import { unlinkParentStudent } from '../api/parent.api';
 import {
@@ -104,5 +109,44 @@ export function useStudentProfile(id: string | undefined) {
     queryKey: queryKeys.students.profile(id ?? ''),
     queryFn: () => getStudentProfile(id as string).then((res) => res.data),
     enabled: !!id,
+  });
+}
+
+// GET /students/:id/account — the "حساب پرتال دانش‌آموز" section on
+// StudentDetailPage. Same "id or disabled" shape as useStudent/
+// useStudentProfile above.
+export function useStudentAccount(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.students.account(id ?? ''),
+    queryFn: () => getStudentAccount(id as string).then((res) => res.data),
+    enabled: !!id,
+  });
+}
+
+// POST /students/:id/account — creates the student's portal login.
+// Invalidates just this student's account-status query; nothing else
+// embeds account data.
+export function useProvisionStudentAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ studentId, dto }: { studentId: string; dto: ProvisionStudentAccountInput }) =>
+      provisionStudentAccount(studentId, dto).then((res) => res.data),
+    onSuccess: (_data, { studentId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.students.account(studentId) });
+    },
+  });
+}
+
+// PATCH /students/:id/account — resets the student's password and/or
+// toggles portal access. Same invalidation footprint as
+// useProvisionStudentAccount above.
+export function useUpdateStudentAccount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ studentId, dto }: { studentId: string; dto: UpdateStudentAccountInput }) =>
+      updateStudentAccount(studentId, dto).then((res) => res.data),
+    onSuccess: (_data, { studentId }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.students.account(studentId) });
+    },
   });
 }

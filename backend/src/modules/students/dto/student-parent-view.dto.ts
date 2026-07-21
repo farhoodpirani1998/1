@@ -9,7 +9,7 @@ export interface StudentParentView {
   linkId: string;
   id: string;
   fullName: string;
-  phone: string;
+  phone: string | null;
   isActive: boolean;
 }
 

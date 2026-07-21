@@ -10,7 +10,7 @@ export interface FounderTeacherAssignmentView {
 export interface FounderTeacherView {
   id: string;
   fullName: string;
-  phone: string;
+  phone: string | null;
   isActive: boolean;
   createdAt: Date;
   assignments: FounderTeacherAssignmentView[];

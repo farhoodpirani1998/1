@@ -24,6 +24,8 @@ import { UpdateStudentDto } from './dto/update-student.dto';
 import { QueryStudentsDto } from './dto/query-students.dto';
 import { CreateStudentParentDto } from './dto/create-student-parent.dto';
 import { ProvisionStudentAccountDto } from './dto/provision-student-account.dto';
+import { UpdateStudentAccountDto } from './dto/update-student-account.dto';
+import { StudentAccountView } from './dto/student-account-view.dto';
 import {
   StudentParentView,
   toStudentParentView,
@@ -49,6 +51,8 @@ export class StudentsService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(ParentStudent)
     private readonly parentStudentRepo: Repository<ParentStudent>,
+    @InjectRepository(StudentUser)
+    private readonly studentUserRepo: Repository<StudentUser>,
     private readonly guardiansService: GuardiansService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
@@ -413,6 +417,16 @@ export class StudentsService {
    * User + StudentUser are created together in one transaction: either
    * both rows exist afterward, or neither does -- never a User with no
    * matching link, or vice versa.
+   *
+   * The pre-checks above are a UX nicety (a clear Persian message instead
+   * of a raw DB error), not the actual guarantee -- two concurrent
+   * requests can both pass them before either commits. The real
+   * guarantee is the unique constraints themselves (uq_student_users_
+   * student, uq_student_users_user, uq_users_username), so a 23505 from
+   * either one is caught below and re-thrown as the same kind of
+   * ConflictException the pre-check would have given a non-racing
+   * caller, keyed off which constraint actually fired rather than
+   * guessing from request order.
    */
   async provisionStudentAccount(
     studentId: string,
@@ -423,38 +437,149 @@ export class StudentsService {
     // user/link is created -- same check addParent() runs first.
     const student = await this.findOne(studentId, schoolId);
 
-    return this.dataSource.transaction(async (manager) => {
-      const userRepo = manager.getRepository(User);
-      const studentUserRepo = manager.getRepository(StudentUser);
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const userRepo = manager.getRepository(User);
+        const studentUserRepo = manager.getRepository(StudentUser);
 
-      const existingLink = await studentUserRepo.findOne({ where: { studentId } });
-      if (existingLink) {
-        throw new ConflictException('این دانش‌آموز قبلاً دارای حساب کاربری است');
+        const existingLink = await studentUserRepo.findOne({ where: { studentId } });
+        if (existingLink) {
+          throw new ConflictException('این دانش‌آموز قبلاً دارای حساب کاربری است');
+        }
+
+        const existingUsername = await userRepo.findOne({ where: { username: dto.username } });
+        if (existingUsername) {
+          throw new ConflictException('این نام کاربری قبلاً استفاده شده است');
+        }
+
+        const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+        const user = await userRepo.save(
+          userRepo.create({
+            schoolId,
+            fullName: student.fullName,
+            username: dto.username,
+            passwordHash,
+            role: Role.STUDENT,
+            isActive: true,
+          }),
+        );
+
+        const studentUser = await studentUserRepo.save(
+          studentUserRepo.create({ studentId, userId: user.id }),
+        );
+
+        const { passwordHash: _drop, ...safeUser } = user;
+        return { user: safeUser, studentUserId: studentUser.id };
+      });
+    } catch (err) {
+      if (err instanceof ConflictException) {
+        throw err;
       }
-
-      const existingUsername = await userRepo.findOne({ where: { username: dto.username } });
-      if (existingUsername) {
-        throw new ConflictException('این نام کاربری قبلاً استفاده شده است');
+      // Postgres unique_violation. `constraint` names the exact index
+      // that fired, so the race is reported the same way the pre-check
+      // would have reported it, not with one generic message for both
+      // cases.
+      const code = (err as { code?: string })?.code;
+      const constraint = (err as { constraint?: string })?.constraint;
+      if (code === '23505') {
+        if (constraint === 'uq_users_username') {
+          throw new ConflictException('این نام کاربری قبلاً استفاده شده است');
+        }
+        if (constraint === 'uq_student_users_student' || constraint === 'uq_student_users_user') {
+          throw new ConflictException('این دانش‌آموز قبلاً دارای حساب کاربری است');
+        }
       }
+      throw err;
+    }
+  }
 
-      const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
-      const user = await userRepo.save(
-        userRepo.create({
-          schoolId,
-          fullName: student.fullName,
-          username: dto.username,
-          passwordHash,
-          role: Role.STUDENT,
-          isActive: true,
-        }),
-      );
+  /**
+   * GET /students/:id/account — school_admin: the read-only status
+   * summary behind the "حساب پرتال دانش‌آموز" card on StudentDetailPage.
+   * Same tenant check as findOne()/provisionStudentAccount() elsewhere in
+   * this service; hasAccount: false (with every other field null) is the
+   * normal, non-error shape for a student that was never provisioned,
+   * not a 404 — the student itself exists, it's the login that's absent.
+   */
+  async getAccountStatus(studentId: string, schoolId: string): Promise<StudentAccountView> {
+    await this.findOne(studentId, schoolId);
 
-      const studentUser = await studentUserRepo.save(
-        studentUserRepo.create({ studentId, userId: user.id }),
-      );
+    const link = await this.studentUserRepo.findOne({ where: { studentId } });
+    if (!link) {
+      return { hasAccount: false, username: null, isActive: null, createdAt: null };
+    }
 
-      const { passwordHash: _drop, ...safeUser } = user;
-      return { user: safeUser, studentUserId: studentUser.id };
-    });
+    const user = await this.userRepo.findOne({ where: { id: link.userId } });
+    if (!user) {
+      // StudentUser.userId is a foreign key with no cascading delete
+      // (see StudentUser entity) -- this shouldn't happen in practice,
+      // but if the linked User row were ever removed out-of-band, treat
+      // it the same as "never provisioned" rather than throwing.
+      return { hasAccount: false, username: null, isActive: null, createdAt: null };
+    }
+
+    return {
+      hasAccount: true,
+      username: user.username,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    };
+  }
+
+  /**
+   * PATCH /students/:id/account — school_admin: resets the student's
+   * portal password and/or toggles their portal access, in any
+   * combination (see UpdateStudentAccountDto). Same tenant check as
+   * getAccountStatus()/provisionStudentAccount() above. 404s if this
+   * student has never been provisioned an account -- there is nothing
+   * here to reset or toggle, same "can't edit what doesn't exist" shape
+   * as update()/findOne() elsewhere in this service.
+   *
+   * Bumps tokenVersion on either change, same reasoning as
+   * UsersService.update()/resetPassword(): a password reset or a
+   * disable must invalidate any JWT already issued to this student,
+   * rather than leaving an existing session valid until it naturally
+   * expires.
+   */
+  async updateAccount(
+    studentId: string,
+    dto: UpdateStudentAccountDto,
+    schoolId: string,
+  ): Promise<StudentAccountView> {
+    await this.findOne(studentId, schoolId);
+
+    const link = await this.studentUserRepo.findOne({ where: { studentId } });
+    if (!link) {
+      throw new NotFoundException('این دانش‌آموز حساب کاربری ندارد');
+    }
+
+    const user = await this.userRepo.findOne({ where: { id: link.userId } });
+    if (!user) {
+      throw new NotFoundException('این دانش‌آموز حساب کاربری ندارد');
+    }
+
+    let changed = false;
+
+    if (dto.newPassword !== undefined) {
+      user.passwordHash = await bcrypt.hash(dto.newPassword, BCRYPT_ROUNDS);
+      changed = true;
+    }
+
+    if (dto.isActive !== undefined && dto.isActive !== user.isActive) {
+      user.isActive = dto.isActive;
+      changed = true;
+    }
+
+    if (changed) {
+      user.tokenVersion += 1;
+      await this.userRepo.save(user);
+    }
+
+    return {
+      hasAccount: true,
+      username: user.username,
+      isActive: user.isActive,
+      createdAt: user.createdAt,
+    };
   }
 }

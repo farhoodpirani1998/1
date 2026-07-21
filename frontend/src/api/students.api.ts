@@ -154,3 +154,44 @@ export function restoreStudent(id: string) {
 export function getStudentProfile(id: string) {
   return api.get<StudentProfileView>(`/students/${id}/profile`);
 }
+
+// Student Account Management — POST/GET/PATCH /students/:id/account
+// (@Roles('school_admin') only, all three). Manages the single
+// student-role login this student may have (Student -> StudentUser ->
+// User, see backend StudentUser entity) for the /student/* portal —
+// distinct from AddStudentParentInput/StudentParentLink above, which
+// manage parent-portal logins instead.
+export interface StudentAccountStatus {
+  hasAccount: boolean;
+  username: string | null;
+  isActive: boolean | null;
+  createdAt: string | null;
+}
+
+// Matches ProvisionStudentAccountDto: username + password only —
+// schoolId/fullName/role are derived server-side from the Student
+// record and the caller's own school.
+export interface ProvisionStudentAccountInput {
+  username: string;
+  password: string;
+}
+
+export function getStudentAccount(studentId: string) {
+  return api.get<StudentAccountStatus>(`/students/${studentId}/account`);
+}
+
+export function provisionStudentAccount(studentId: string, dto: ProvisionStudentAccountInput) {
+  return api.post<StudentAccountStatus>(`/students/${studentId}/account`, dto);
+}
+
+// Matches UpdateStudentAccountDto: both optional, any combination —
+// { newPassword } resets credentials, { isActive } enables/disables
+// portal access, both together does both in one request.
+export interface UpdateStudentAccountInput {
+  isActive?: boolean;
+  newPassword?: string;
+}
+
+export function updateStudentAccount(studentId: string, dto: UpdateStudentAccountInput) {
+  return api.patch<StudentAccountStatus>(`/students/${studentId}/account`, dto);
+}

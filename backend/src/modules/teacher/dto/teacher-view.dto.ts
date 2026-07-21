@@ -8,7 +8,7 @@ import { TeacherAssignment } from '../entities/teacher-assignment.entity';
 export interface TeacherProfileView {
   id: string;
   fullName: string;
-  phone: string;
+  phone: string | null;
   schoolId: string;
   isActive: boolean;
   assignments: Array<{
@@ -97,7 +97,7 @@ export function toTeacherAssignmentView(assignment: TeacherAssignment): TeacherA
 export interface TeacherListItemView {
   id: string;
   fullName: string;
-  phone: string;
+  phone: string | null;
   isActive: boolean;
 }
 
