@@ -1,4 +1,4 @@
-node_modules
-dist/
-.env
-uploads/
+# Local database backups (scripts/backup.sh, scripts/restore.sh). These can
+# contain real student/school data and must never be committed.
+/backups/
+*.sql.gz

@@ -98,6 +98,13 @@ Migrations are **never** run automatically on container start
 them explicitly as a one-off step before rolling out a new image, the same
 way `npm run migration:run` works outside Docker.
 
+## Backup & restore
+
+Database backup and restore is covered separately in
+[`BACKUP_RESTORE.md`](BACKUP_RESTORE.md) — covers `scripts/backup.sh` /
+`scripts/restore.sh`, cron scheduling, the recovery procedure, and RPO/RTO
+expectations.
+
 ## Production-safe defaults reviewed in this phase
 
 - **`trust proxy`** is enabled in production (`main.ts`) so Express (and

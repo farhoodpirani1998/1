@@ -18,3 +18,8 @@ docs
 docker-compose*.yml
 Dockerfile
 .dockerignore
+
+# Local database backups (scripts/backup.sh) — never bake real data dumps
+# into an image layer.
+backups
+*.sql.gz
