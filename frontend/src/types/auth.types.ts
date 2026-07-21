@@ -37,6 +37,13 @@ export interface AuthUser {
   schoolId: string;
   role: UserRole;
   fullName: string;
+  // Sprint P1 — Universal Avatar System. Mirrors User.avatarUrl on the
+  // backend (relative URL under /uploads/avatars, see
+  // AddAvatarUrlToUsers migration + AvatarStorageService). Null for
+  // every user who hasn't uploaded a photo — every consumer (Avatar
+  // component) already falls back to the initial-letter placeholder in
+  // that case.
+  avatarUrl: string | null;
 }
 
 // POST /auth/login and /auth/register both return the same shape:

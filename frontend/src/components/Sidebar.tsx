@@ -3,6 +3,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useSchoolSettings } from '../hooks/useSchoolSettings';
 import type { UserRole } from '../types/auth.types';
+import { Avatar } from './Avatar';
 import {
   DashboardIcon,
   StudentsIcon,
@@ -429,9 +430,12 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
 
       {user && (
         <div className="flex items-center gap-3 border-t border-white/[0.06] px-4 py-4">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">
-            {user.fullName?.charAt(0) ?? '?'}
-          </div>
+          <Avatar
+            avatarUrl={user.avatarUrl}
+            fullName={user.fullName}
+            shape="circle"
+            colorClassName="bg-white/10 text-white"
+          />
           <div className="min-w-0">
             <div className="truncate text-xs font-medium text-white/85">{user.fullName}</div>
             <div className="truncate text-[11px] text-white/40">{roleLabels[user.role] ?? user.role}</div>

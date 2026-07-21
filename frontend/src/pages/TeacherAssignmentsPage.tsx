@@ -19,7 +19,9 @@
 
 import { useMemo, useState, FormEvent } from 'react';
 import { Card } from '../components/Card';
-import { PageHeader } from '../components/PageHeader';
+import { WorkspaceHeader } from '../components/WorkspaceHeader';
+import { FilterBar } from '../components/FilterBar';
+import { DensityToggle, type TableDensity } from '../components/DensityToggle';
 import { Table, type TableColumn } from '../components/Table';
 import { Button } from '../components/Button';
 import { Select } from '../components/Select';
@@ -28,9 +30,10 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { FormError } from '../components/FormError';
 import { useToast } from '../lib/toast';
 import { parseApiError, getErrorMessage, ParsedApiError } from '../lib/error-handler';
-import { formatDate } from '../lib/format';
+import { formatDate, toPersianDigits } from '../lib/format';
 import { useGrades, useClasses, useAcademicYears } from '../hooks/useStudents';
 import { useSubjects } from '../hooks/useSubjects';
+import { AlertIcon, TeacherIcon } from '../components/icons/SchoolIcons';
 import {
   useTeacherAssignments,
   useCreateTeacherAssignment,
@@ -96,6 +99,10 @@ export function TeacherAssignmentsPage() {
   const [showForm, setShowForm] = useState(false);
   const [createError, setCreateError] = useState<ParsedApiError | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TeacherAssignmentView | null>(null);
+  // Sprint A3.1 — Workspace Toolbar "View controls", same presentational-
+  // only density switch the Student Workspace uses (Table already
+  // supports this prop; no query/filter/sort change of any kind).
+  const [density, setDensity] = useState<TableDensity>('comfortable');
 
   function handleCreate(dto: { teacherId: string; gradeId: string; subjectId: string; classId: string }) {
     setCreateError(null);
@@ -154,12 +161,21 @@ export function TeacherAssignmentsPage() {
     {
       key: 'createdAt',
       header: 'تاریخ ثبت',
-      cellClassName: 'text-ink/60 dark:text-paper/60',
+      // Sprint A3.1 (task 6) — same "hide the least essential column below
+      // sm" treatment the Student Workspace already applies to its
+      // guardian column, to reduce crowding on small screens. Data is
+      // unchanged and still visible at sm and up.
+      headerClassName: 'hidden sm:table-cell',
+      cellClassName: 'hidden sm:table-cell text-ink/60 dark:text-paper/60',
       render: (a) => formatDate(a.createdAt),
     },
     {
       key: 'actions',
-      header: '',
+      // Sprint A3.1 (task 4) — sr-only label so the blank header still
+      // announces something to screen readers, same treatment already
+      // applied to the Student Workspace's actions column. Row action
+      // itself (the "حذف" button below) is untouched.
+      header: <span className="sr-only">عملیات</span>,
       align: 'left',
       render: (a) => (
         <Button variant="danger" size="sm" onClick={() => setDeleteTarget(a)}>
@@ -169,12 +185,25 @@ export function TeacherAssignmentsPage() {
     },
   ];
 
+  const teacherCount = teachers.length;
+
   return (
     <div className="fade-in">
-      <PageHeader
+      {/* Sprint A3.1 (Teacher Workspace) — structured header via the same
+          shared <WorkspaceHeader/> the Student Workspace uses (task 1).
+          Count badge is the school's teacher roster size — already
+          fetched via useTeacherList() for the create-form's picker below,
+          so this is existing data, not a new query. There's no secondary,
+          page-level action analogous to Students' "غیرفعال‌ها" link here
+          (no archived-teachers view exists), so that slot is simply
+          omitted rather than filled with a placeholder. */}
+      <WorkspaceHeader
         title="تخصیص معلمان"
-        description="مدیریت تخصیص معلمان به پایه‌ها و دروس"
-        actions={
+        subtitle="مدیریت تخصیص معلمان به پایه‌ها و دروس"
+        countLabel={teachersQuery.isLoading ? '…' : `${toPersianDigits(teacherCount)} معلم`}
+        countIcon={<TeacherIcon size={12} />}
+        countAriaLabel="تعداد کل معلمان"
+        primaryAction={
           <Button variant={showForm ? 'secondary' : 'primary'} onClick={() => setShowForm((v) => !v)}>
             {showForm ? 'انصراف' : '+ تخصیص جدید'}
           </Button>
@@ -194,8 +223,40 @@ export function TeacherAssignmentsPage() {
       )}
 
       <Card className="mt-6">
+        {/* Sprint A3.1 (task 2) — Workspace Toolbar. This page has no
+            search box or filter controls today (GET /teacher/assignments
+            takes only an optional teacherId no UI ever set — see
+            useTeacherAssignments above), so per this sprint's "do not add
+            new filters" constraint, the Search/Filters sections are left
+            out entirely rather than filled with non-functional controls.
+            Only the View controls section (density, identical to the
+            Student Workspace's) has something real to show; Workspace
+            actions live in the header above ("+ تخصیص جدید") rather than
+            being duplicated here.
+            Sprint A3.2 (task 6) — this row now renders through the shared
+            <FilterBar/> instead of a hand-rolled div that duplicated its
+            exact layout classes; the row count also shows a loading
+            ellipsis (matching the header's own countLabel convention)
+            and announces itself via aria-live so screen-reader users hear
+            the updated count after a create/delete without a full re-read
+            of the page. Purely presentational — no filter, sort, or query
+            behavior is attached to this row. */}
+        <FilterBar
+          className="border-b border-line pb-4 dark:border-white/10"
+          actions={<DensityToggle value={density} onChange={setDensity} />}
+        >
+          <span className="text-xs font-medium text-ink/45 dark:text-paper/45" aria-live="polite">
+            {loading ? '…' : `${toPersianDigits(assignments.length)} تخصیص`}
+          </span>
+        </FilterBar>
+
+        {/* Sprint A3.1 (task 5) — error state polished with the same
+            AlertIcon + retry convention already used on the Student
+            Workspace, instead of the generic default icon. Retry reuses
+            the query's own existing refetch — no new request type. */}
         {isError ? (
           <EmptyState
+            icon={<AlertIcon size={28} />}
             message="خطا در بارگذاری تخصیص‌ها"
             description="ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید."
             action={
@@ -206,11 +267,14 @@ export function TeacherAssignmentsPage() {
           />
         ) : (
           <Table
+            stickyHeader
+            density={density}
             columns={columns}
             data={assignments}
             rowKey={(a) => a.id}
             loading={loading}
             skeletonRows={5}
+            emptyIcon={<TeacherIcon size={28} />}
             emptyMessage="هنوز تخصیصی ثبت نشده است."
             emptyDescription="برای شروع، از دکمه «تخصیص جدید» استفاده کنید."
           />

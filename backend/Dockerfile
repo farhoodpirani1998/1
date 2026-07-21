@@ -52,6 +52,16 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 COPY package.json ./
 
+# Sprint P1 — Universal Avatar System. docker-compose.yml mounts the
+# named `avatar-uploads` volume at AVATAR_UPLOAD_DIR=/data/avatars. A
+# brand-new named volume is initialized from whatever already exists at
+# that path in the image; since nothing did, Docker would otherwise
+# create it owned by root, and AvatarStorageService's fs.mkdir/writeFile
+# (running as the unprivileged `node` user below) would fail with EACCES
+# on every upload. Pre-creating it here with `node` ownership means the
+# volume inherits the right permissions the first time it's mounted.
+RUN mkdir -p /data/avatars && chown node:node /data/avatars
+
 # The base image already ships an unprivileged `node` user (uid 1000) —
 # use it instead of running the server as root.
 USER node

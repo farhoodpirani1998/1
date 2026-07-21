@@ -1,12 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { AppLogger } from './common/logging/app-logger.service';
+import { AVATAR_URL_PREFIX, resolveAvatarUploadDir } from './common/storage/avatar-storage.service';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // Structured (JSON in production, pretty in dev) logger — see
     // app-logger.service.ts. bufferLogs holds Nest's own bootstrap log
     // lines until this logger is ready, so nothing gets lost/printed via
@@ -32,6 +34,22 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   app.use(helmet());
+
+  // Sprint P1 — Universal Avatar System. Serves whatever
+  // AvatarStorageService writes to disk (see common/storage/avatar-storage.service.ts)
+  // back out at the same AVATAR_URL_PREFIX stored on User.avatarUrl.
+  //
+  // helmet()'s default Cross-Origin-Resource-Policy ('same-origin') would
+  // otherwise block the frontend — a different origin per CORS_ORIGINS —
+  // from actually rendering these images in an <img> tag, even though
+  // enableCors() above already allows the request itself. Only this one
+  // static route relaxes it; every other response keeps helmet's default.
+  app.useStaticAssets(resolveAvatarUploadDir(), {
+    prefix: AVATAR_URL_PREFIX,
+    setHeaders: (res) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  });
 
   const configuredOrigins = process.env.CORS_ORIGINS?.split(',').map((o) => o.trim()).filter(Boolean);
 

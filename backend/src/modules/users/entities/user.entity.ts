@@ -71,4 +71,14 @@ export class User {
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
+
+  // Sprint P1 — Universal Avatar System. Relative URL into the static
+  // /uploads/avatars route (see AvatarStorageService + main.ts), never
+  // the image bytes themselves -- same "reference, not bytes" shape as
+  // StudentDocument.fileUrl. NULL means no photo has been uploaded; every
+  // frontend avatar component already falls back to an initial-letter
+  // placeholder in that case, so this column is a pure addition with no
+  // behavior change for existing users.
+  @Column({ name: 'avatar_url', type: 'varchar', length: 2000, nullable: true })
+  avatarUrl: string | null;
 }

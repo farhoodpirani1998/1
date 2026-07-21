@@ -120,6 +120,12 @@ export const queryKeys = {
     list: () => [...queryKeys.users.all(), 'list'] as const,
   },
 
+  // Sprint A3 — My Profile. GET/PATCH /users/me — single-shot "my own
+  // record" read, same shape as queryKeys.teacher.profile().
+  myProfile: {
+    all: () => ['myProfile'] as const,
+  },
+
   tuitionPlans: {
     all: () => ['tuitionPlans'] as const,
     detail: (id: string) => [...queryKeys.tuitionPlans.all(), 'detail', id] as const,

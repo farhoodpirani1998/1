@@ -38,3 +38,14 @@ export interface RegisterUserInput {
 export function register(dto: RegisterUserInput) {
   return api.post('/auth/register', dto);
 }
+
+// Sprint A3 — My Profile. POST /auth/change-password — any authenticated
+// role (see AuthController.changePassword), already existed on the
+// backend with no frontend caller until now.
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+export function changePassword(dto: ChangePasswordInput) {
+  return api.post<{ success: true }>('/auth/change-password', dto);
+}

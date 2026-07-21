@@ -30,6 +30,9 @@ import { useAuth } from '../lib/auth';
 import { UsersIcon, CheckIcon, AlertIcon, CalendarIcon, ChevronEnterIcon } from '../components/icons/SchoolIcons';
 import { BulkImportStudentsPanel } from '../components/BulkImportStudentsPanel';
 import { StudentProfileModal } from '../components/StudentProfileModal';
+import { EmptyState } from '../components/EmptyState';
+import { WorkspaceHeader } from '../components/WorkspaceHeader';
+import { DensityToggle } from '../components/DensityToggle';
 
 const PAGE_SIZE = 10;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -119,6 +122,12 @@ export function StudentsPage() {
   // پروفایل دانش‌آموز — opened via the "پروفایل" row action below; shared
   // modal, same component TeacherAssessmentsPage/TeacherStudentsPage use.
   const [profileStudentId, setProfileStudentId] = useState<string | null>(null);
+  // Sprint A2.1 — Workspace Toolbar "View controls". Purely presentational:
+  // Table already supports a `density` prop ('compact' | 'comfortable',
+  // hardcoded to 'comfortable' below before this sprint) — this just lets
+  // the admin switch it instead of it being fixed. No query, filter,
+  // pagination, or column change of any kind.
+  const [density, setDensity] = useState<'compact' | 'comfortable'>('comfortable');
 
   const filterParams = {
     ...(debouncedSearch ? { search: debouncedSearch } : {}),
@@ -241,6 +250,61 @@ export function StudentsPage() {
   // (show a plain no-results message instead).
   const isFiltered = Boolean(debouncedSearch || gradeId || classId || academicYearId);
 
+  // Sprint A2.2 — single source of truth for "grade changed" (a class from
+  // the previous grade no longer applies), extracted from the Select's
+  // inline onChange below so the filter chips' "×" can call the exact same
+  // logic instead of duplicating it. No new filtering behavior — same two
+  // setState calls that already existed.
+  function handleGradeChange(value: string) {
+    setGradeId(value);
+    setClassId('');
+  }
+
+  // Sprint A2.2 — same reset already used by the table's "پاک کردن فیلترها"
+  // empty-state action, pulled out so the new filter-chips row can reuse it
+  // verbatim (task 1 requires reusing existing filter state, not new logic).
+  function clearAllFilters() {
+    setSearch('');
+    setGradeId('');
+    setAcademicYearId('');
+    setClassId('');
+    // Visual-only placeholder from Sprint 3.1 — reset for consistency even
+    // though it doesn't drive the query.
+    setStatusFilterDisplay('');
+  }
+
+  // Sprint A2.2 — compact filter chips (task 1). Purely derived from
+  // existing filter state + the option lists already fetched for the
+  // Selects above; no new query, no new filtering logic. Only real,
+  // query-affecting filters get a chip — the still-unwired "status"
+  // placeholder (see Sprint 3.1 notes on statusFilterDisplay) is
+  // intentionally excluded so a chip never claims to filter something it
+  // doesn't.
+  const activeFilterChips: { key: string; label: string; onClear: () => void }[] = [];
+  if (debouncedSearch) {
+    activeFilterChips.push({ key: 'search', label: `جستجو: «${debouncedSearch}»`, onClear: () => setSearch('') });
+  }
+  if (gradeId) {
+    const grade = grades.find((g) => g.id === gradeId);
+    activeFilterChips.push({
+      key: 'grade',
+      label: `پایه: ${grade?.title ?? '—'}`,
+      onClear: () => handleGradeChange(''),
+    });
+  }
+  if (classId) {
+    const cls = classesForFilter.find((c) => c.id === classId);
+    activeFilterChips.push({ key: 'class', label: `کلاس: ${cls?.title ?? '—'}`, onClear: () => setClassId('') });
+  }
+  if (academicYearId) {
+    const year = academicYears.find((y) => y.id === academicYearId);
+    activeFilterChips.push({
+      key: 'year',
+      label: `سال تحصیلی: ${year?.title ?? '—'}`,
+      onClear: () => setAcademicYearId(''),
+    });
+  }
+
   const pageCount = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   // Sprint 3.2 — presentational only, for the "نمایش X–Y از Z" pagination
   // summary. Derived entirely from state already in scope; no new query.
@@ -323,7 +387,13 @@ export function StudentsPage() {
     },
     {
       key: 'actions',
-      header: '',
+      // Sprint A2.2 (task 4) — the visible header stays blank (an "عملیات"
+      // label above right-aligned row actions is redundant for sighted
+      // users and every other table in the app leaves this column
+      // unlabeled too), but a sr-only label means the column still
+      // announces something meaningful to screen readers instead of an
+      // empty header cell. Row actions/behavior below are untouched.
+      header: <span className="sr-only">عملیات</span>,
       align: 'left',
       render: (s) => (
         <div className="flex items-center justify-end gap-1">
@@ -350,40 +420,36 @@ export function StudentsPage() {
 
   return (
     <div className="fade-in">
-      {/* Sprint 3.1 — workspace header. Same title/description/action data
-          and handlers as before, just restyled: a student-count pill next
-          to the title (reuses `totalCount`, already fetched for the stat
-          cards below — no new query), and a single primary action per the
-          Sprint 3.1 header spec. The bulk-import toggle keeps its exact
-          existing state/handler (`showBulkImport`/`setShowBulkImport`) but
-          is now surfaced as the toolbar's "Import" button instead of a
-          second header action — see the toolbar Actions area below. */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-xl font-bold text-ink dark:text-paper">دانش‌آموزان</h1>
-            <span
-              className="badge border-line bg-ink/5 text-ink/60 dark:border-white/10 dark:bg-white/10 dark:text-paper/60"
-              aria-label="تعداد کل دانش‌آموزان"
-            >
-              <UsersIcon size={12} />
-              {loading ? '…' : `${toPersianCount(totalCount)} دانش‌آموز`}
-            </span>
-          </div>
-          <p className="mt-1.5 text-sm text-ink/55 dark:text-paper/55">
-            مدیریت اطلاعات، وضعیت ثبت‌نام و صورت‌حساب دانش‌آموزان
-          </p>
-        </div>
-        <Button
-          variant={showForm ? 'secondary' : 'primary'}
-          onClick={() => {
-            setShowForm((v) => !v);
-            setShowBulkImport(false);
-          }}
-        >
-          {showForm ? 'انصراف' : '+ دانش‌آموز جدید'}
-        </Button>
-      </div>
+      {/* Sprint A2.1 (Student Workspace) — structured page header, now via
+          the shared <WorkspaceHeader/> (extracted in Sprint A3.1 so the
+          Teacher Workspace can reuse the identical markup). Live count
+          badge uses the same totalCount already fetched for the stat
+          cards below — no new query. "غیرفعال‌ها" stays here as the
+          secondary action (a page-level navigation shortcut, not a
+          workspace/filtering action). */}
+      <WorkspaceHeader
+        title="دانش‌آموزان"
+        subtitle="مدیریت اطلاعات، وضعیت ثبت‌نام و صورت‌حساب دانش‌آموزان"
+        countLabel={loading ? '…' : `${toPersianCount(totalCount)} دانش‌آموز`}
+        countIcon={<UsersIcon size={12} />}
+        countAriaLabel="تعداد کل دانش‌آموزان"
+        secondaryActions={
+          <Link to="/students/archived" className="btn-secondary">
+            غیرفعال‌ها
+          </Link>
+        }
+        primaryAction={
+          <Button
+            variant={showForm ? 'secondary' : 'primary'}
+            onClick={() => {
+              setShowForm((v) => !v);
+              setShowBulkImport(false);
+            }}
+          >
+            {showForm ? 'انصراف' : '+ دانش‌آموز جدید'}
+          </Button>
+        }
+      />
 
       {loading ? (
         <div className="mb-2">
@@ -446,13 +512,22 @@ export function StudentsPage() {
             handlers and still drive the real query below; Status, Class
             and "More filters" are new, visual-only placeholders per the
             Sprint 3.1 spec (no filtering logic attached — see task 2). */}
-        <div className="mb-4 border-b border-line pb-4 dark:border-white/10">
+        <div className="mb-4 flex flex-col border-b border-line pb-4 dark:border-white/10">
           <FilterBar
             actions={
               <>
-                <Link to="/students/archived" className="btn-secondary">
-                  غیرفعال‌ها
-                </Link>
+                {/* View controls — toggles the exact 'compact' |
+                    'comfortable' values Table's own `density` prop already
+                    accepted (see the `density` state above and the Table
+                    call below). Sprint A3.1 extracted this into the shared
+                    <DensityToggle/> so the Teacher Workspace's toolbar
+                    reuses the identical control. */}
+                <DensityToggle value={density} onChange={setDensity} />
+
+                <span className="hidden h-6 w-px bg-line dark:bg-white/10 sm:inline-block" aria-hidden="true" />
+
+                {/* Data actions — same handlers as before, just grouped
+                    together separately from the view controls above. */}
                 <Button variant="secondary" leftIcon={<ImportIcon />} onClick={() => { setShowBulkImport((v) => !v); setShowForm(false); }}>
                   ورودی اکسل
                 </Button>
@@ -462,7 +537,7 @@ export function StudentsPage() {
                 {/* Sprint 3.1 — visual only. Wiring this to studentsQuery /
                     activeCountQuery / gradesQuery / academicYearsQuery
                     refetch is a one-line change but is deliberately left
-                    for Sprint 3.2 so this sprint stays UI-shell-only. */}
+                    for a future sprint so this stays UI-shell-only. */}
                 <Button variant="ghost" leftIcon={<RefreshIcon />} aria-label="بروزرسانی فهرست">
                   بروزرسانی
                 </Button>
@@ -476,12 +551,12 @@ export function StudentsPage() {
               placeholder="جستجو با نام..."
               containerClassName="w-full sm:w-60"
             />
+
+            <span className="hidden h-6 w-px bg-line dark:bg-white/10 sm:inline-block" aria-hidden="true" />
+
             <Select
               value={gradeId}
-              onChange={(e) => {
-                setGradeId(e.target.value);
-                setClassId(''); // a class from the previous grade no longer applies
-              }}
+              onChange={(e) => handleGradeChange(e.target.value)}
               options={[{ value: '', label: 'همه‌ی پایه‌ها' }, ...grades.map((g) => ({ value: g.id, label: g.title }))]}
               containerClassName="w-auto"
               aria-label="فیلتر پایه تحصیلی"
@@ -529,111 +604,166 @@ export function StudentsPage() {
               فیلترهای بیشتر
             </Button>
           </FilterBar>
+
+          {/* Sprint A2.2 — active filter chips (task 1). Shown only when at
+              least one real filter is applied; each chip reflects existing
+              filter state and its "×" reuses the exact same setters as the
+              Selects/SearchInput above (or the shared handleGradeChange /
+              clearAllFilters helpers) — no new filtering logic is
+              introduced anywhere in this block. */}
+          {activeFilterChips.length > 0 && (
+            <div
+              role="group"
+              aria-label="فیلترهای فعال"
+              className="fade-in mt-3 flex flex-wrap items-center gap-2"
+            >
+              {activeFilterChips.map((chip) => (
+                <span
+                  key={chip.key}
+                  className="badge border-action/25 bg-action-soft py-1 pl-1.5 text-action dark:border-action/30 dark:bg-action/10 dark:text-action-light"
+                >
+                  {chip.label}
+                  <button
+                    type="button"
+                    onClick={chip.onClear}
+                    aria-label={`حذف فیلتر ${chip.label}`}
+                    className="flex h-4 w-4 items-center justify-center rounded-full text-action/70 transition-colors hover:bg-action/15 hover:text-action dark:text-action-light/70 dark:hover:bg-action-light/15 dark:hover:text-action-light"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M6 6l12 12M18 6 6 18" />
+                    </svg>
+                  </button>
+                </span>
+              ))}
+              {activeFilterChips.length > 1 && (
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="rounded-md px-2 py-1 text-xs font-medium text-ink/50 transition-colors hover:bg-paper hover:text-ink dark:text-paper/50 dark:hover:bg-white/10 dark:hover:text-paper"
+                >
+                  پاک کردن همه
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Sprint 3.3 — bulk action bar, shown only once at least one row
+              is selected. Content/handlers unchanged from before this
+              sprint (reused verbatim, per task 2); now nested inside the
+              same toolbar shell as the search/filter/actions row above
+              instead of sitting outside it, so it reads as this toolbar's
+              fourth section rather than a separate floating strip. */}
+          {selectedIds.size > 0 && (
+            <div
+              role="region"
+              aria-label="نوار عملیات گروهی"
+              className="fade-in mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-action/25 bg-action-soft px-4 py-2.5 dark:border-action/30 dark:bg-action/10"
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-action dark:text-action-light" aria-live="polite">
+                  {toPersianCount(selectedIds.size)} مورد انتخاب شده
+                </span>
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-ink/60 transition-colors hover:bg-white/60 hover:text-ink dark:text-paper/60 dark:hover:bg-white/10 dark:hover:text-paper"
+                >
+                  <ClearSelectionIcon />
+                  لغو انتخاب
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<ExportIcon />}
+                  disabled
+                  title="پس از اتصال به بک‌اند فعال می‌شود"
+                >
+                  خروجی انتخاب‌شده‌ها
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<ArchiveIcon />}
+                  disabled
+                  title="پس از اتصال به بک‌اند فعال می‌شود"
+                >
+                  بایگانی انتخاب‌شده‌ها
+                </Button>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  leftIcon={<DeleteIcon />}
+                  disabled
+                  title="پس از اتصال به بک‌اند فعال می‌شود"
+                >
+                  حذف انتخاب‌شده‌ها
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Sprint 3.3 — bulk action bar, shown only once at least one row
-            is selected. Purely visual/UI-state: count + clear come from
-            selectedIds already in scope, and the three action buttons are
-            deliberately unwired placeholders (disabled, with the same
-            "not connected yet" tooltip convention used elsewhere in this
-            codebase — see DashboardPage's StaffDashboard checklist). */}
-        {selectedIds.size > 0 && (
-          <div
-            role="region"
-            aria-label="نوار عملیات گروهی"
-            className="fade-in mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-action/25 bg-action-soft px-4 py-2.5 dark:border-action/30 dark:bg-action/10"
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-action dark:text-action-light" aria-live="polite">
-                {toPersianCount(selectedIds.size)} مورد انتخاب شده
-              </span>
-              <button
-                type="button"
-                onClick={clearSelection}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-ink/60 transition-colors hover:bg-white/60 hover:text-ink dark:text-paper/60 dark:hover:bg-white/10 dark:hover:text-paper"
-              >
-                <ClearSelectionIcon />
-                لغو انتخاب
-              </button>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                leftIcon={<ExportIcon />}
-                disabled
-                title="پس از اتصال به بک‌اند فعال می‌شود"
-              >
-                خروجی انتخاب‌شده‌ها
+        {/* Sprint A2.2 (task 2) — the students query previously had no
+            error state at all: a failed request just silently rendered an
+            empty table. This reuses the exact retry pattern already used
+            by GuardiansPage/TeacherAssignmentsPage (EmptyState + a
+            secondary "تلاش مجدد" button calling the query's own refetch) —
+            no new error-handling logic, just the existing
+            parseApiError/getErrorMessage-adjacent convention applied here
+            too. Filters/toolbar above stay usable during an error so the
+            admin isn't blocked from adjusting them and retrying. */}
+        {studentsQuery.isError ? (
+          <EmptyState
+            icon={<AlertIcon size={28} />}
+            message="خطا در بارگذاری فهرست دانش‌آموزان"
+            description="ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید."
+            action={
+              <Button variant="secondary" size="sm" onClick={() => studentsQuery.refetch()}>
+                تلاش مجدد
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                leftIcon={<ArchiveIcon />}
-                disabled
-                title="پس از اتصال به بک‌اند فعال می‌شود"
-              >
-                بایگانی انتخاب‌شده‌ها
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                leftIcon={<DeleteIcon />}
-                disabled
-                title="پس از اتصال به بک‌اند فعال می‌شود"
-              >
-                حذف انتخاب‌شده‌ها
-              </Button>
-            </div>
-          </div>
-        )}
+            }
+          />
+        ) : (
+          <>
+            <Table
+              stickyHeader
+              density={density}
+              columns={columns}
+              data={pageItems}
+              rowKey={(s) => s.id}
+              selectedRowKeys={selectedIds}
+              loading={loading}
+              skeletonRows={6}
+              emptyMessage={isFiltered ? 'دانش‌آموزی با این مشخصات یافت نشد.' : 'هنوز دانش‌آموزی ثبت نشده است.'}
+              emptyDescription={
+                isFiltered ? 'جستجو یا فیلترها را تغییر دهید.' : 'برای شروع، اولین دانش‌آموز مدرسه را ثبت کنید.'
+              }
+              emptyIcon={isFiltered ? <NoSearchResultsIcon /> : <StudentsEmptyIcon />}
+              emptyAction={
+                isFiltered ? (
+                  <Button variant="secondary" size="sm" onClick={clearAllFilters}>
+                    پاک کردن فیلترها
+                  </Button>
+                ) : (
+                  <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
+                    + همین حالا اضافه کنید
+                  </Button>
+                )
+              }
+            />
 
-        <Table
-          stickyHeader
-          density="comfortable"
-          columns={columns}
-          data={pageItems}
-          rowKey={(s) => s.id}
-          selectedRowKeys={selectedIds}
-          loading={loading}
-          skeletonRows={6}
-          emptyMessage={isFiltered ? 'دانش‌آموزی با این مشخصات یافت نشد.' : 'هنوز دانش‌آموزی ثبت نشده است.'}
-          emptyDescription={
-            isFiltered ? 'جستجو یا فیلترها را تغییر دهید.' : 'برای شروع، اولین دانش‌آموز مدرسه را ثبت کنید.'
-          }
-          emptyIcon={isFiltered ? <NoSearchResultsIcon /> : <StudentsEmptyIcon />}
-          emptyAction={
-            isFiltered ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setSearch('');
-                  setGradeId('');
-                  setAcademicYearId('');
-                  setClassId('');
-                  // Visual-only placeholder from Sprint 3.1 — reset for
-                  // consistency even though it doesn't drive the query.
-                  setStatusFilterDisplay('');
-                }}
-              >
-                پاک کردن فیلترها
-              </Button>
-            ) : (
-              <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
-                + همین حالا اضافه کنید
-              </Button>
-            )
-          }
-        />
-
-        {!loading && totalCount > 0 && (
-          <div className="mt-4 border-t border-line pt-4 text-center dark:border-white/10">
-            <p className="tabular mb-2 text-xs text-ink/50 dark:text-paper/50">
-              نمایش {toPersianCount(rangeStart)}–{toPersianCount(rangeEnd)} از {toPersianCount(totalCount)} دانش‌آموز
-            </p>
-            <Pagination page={page} pageCount={pageCount} onChange={setPage} />
-          </div>
+            {!loading && totalCount > 0 && (
+              <div className="mt-4 border-t border-line pt-4 text-center dark:border-white/10">
+                <p className="tabular mb-2 text-xs text-ink/50 dark:text-paper/50">
+                  نمایش {toPersianCount(rangeStart)}–{toPersianCount(rangeEnd)} از {toPersianCount(totalCount)}{' '}
+                  دانش‌آموز
+                </p>
+                <Pagination page={page} pageCount={pageCount} onChange={setPage} />
+              </div>
+            )}
+          </>
         )}
       </Card>
 

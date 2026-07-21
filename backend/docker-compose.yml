@@ -17,8 +17,15 @@ services:
       - .env
     environment:
       NODE_ENV: production
+      # Sprint P1 — Universal Avatar System. Points at the mounted
+      # avatar-uploads volume below rather than a path inside the
+      # container's writable layer, so uploaded avatars survive
+      # `docker compose up -d --build` redeploys.
+      AVATAR_UPLOAD_DIR: /data/avatars
     ports:
       - '${PORT:-3000}:3000'
+    volumes:
+      - avatar-uploads:/data/avatars
     depends_on:
       postgres:
         condition: service_healthy
@@ -65,3 +72,4 @@ services:
 volumes:
   postgres-data:
   redis-data:
+  avatar-uploads:

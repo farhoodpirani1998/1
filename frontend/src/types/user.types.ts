@@ -11,4 +11,8 @@ export interface ManagedUser {
   role: UserRole;
   isActive: boolean;
   schoolId: string | null;
+  // Sprint P1 — Universal Avatar System. See AuthUser.avatarUrl in
+  // auth.types.ts for the full note — same nullable "reference, not
+  // bytes" shape.
+  avatarUrl: string | null;
 }

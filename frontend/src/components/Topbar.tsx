@@ -1,8 +1,10 @@
+import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useTheme } from '../lib/theme';
 import { GlobalSearch } from './GlobalSearch';
+import { Avatar } from './Avatar';
 
-const roleLabels: Record<string, string> = {
+export const roleLabels: Record<string, string> = {
   super_admin: 'مدیر کل',
   school_admin: 'مدیر مدرسه',
   accountant: 'حسابدار',
@@ -11,6 +13,16 @@ const roleLabels: Record<string, string> = {
   teacher: 'معلم',
   founder: 'مؤسس',
   student: 'دانش‌آموز',
+};
+
+// Sprint A3 — My Profile. /profile is registered once per portal (see
+// App.tsx) — parent/teacher/student use their own path prefix, every
+// other role (super_admin/school_admin/accountant/staff/founder) shares
+// the plain /profile registered in the staff AppLayout block.
+const PROFILE_PATH: Record<string, string> = {
+  parent: '/parent/profile',
+  teacher: '/teacher/profile',
+  student: '/student/profile',
 };
 
 // GET /search is staff-only on the backend (school_admin/accountant/
@@ -59,17 +71,18 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
         </button>
 
         {user && (
-          <div className="hidden items-center gap-2.5 rounded-lg border border-line py-1 pl-1 pr-3 sm:flex dark:border-white/10">
+          <Link
+            to={PROFILE_PATH[user.role] ?? '/profile'}
+            className="hidden items-center gap-2.5 rounded-lg border border-line py-1 pl-1 pr-3 transition-colors hover:bg-paper sm:flex dark:border-white/10 dark:hover:bg-white/10"
+          >
             <div className="text-left">
               <div className="text-sm font-medium leading-tight text-ink dark:text-paper">{user.fullName}</div>
               <div className="text-[11px] leading-tight text-ink/45 dark:text-paper/45">
                 {roleLabels[user.role] ?? user.role}
               </div>
             </div>
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-action-soft text-xs font-semibold text-action dark:bg-action/15 dark:text-action-light">
-              {user.fullName?.charAt(0) ?? '?'}
-            </div>
-          </div>
+            <Avatar avatarUrl={user.avatarUrl} fullName={user.fullName} />
+          </Link>
         )}
         <button
           onClick={logout}

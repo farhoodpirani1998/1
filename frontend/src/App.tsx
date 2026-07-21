@@ -28,6 +28,7 @@ import { TimetablePage } from './pages/TimetablePage';
 import { AttendancePage } from './pages/AttendancePage';
 import { PrintReceiptPage } from './pages/PrintReceiptPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { ProfilePage } from './pages/ProfilePage';
 import { HomeRedirect } from './components/HomeRedirect';
 import { ParentLoginPage } from './pages/parent/ParentLoginPage';
 import { ParentForgotPasswordPage } from './pages/parent/ParentForgotPasswordPage';
@@ -122,6 +123,11 @@ export function App() {
                     break that redirect (super_admin/founder would hit "access
                     restricted" instead of being sent to their real home). */}
                 <Route path="/" element={<HomeRedirect />} />
+                {/* Sprint A3 — My Profile. No RequireRole: every role that
+                    lands in this AppLayout block (super_admin, school_admin,
+                    accountant, staff, founder) gets the same shared
+                    self-service account page. */}
+                <Route path="/profile" element={<ProfilePage />} />
                 <Route
                   path="/students"
                   element={
@@ -337,6 +343,9 @@ export function App() {
                   }
                 >
                   <Route path="dashboard" element={<ParentDashboardPage />} />
+                  {/* Sprint A3 — My Profile. Same shared account page as
+                      every other portal — no student-linking data here. */}
+                  <Route path="profile" element={<ProfilePage />} />
                   <Route path="tuition" element={<ParentTuitionPage />} />
                   <Route path="installments" element={<ParentInstallmentsPage />} />
                   <Route path="payments" element={<ParentPaymentsPage />} />
@@ -364,6 +373,9 @@ export function App() {
                   }
                 >
                   <Route path="dashboard" element={<TeacherDashboardPage />} />
+                  {/* Sprint A3 — My Profile. Same shared account page as
+                      every other portal — no class/assignment data here. */}
+                  <Route path="profile" element={<ProfilePage />} />
                   <Route path="students" element={<TeacherStudentsPage />} />
                   <Route path="attendance" element={<TeacherAttendancePage />} />
                   <Route path="assessments" element={<TeacherAssessmentsPage />} />
@@ -391,6 +403,10 @@ export function App() {
                   }
                 >
                   <Route path="dashboard" element={<StudentDashboardPage />} />
+                  {/* Sprint A3 — My Profile. Same shared account page as
+                      every other portal — no grades/attendance/homework
+                      data here. */}
+                  <Route path="profile" element={<ProfilePage />} />
                   <Route path="attendance" element={<StudentAttendancePage />} />
                   <Route path="homework" element={<StudentHomeworkPage />} />
                   <Route path="announcements" element={<StudentAnnouncementsPage />} />

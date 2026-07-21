@@ -15,7 +15,7 @@ import {
 import { Card } from '../components/Card';
 import { PageHeader } from '../components/PageHeader';
 import { SectionHeader } from '../components/SectionHeader';
-import { StatCard } from '../components/StatCard';
+import { StatCard, type StatAccent } from '../components/StatCard';
 import { KPICard } from '../components/KPICard';
 import { Table, type TableColumn } from '../components/Table';
 import { SkeletonCards, SkeletonRows } from '../components/Skeleton';
@@ -34,6 +34,8 @@ import {
   NotificationIcon,
   ScoreIcon,
   ClassIcon,
+  ReportsIcon,
+  LockIcon,
 } from '../components/icons/SchoolIcons';
 import { formatToman, formatDate, formatRelativeTime, toPersianDigits, paymentMethodLabels } from '../lib/format';
 import { useAuth } from '../lib/auth';
@@ -336,13 +338,17 @@ function SeverityBadge({ severity }: { severity: ActionSeverity }) {
   );
 }
 
-// Sprint 2.2 — Quick Actions. Visual only, no handlers: these mirror the
-// disabled-button pattern already used by StaffDashboard's
-// ChecklistSection above, until each destination flow is wired up.
+// Sprint 2.2 — Quick Actions. Visual shortcuts to existing pages only:
+// `to` is omitted entirely when no school_admin-accessible route exists
+// yet for that action (see QuickActionTile below, same disabled-tile
+// convention as ChecklistSection's disabled button), so a tile never
+// links to a route that isn't already in App.tsx.
 interface QuickAction {
   id: string;
   icon: ReactNode;
   label: string;
+  caption: string;
+  to?: string;
 }
 
 // Sprint 2.3 — Financial Overview summary. Monthly revenue, tuition
@@ -423,13 +429,232 @@ const MOCK_ACTIVITY_TEMPLATES: {
   },
 ];
 
+// Sprint A1.1 (Dashboard Foundation) — the 6 shortcuts requested for the
+// Quick Actions section. Each `to` is an existing, already-registered
+// route this role can already reach (see App.tsx): /students,
+// /settings (grades/classes management lives there — see
+// useStudents.ts's Grade/Class hooks), /attendance, /installments
+// (closest existing route to "tuition" — there is no separate
+// /tuition route), and /reports. "افزودن معلم" has no `to`: the only
+// account-creation page, /users, is super_admin-only (see App.tsx), and
+// /teacher-assignments only assigns an *existing* teacher to a class —
+// neither is a real "add teacher" destination for this role, so this
+// tile stays a disabled placeholder rather than linking somewhere
+// misleading.
 const QUICK_ACTIONS: QuickAction[] = [
-  { id: 'qa1', icon: <StudentIcon size={20} />, label: 'افزودن دانش‌آموز' },
-  { id: 'qa2', icon: <TuitionIcon size={20} />, label: 'ثبت پرداخت' },
-  { id: 'qa3', icon: <TeacherIcon size={20} />, label: 'تخصیص معلم' },
-  { id: 'qa4', icon: <AttendanceIcon size={20} />, label: 'ثبت حضور و غیاب' },
-  { id: 'qa5', icon: <NotificationIcon size={20} />, label: 'ایجاد اطلاعیه' },
+  {
+    id: 'add-student',
+    icon: <StudentIcon size={22} />,
+    label: 'افزودن دانش‌آموز',
+    caption: 'ثبت‌نام دانش‌آموز جدید',
+    to: '/students',
+  },
+  {
+    id: 'add-teacher',
+    icon: <TeacherIcon size={22} />,
+    label: 'افزودن معلم',
+    caption: 'به‌زودی',
+  },
+  {
+    id: 'manage-classes',
+    icon: <ClassIcon size={22} />,
+    label: 'مدیریت کلاس‌ها',
+    caption: 'پایه‌ها، شعب و سال تحصیلی',
+    to: '/settings',
+  },
+  {
+    id: 'attendance',
+    icon: <AttendanceIcon size={22} />,
+    label: 'حضور و غیاب',
+    caption: 'ثبت و مشاهده‌ی حضور امروز',
+    to: '/attendance',
+  },
+  {
+    id: 'tuition',
+    icon: <TuitionIcon size={22} />,
+    label: 'شهریه',
+    caption: 'اقساط و پرداخت‌ها',
+    to: '/installments',
+  },
+  {
+    id: 'reports',
+    icon: <ReportsIcon size={22} />,
+    label: 'گزارش‌ها',
+    caption: 'گزارش‌های مالی و آموزشی',
+    to: '/reports',
+  },
 ];
+
+// Shared tile renderer for both cases above — a real <Link> when a route
+// exists, otherwise a disabled <button> (same semantics as
+// ChecklistSection's disabled action button: focusable-but-inert,
+// announced as disabled to assistive tech, no dead href). Keeping one
+// component avoids duplicating the tile markup/classNames twice.
+function QuickActionTile({ action }: { action: QuickAction }) {
+  const tileClass =
+    'group flex flex-col items-center gap-2.5 rounded-xl border border-line bg-white px-3 py-4 text-center shadow-card transition-all duration-150 dark:border-white/10 dark:bg-white/[0.03] sm:py-5';
+  const iconClass =
+    'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-action-soft text-action transition-colors dark:bg-action/15 dark:text-action-light';
+
+  if (!action.to) {
+    return (
+      <button
+        type="button"
+        disabled
+        title="این بخش هنوز صفحه‌ی مدیریت مستقلی ندارد"
+        className={`${tileClass} cursor-not-allowed opacity-50`}
+      >
+        <span className={iconClass}>{action.icon}</span>
+        <span className="text-sm font-medium text-ink dark:text-paper">{action.label}</span>
+        <span className="text-[11px] text-ink/45 dark:text-paper/45">{action.caption}</span>
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      to={action.to}
+      className={`${tileClass} hover:-translate-y-0.5 hover:border-action/30 hover:shadow-pop active:translate-y-0 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50`}
+    >
+      <span className={`${iconClass} group-hover:bg-action group-hover:text-white`}>{action.icon}</span>
+      <span className="text-sm font-medium text-ink dark:text-paper">{action.label}</span>
+      <span className="text-[11px] text-ink/45 dark:text-paper/45">{action.caption}</span>
+    </Link>
+  );
+}
+
+// Sprint A1.2 (Operational Dashboard) — Attention Required + Upcoming.
+// A single tile shape covers both sections: 'ready' tiles show a real
+// number pulled from data useDashboard() already fetches (no new
+// request — see SchoolAdminDashboard below), 'placeholder' tiles show a
+// polished "not connected yet" empty state instead of a fabricated
+// number. Reusing one type/component for both sections (rather than two
+// near-identical ones) is the "avoid duplicate code" requirement for
+// this sprint.
+type SignalTile =
+  | {
+      id: string;
+      status: 'ready';
+      icon: ReactNode;
+      title: string;
+      value: string;
+      description: string;
+      accent: StatAccent;
+      to: string;
+    }
+  | {
+      id: string;
+      status: 'placeholder';
+      icon: ReactNode;
+      title: string;
+      description: string;
+    };
+
+// Same accent → color mapping StatCard keeps privately, duplicated here
+// on purpose — same "small per-page duplication over new shared
+// abstractions" convention already noted at the top of this file, since
+// SignalTile's layout (icon + title + big value + caption, as a full
+// clickable tile) isn't a fit for StatCard's own props.
+const SIGNAL_ICON_BG: Record<StatAccent, string> = {
+  default: 'bg-ink/5 text-ink/60 dark:bg-white/10 dark:text-paper/60',
+  action: 'bg-action-soft text-action dark:bg-action/15 dark:text-action-light',
+  paid: 'bg-paid-soft text-paid dark:bg-paid/15',
+  warning: 'bg-warning-soft text-warning dark:bg-warning/15',
+  overdue: 'bg-overdue-soft text-overdue dark:bg-overdue/15',
+};
+
+const SIGNAL_VALUE_COLOR: Record<StatAccent, string> = {
+  default: 'text-ink dark:text-paper',
+  action: 'text-action',
+  paid: 'text-paid',
+  warning: 'text-warning',
+  overdue: 'text-overdue',
+};
+
+function SignalTileCard({ tile }: { tile: SignalTile }) {
+  if (tile.status === 'placeholder') {
+    return (
+      <div className="flex flex-col gap-3 rounded-xl border border-dashed border-line p-4 dark:border-white/15">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink/5 text-ink/40 dark:bg-white/10 dark:text-paper/40">
+            {tile.icon}
+          </span>
+          <span className="text-sm font-medium text-ink/70 dark:text-paper/70">{tile.title}</span>
+        </div>
+        <p className="text-xs leading-relaxed text-ink/45 dark:text-paper/45">{tile.description}</p>
+        <span className="badge w-fit border-ink/10 bg-ink/5 text-ink/45 dark:border-white/10 dark:bg-white/10 dark:text-paper/45">
+          به‌زودی
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      to={tile.to}
+      className="group flex flex-col gap-3 rounded-xl border border-line bg-white p-4 shadow-card transition-all duration-150 hover:-translate-y-0.5 hover:border-action/30 hover:shadow-pop focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-action/50 dark:border-white/10 dark:bg-white/[0.03]"
+    >
+      <div className="flex items-center gap-2.5">
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${SIGNAL_ICON_BG[tile.accent]}`}>
+          {tile.icon}
+        </span>
+        <span className="text-sm font-medium text-ink dark:text-paper">{tile.title}</span>
+      </div>
+      <div className={`tabular text-xl font-bold ${SIGNAL_VALUE_COLOR[tile.accent]}`}>{tile.value}</div>
+      <p className="text-xs leading-relaxed text-ink/50 dark:text-paper/50">{tile.description}</p>
+    </Link>
+  );
+}
+
+// Sprint A1.2 — Upcoming. No backend module anywhere in this frontend
+// covers school events, exam scheduling, or generic deadlines (only
+// installment due dates exist, already surfaced elsewhere on this page
+// and in the Attention Required section below) — so unlike Attention
+// Required, every tile here is a placeholder. No new request is made for
+// this section at all.
+const UPCOMING_TILES: SignalTile[] = [
+  {
+    id: 'upcoming-events',
+    status: 'placeholder',
+    icon: <CalendarIcon size={18} />,
+    title: 'رویدادهای پیش‌رو',
+    description: 'رویدادهای مدرسه پس از اتصال ماژول تقویم/رویدادها در همین‌جا نمایش داده می‌شوند.',
+  },
+  {
+    id: 'upcoming-exams',
+    status: 'placeholder',
+    icon: <AssignmentsIcon size={18} />,
+    title: 'آزمون‌های پیش‌رو',
+    description: 'زمان‌بندی آزمون‌ها پس از اتصال ماژول امتحانات در همین‌جا نمایش داده می‌شود.',
+  },
+  {
+    id: 'upcoming-deadlines',
+    status: 'placeholder',
+    icon: <ListIcon size={18} />,
+    title: 'سررسیدهای پیش‌رو',
+    description: 'مهلت‌های مهم غیر از اقساط شهریه پس از اتصال ماژول مربوطه در همین‌جا نمایش داده می‌شوند.',
+  },
+];
+
+// Lightweight visual grouping for the macro-sections of the page below —
+// a muted label + divider line above a cluster of sections. Purely
+// presentational and new to this sprint: it changes how sections are
+// clustered and spaced, not what any section inside it renders.
+// SectionHeader (used *inside* each group, for individual sections) is
+// completely untouched.
+function DashboardGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section className="mt-8 first:mt-0">
+      <div className="mb-4 flex items-center gap-3">
+        <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wider text-ink/35 dark:text-paper/35">
+          {label}
+        </span>
+        <span className="h-px flex-1 bg-line dark:bg-white/10" />
+      </div>
+      <div className="flex flex-col gap-6">{children}</div>
+    </section>
+  );
+}
 
 // school_admin dashboard, backed by the single GET /analytics/dashboard
 // call (useDashboard()). Unlike FinancialDashboard below, the finance
@@ -499,6 +724,56 @@ function SchoolAdminDashboard() {
 
   const todayLabel = formatDate(new Date().toISOString());
 
+  // Sprint A1.2 — Attention Required tiles. Three of four reuse fields
+  // useDashboard() already returns but nothing on this page rendered
+  // until now (finance.overdueAmount, attendance.absentToday/lateToday,
+  // assessments.lowestStudents — see analytics.types.ts); no new
+  // request. "Students without portal accounts" has no backing field
+  // anywhere in this frontend (no such aggregate on /students or
+  // DashboardStudentsSummary), so it stays a placeholder — no fabricated
+  // count.
+  const attentionTiles: SignalTile[] = [
+    {
+      id: 'overdue-tuition',
+      status: 'ready',
+      icon: <AlertIcon size={18} />,
+      title: 'شهریه‌های معوق',
+      value: formatToman(finance?.overdueAmount ?? 0),
+      description: 'مجموع مبلغ قسط‌هایی که از سررسید گذشته‌اند — برای پیگیری وارد صفحه اقساط شوید.',
+      accent: 'overdue',
+      to: '/installments',
+    },
+    {
+      id: 'attendance-today',
+      status: 'ready',
+      icon: <AttendanceIcon size={18} />,
+      title: 'غیبت و تأخیر امروز',
+      value: toPersianDigits((attendance?.absentToday ?? 0) + (attendance?.lateToday ?? 0)),
+      description: `${toPersianDigits(attendance?.absentToday ?? 0)} غایب و ${toPersianDigits(
+        attendance?.lateToday ?? 0,
+      )} با تأخیر — برای پیگیری وارد صفحه حضور و غیاب شوید.`,
+      accent: 'warning',
+      to: '/attendance',
+    },
+    {
+      id: 'low-performers',
+      status: 'ready',
+      icon: <ScoreIcon size={18} />,
+      title: 'نیازمند بررسی نمره',
+      value: toPersianDigits(assessments?.lowestStudents.length ?? 0),
+      description: 'دانش‌آموزان با پایین‌ترین میانگین ارزیابی — برای بررسی وارد لیست دانش‌آموزان شوید.',
+      accent: 'action',
+      to: '/students',
+    },
+    {
+      id: 'no-portal-account',
+      status: 'placeholder',
+      icon: <LockIcon size={18} />,
+      title: 'دانش‌آموزان بدون حساب کاربری',
+      description: 'تعداد دانش‌آموزان بدون حساب پورتال، پس از افزودن این شاخص به بک‌اند، در همین‌جا نمایش داده می‌شود.',
+    },
+  ];
+
   const paymentTrendPoints = monthlyPayments.map((p) => ({
     ...p,
     label: `${persianMonthNames[p.month - 1]} ${p.year}`,
@@ -525,16 +800,24 @@ function SchoolAdminDashboard() {
 
   return (
     <div className="fade-in">
-      {/* Sprint 2.1 — redesigned header: welcome message, current (Jalali)
-          date, and a short school summary built from data the dashboard
-          query already returns (no new request). */}
+      {/* Sprint A1.1 (Dashboard Foundation) — header: welcome title, a
+          fixed descriptive subtitle, and the existing dynamic school
+          summary line (unchanged data, just demoted to a secondary line
+          under the subtitle for clearer hierarchy). Current academic
+          year is intentionally not shown here — GET /analytics/dashboard
+          (useDashboard) has no such field (see analytics.types.ts), and
+          Sprint A1.1 doesn't fetch anything new — see the "left for
+          Sprint A1.2" note in the handoff. */}
       <div className="mb-6 rounded-xl border border-line bg-white p-5 shadow-card dark:border-white/10 dark:bg-white/[0.03] sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-xl font-bold text-ink dark:text-paper">
+            <h1 className="text-xl font-bold text-ink dark:text-paper sm:text-2xl">
               خوش آمدید{user?.fullName ? `، ${user.fullName}` : ''}
             </h1>
-            <p className="mt-1.5 text-sm text-ink/60 dark:text-paper/60">
+            <p className="mt-1 text-sm text-ink/60 dark:text-paper/60">
+              نمای کلی وضعیت مدرسه و دسترسی سریع به کارهای روزانه
+            </p>
+            <p className="mt-2.5 text-xs text-ink/45 dark:text-paper/45">
               {loading
                 ? 'در حال بارگذاری خلاصه مدرسه...'
                 : `هم‌اکنون ${toPersianDigits(data?.students.total ?? 0)} دانش‌آموز (${toPersianDigits(
@@ -556,96 +839,137 @@ function SchoolAdminDashboard() {
         </div>
       )}
 
-      {/* Sprint 2.1 — redesigned KPI section: 6 responsive cards */}
-      {loading ? (
-        <SkeletonCards count={6} />
-      ) : (
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-          <StatCard
-            label="کل دانش‌آموزان"
-            value={toPersianDigits(data?.students.total ?? 0)}
-            icon={<UsersIcon />}
-          />
-          <StatCard
-            label="کل معلمان"
-            value={toPersianDigits(MOCK_TOTAL_TEACHERS)}
-            accent="action"
-            icon={<TeacherIcon />}
-          />
-          <StatCard
-            label="حضور امروز"
-            value={`${toPersianDigits(Math.round(attendance?.attendanceRate ?? 0))}٪`}
-            accent="paid"
-            icon={<AttendanceIcon />}
-          />
-          <StatCard
-            label="درآمد این ماه"
-            value={formatToman(currentMonthRevenue)}
-            accent="paid"
-            icon={<TuitionIcon />}
-          />
-          <StatCard
-            label="شهریه معوق"
-            value={formatToman(finance?.totalUnpaid ?? 0)}
-            accent="overdue"
-            icon={<AlertIcon />}
-          />
-          <StatCard
-            label="ثبت‌نام‌های جدید"
-            value={toPersianDigits(currentMonthRegistrations)}
-            accent="action"
-            icon={<CalendarIcon />}
-          />
+      <DashboardGroup label="نمای کلی و اقدامات سریع">
+        {/* Sprint A1.1 — KPI Overview: same 6 metrics as before (no new
+            values), grouped under a labeled section for clearer hierarchy
+            and given a bit more breathing room at each breakpoint. */}
+        <div>
+          <SectionHeader title="نمای کلی شاخص‌ها" description="مهم‌ترین اعداد مدرسه در یک نگاه" />
+          {loading ? (
+            <SkeletonCards count={6} />
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
+              <StatCard
+                label="کل دانش‌آموزان"
+                value={toPersianDigits(data?.students.total ?? 0)}
+                icon={<UsersIcon />}
+              />
+              <StatCard
+                label="کل معلمان"
+                value={toPersianDigits(MOCK_TOTAL_TEACHERS)}
+                accent="action"
+                icon={<TeacherIcon />}
+              />
+              <StatCard
+                label="حضور امروز"
+                value={`${toPersianDigits(Math.round(attendance?.attendanceRate ?? 0))}٪`}
+                accent="paid"
+                icon={<AttendanceIcon />}
+              />
+              <StatCard
+                label="درآمد این ماه"
+                value={formatToman(currentMonthRevenue)}
+                accent="paid"
+                icon={<TuitionIcon />}
+              />
+              <StatCard
+                label="شهریه معوق"
+                value={formatToman(finance?.totalUnpaid ?? 0)}
+                accent="overdue"
+                icon={<AlertIcon />}
+              />
+              <StatCard
+                label="ثبت‌نام‌های جدید"
+                value={toPersianDigits(currentMonthRegistrations)}
+                accent="action"
+                icon={<CalendarIcon />}
+              />
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Sprint 2.2 — Action Center */}
-      <div className="mt-6">
-        <Card title="مرکز اقدامات">
-          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {ACTION_CENTER_ITEMS.map((item) => (
-              <li
-                key={item.id}
-                className="flex items-start gap-3 rounded-lg border border-line p-3.5 dark:border-white/10"
-              >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink/5 text-ink/60 dark:bg-white/10 dark:text-paper/60">
-                  {item.icon}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-ink dark:text-paper">{item.title}</span>
-                    <SeverityBadge severity={item.severity} />
-                  </div>
-                  <p className="mt-1 truncate text-xs text-ink/55 dark:text-paper/55">{item.description}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
-
-      {/* Sprint 2.2 — Quick Actions (visual only, not wired to any flow yet) */}
-      <div className="mt-6">
-        <Card title="اقدامات سریع">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {/* Sprint A1.1 — Quick Actions. Visual shortcuts only (see
+            QUICK_ACTIONS / QuickActionTile above) — 5 of 6 link to routes
+            that already exist and are reachable by this role; "افزودن
+            معلم" has none yet, so it renders disabled rather than linking
+            anywhere. */}
+        <div>
+          <SectionHeader title="اقدامات سریع" description="میان‌برهای پراستفاده برای کارهای روزانه" />
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
             {QUICK_ACTIONS.map((action) => (
-              <button
-                key={action.id}
-                type="button"
-                className="flex flex-col items-center justify-center gap-2 rounded-lg border border-line px-3 py-4 text-xs font-medium text-ink transition-transform active:scale-[0.97] hover:border-action/30 hover:bg-action-soft/40 dark:border-white/10 dark:text-paper dark:hover:bg-action/10"
-              >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-action-soft text-action dark:bg-action/15 dark:text-action-light">
-                  {action.icon}
-                </span>
-                {action.label}
-              </button>
+              <QuickActionTile key={action.id} action={action} />
             ))}
           </div>
-        </Card>
-      </div>
+        </div>
+      </DashboardGroup>
 
+      <DashboardGroup label="نیازمند توجه">
+        {/* Sprint A1.2 — Attention Required. Real numbers where
+            useDashboard() already has the field (overdue tuition,
+            today's absences/lateness, low-scoring students); a single
+            clearly-labeled placeholder where no field exists yet
+            (students without portal accounts). No new request, no
+            fabricated figures. */}
+        <div>
+          <SectionHeader
+            title="نیازمند توجه"
+            description="موضوعاتی که این هفته احتمالاً به پیگیری نیاز دارند"
+          />
+          {loading ? (
+            <SkeletonCards count={4} />
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
+              {attentionTiles.map((tile) => (
+                <SignalTileCard key={tile.id} tile={tile} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Sprint 2.2 — Action Center (unchanged content — only its
+            position moved, to sit next to the other "needs attention"
+            signals above). */}
+        <div>
+          <Card title="مرکز اقدامات">
+            <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {ACTION_CENTER_ITEMS.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex items-start gap-3 rounded-lg border border-line p-3.5 dark:border-white/10"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink/5 text-ink/60 dark:bg-white/10 dark:text-paper/60">
+                    {item.icon}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-medium text-ink dark:text-paper">{item.title}</span>
+                      <SeverityBadge severity={item.severity} />
+                    </div>
+                    <p className="mt-1 truncate text-xs text-ink/55 dark:text-paper/55">{item.description}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </div>
+
+        {/* Sprint A1.2 — Upcoming. Forward-looking placeholders only
+            (events, exams, deadlines) — no backend module for any of
+            these exists yet anywhere in this frontend, and no new
+            request is made for this section. */}
+        <div>
+          <SectionHeader title="پیش‌رو" description="برنامه‌ریزی عملیاتی برای روزهای آینده" />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
+            {UPCOMING_TILES.map((tile) => (
+              <SignalTileCard key={tile.id} tile={tile} />
+            ))}
+          </div>
+        </div>
+      </DashboardGroup>
+
+      <DashboardGroup label="عملکرد امروز">
       {/* Attendance summary + Assessments summary */}
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card title="خلاصه حضور و غیاب امروز">
           {loading ? (
             <SkeletonRows rows={3} cols={1} />
@@ -715,7 +1039,7 @@ function SchoolAdminDashboard() {
           Attendance/Assessments cards above (those are left untouched).
           Same Card/StatCard/SectionHeader/badge components as the rest
           of the page; no new chart. */}
-      <div className="mt-6">
+      <div>
         <SectionHeader title="نمای کلی آموزشی" description="خلاصه وضعیت حضور، ارزیابی‌ها، کلاس‌ها و بار کاری معلمان" />
         {loading ? (
           <SkeletonCards count={4} />
@@ -752,11 +1076,13 @@ function SchoolAdminDashboard() {
           <span>«کلاس‌های فعال امروز» و «بار کاری معلمان» فعلاً داده نمونه هستند تا ماژول مربوطه به بک‌اند وصل شود.</span>
         </div>
       </div>
+      </DashboardGroup>
 
+      <DashboardGroup label="روند مالی">
       {/* Sprint 2.3 — Financial Overview (was "Monthly payments trend").
           Same LineChart as before, just regrouped with a financial
           summary for clearer hierarchy — no new chart added. */}
-      <div className="mt-6">
+      <div>
         <SectionHeader title="نمای کلی مالی" description="روند پرداخت‌های ماهانه و خلاصه وضعیت مالی مدرسه" />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
           <Card className="lg:col-span-2">
@@ -798,13 +1124,16 @@ function SchoolAdminDashboard() {
           )}
         </div>
       </div>
+      </DashboardGroup>
 
-      {/* Sprint 2.5 — Recent Activity: vertical timeline placed below
-          Financial Overview. Payments/attendance rows are real
-          (data.recentActivity — already fetched, simply not shown
-          anywhere until now); registration/teacher-assignment rows are
-          clearly marked mock (see MOCK_ACTIVITY_TEMPLATES above). */}
-      <div className="mt-6">
+      <DashboardGroup label="فعالیت‌های اخیر">
+      {/* Sprint A1.1 — Recent Activity: same items/order/sort as before
+          (payments + attendance are real, from data.recentActivity;
+          registration/teacher-assignment stay clearly-marked mocks —
+          see MOCK_ACTIVITY_TEMPLATES above), restyled as individual
+          rounded rows instead of a plain list so each entry reads as its
+          own card while keeping the connecting timeline thread. */}
+      <div>
         <SectionHeader title="فعالیت‌های اخیر" description="جدیدترین رویدادهای ثبت‌شده در مدرسه" />
         <Card>
           {loading ? (
@@ -814,21 +1143,25 @@ function SchoolAdminDashboard() {
               هنوز فعالیتی ثبت نشده است.
             </p>
           ) : (
-            <ul>
+            <ul className="-my-1">
               {recentActivityItems.map((item, index) => (
-                <li key={item.id} className="flex gap-3">
+                <li key={item.id} className="flex gap-3.5">
                   <div className="flex flex-col items-center">
                     <span
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${ACTIVITY_ICON_BG[item.kind]}`}
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ring-4 ring-white dark:ring-navy-dark ${ACTIVITY_ICON_BG[item.kind]}`}
                     >
                       {item.icon}
                     </span>
                     {index < recentActivityItems.length - 1 && (
-                      <span className="mt-1 w-px flex-1 bg-line dark:bg-white/10" />
+                      <span className="mt-0.5 w-px flex-1 bg-line dark:bg-white/10" />
                     )}
                   </div>
-                  <div className={`min-w-0 flex-1 ${index < recentActivityItems.length - 1 ? 'pb-5' : ''}`}>
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div
+                    className={`min-w-0 flex-1 rounded-lg px-3 py-2.5 transition-colors hover:bg-paper dark:hover:bg-white/5 ${
+                      index < recentActivityItems.length - 1 ? 'mb-1' : ''
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                       <span className="text-sm font-medium text-ink dark:text-paper">{item.title}</span>
                       <div className="flex shrink-0 items-center gap-2">
                         {item.mock && <SeverityBadge severity="info" />}
@@ -837,7 +1170,9 @@ function SchoolAdminDashboard() {
                         </span>
                       </div>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-ink/55 dark:text-paper/55">{item.description}</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-ink/55 dark:text-paper/55">
+                      {item.description}
+                    </p>
                   </div>
                 </li>
               ))}
@@ -845,6 +1180,7 @@ function SchoolAdminDashboard() {
           )}
         </Card>
       </div>
+      </DashboardGroup>
     </div>
   );
 }
