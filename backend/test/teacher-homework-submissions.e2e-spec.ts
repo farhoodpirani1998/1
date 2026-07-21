@@ -158,7 +158,7 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
 
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions`)
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body).toHaveLength(2);
@@ -183,7 +183,7 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions`)
         .query({ status: HomeworkSubmissionStatus.SUBMITTED })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body).toHaveLength(1);
@@ -194,7 +194,7 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions`)
         .query({ status: 'not-a-real-status' })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(400);
     });
@@ -202,7 +202,7 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
     it('rejects a homework the teacher is not assigned to (403)', async () => {
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA2.id}/submissions`)
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(403);
     });
@@ -210,7 +210,7 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
     it('rejects every homework for a teacher with no assignments at all (403)', async () => {
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions`)
-        .set(authHeader(app, unassignedTeacherA));
+        .set('Authorization', authHeader(app, unassignedTeacherA));
 
       expect(res.status).toBe(403);
     });
@@ -230,7 +230,7 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
 
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkB.id}/submissions`)
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(404);
     });
@@ -243,7 +243,7 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
     it('is rejected for a non-teacher role', async () => {
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions`)
-        .set(authHeader(app, schoolAdminA));
+        .set('Authorization', authHeader(app, schoolAdminA));
       expect(res.status).toBe(403);
     });
   });
@@ -265,7 +265,7 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
 
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions/summary`)
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({
@@ -294,7 +294,7 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
 
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions/summary`)
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body.totalStudents).toBe(2);
@@ -313,7 +313,7 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
 
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions/summary`)
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body.totalStudents).toBe(2);
@@ -357,7 +357,7 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
 
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions/summary`)
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({
@@ -372,21 +372,21 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
     it('rejects a homework the teacher is not assigned to (403)', async () => {
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA2.id}/submissions/summary`)
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
       expect(res.status).toBe(403);
     });
 
     it('404s a nonexistent homeworkId', async () => {
       const res = await request(server)
         .get('/api/v1/teacher/homework/00000000-0000-0000-0000-000000000000/submissions/summary')
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
       expect(res.status).toBe(404);
     });
 
     it('is rejected for a non-teacher role', async () => {
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions/summary`)
-        .set(authHeader(app, schoolAdminA));
+        .set('Authorization', authHeader(app, schoolAdminA));
       expect(res.status).toBe(403);
     });
 
@@ -412,7 +412,7 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
 
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions/statistics`)
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({
@@ -443,7 +443,7 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
 
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions/statistics`)
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body.submissionRate).toBe(100);
@@ -454,14 +454,14 @@ describe('Teacher Homework Submission API (Sprint A.3.3 e2e)', () => {
     it('rejects a homework the teacher is not assigned to (403)', async () => {
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA2.id}/submissions/statistics`)
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
       expect(res.status).toBe(403);
     });
 
     it('is rejected for a non-teacher role', async () => {
       const res = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions/statistics`)
-        .set(authHeader(app, schoolAdminA));
+        .set('Authorization', authHeader(app, schoolAdminA));
       expect(res.status).toBe(403);
     });
 

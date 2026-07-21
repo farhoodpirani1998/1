@@ -170,7 +170,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
 
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       const studentIds = res.body.map((r: any) => r.studentId).sort();
@@ -197,7 +197,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
 
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body).toHaveLength(1);
@@ -239,7 +239,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ gradeId: gradeA2.id })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       const studentIds = res.body.map((r: any) => r.studentId).sort();
@@ -263,7 +263,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ gradeId: gradeA1.id })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body.map((r: any) => r.studentId)).toEqual([studentA1a.id]);
@@ -280,7 +280,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ classId: classA1a.id })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body.map((r: any) => r.studentId)).toEqual([studentA1a.id]);
@@ -296,7 +296,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ studentId: studentB.id })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(404);
     });
@@ -317,7 +317,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
 
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body.map((r: any) => r.studentId)).toEqual([studentA1a.id]);
@@ -334,7 +334,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ gradeId: otherGrade.id })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(403);
     });
@@ -343,7 +343,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ classId: classA1b.id })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(403);
     });
@@ -352,7 +352,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ subjectId: scienceSubject.id })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(403);
     });
@@ -361,7 +361,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ studentId: studentA1b.id })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(403);
     });
@@ -370,7 +370,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ gradeId: 'not-a-uuid' })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(400);
     });
@@ -379,7 +379,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ fromDate: 'not-a-date' })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(400);
     });
@@ -393,7 +393,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
     it('returns an empty array when nothing has been recorded yet', async () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
@@ -410,7 +410,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
 
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
-        .set(authHeader(app, unassignedTeacher));
+        .set('Authorization', authHeader(app, unassignedTeacher));
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
@@ -430,7 +430,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
     it('is rejected for a non-teacher role', async () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
-        .set(authHeader(app, schoolAdminA));
+        .set('Authorization', authHeader(app, schoolAdminA));
       expect(res.status).toBe(403);
     });
   });
@@ -478,7 +478,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ fromDate: midDate })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       const ids = res.body.map((r: any) => r.id);
@@ -490,7 +490,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ fromDate: futureDate })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
@@ -500,7 +500,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ toDate: veryPastDate })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
@@ -510,7 +510,7 @@ describe('Teacher Assessment Read (Sprint A.2 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/assessments')
         .query({ fromDate: pastDate, toDate: futureDate })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       const ids = res.body.map((r: any) => r.id).sort();

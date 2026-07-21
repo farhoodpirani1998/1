@@ -130,7 +130,7 @@ describe('Teacher Homework Grading API (Sprint H3.0 e2e)', () => {
     it('grades a submission successfully', async () => {
       const res = await request(server)
         .patch(`/api/v1/teacher/homework/submissions/${submissionA1.id}`)
-        .set(authHeader(app, teacherA))
+        .set('Authorization', authHeader(app, teacherA))
         .send({ score: 18, feedback: '  Great work!  ' });
 
       expect(res.status).toBe(200);
@@ -149,7 +149,7 @@ describe('Teacher Homework Grading API (Sprint H3.0 e2e)', () => {
     it('grades a submission with no feedback supplied', async () => {
       const res = await request(server)
         .patch(`/api/v1/teacher/homework/submissions/${submissionA1.id}`)
-        .set(authHeader(app, teacherA))
+        .set('Authorization', authHeader(app, teacherA))
         .send({ score: 20 });
 
       expect(res.status).toBe(200);
@@ -160,12 +160,12 @@ describe('Teacher Homework Grading API (Sprint H3.0 e2e)', () => {
     it('updates (re-grades) an existing grade in place', async () => {
       await request(server)
         .patch(`/api/v1/teacher/homework/submissions/${submissionA1.id}`)
-        .set(authHeader(app, teacherA))
+        .set('Authorization', authHeader(app, teacherA))
         .send({ score: 10, feedback: 'First pass' });
 
       const res = await request(server)
         .patch(`/api/v1/teacher/homework/submissions/${submissionA1.id}`)
-        .set(authHeader(app, teacherA))
+        .set('Authorization', authHeader(app, teacherA))
         .send({ score: 19, feedback: 'Actually much better on review' });
 
       expect(res.status).toBe(200);
@@ -176,7 +176,7 @@ describe('Teacher Homework Grading API (Sprint H3.0 e2e)', () => {
       // not a duplicate.
       const listRes = await request(server)
         .get(`/api/v1/teacher/homework/${homeworkA1.id}/submissions`)
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
       expect(listRes.body).toHaveLength(1);
       expect(listRes.body[0].score).toBe(19);
     });
@@ -184,12 +184,12 @@ describe('Teacher Homework Grading API (Sprint H3.0 e2e)', () => {
     it('omitting feedback on a re-grade leaves previously-stored feedback unchanged', async () => {
       await request(server)
         .patch(`/api/v1/teacher/homework/submissions/${submissionA1.id}`)
-        .set(authHeader(app, teacherA))
+        .set('Authorization', authHeader(app, teacherA))
         .send({ score: 10, feedback: 'Keep this' });
 
       const res = await request(server)
         .patch(`/api/v1/teacher/homework/submissions/${submissionA1.id}`)
-        .set(authHeader(app, teacherA))
+        .set('Authorization', authHeader(app, teacherA))
         .send({ score: 15 });
 
       expect(res.status).toBe(200);
@@ -200,7 +200,7 @@ describe('Teacher Homework Grading API (Sprint H3.0 e2e)', () => {
     it('rejects a negative score (400)', async () => {
       const res = await request(server)
         .patch(`/api/v1/teacher/homework/submissions/${submissionA1.id}`)
-        .set(authHeader(app, teacherA))
+        .set('Authorization', authHeader(app, teacherA))
         .send({ score: -1 });
       expect(res.status).toBe(400);
     });
@@ -208,7 +208,7 @@ describe('Teacher Homework Grading API (Sprint H3.0 e2e)', () => {
     it('rejects a non-integer score (400)', async () => {
       const res = await request(server)
         .patch(`/api/v1/teacher/homework/submissions/${submissionA1.id}`)
-        .set(authHeader(app, teacherA))
+        .set('Authorization', authHeader(app, teacherA))
         .send({ score: 15.5 });
       expect(res.status).toBe(400);
     });
@@ -216,7 +216,7 @@ describe('Teacher Homework Grading API (Sprint H3.0 e2e)', () => {
     it('rejects a missing score (400)', async () => {
       const res = await request(server)
         .patch(`/api/v1/teacher/homework/submissions/${submissionA1.id}`)
-        .set(authHeader(app, teacherA))
+        .set('Authorization', authHeader(app, teacherA))
         .send({ feedback: 'No score given' });
       expect(res.status).toBe(400);
     });
@@ -224,7 +224,7 @@ describe('Teacher Homework Grading API (Sprint H3.0 e2e)', () => {
     it('404s a nonexistent submissionId', async () => {
       const res = await request(server)
         .patch('/api/v1/teacher/homework/submissions/00000000-0000-0000-0000-000000000000')
-        .set(authHeader(app, teacherA))
+        .set('Authorization', authHeader(app, teacherA))
         .send({ score: 10 });
       expect(res.status).toBe(404);
     });
@@ -256,7 +256,7 @@ describe('Teacher Homework Grading API (Sprint H3.0 e2e)', () => {
 
       const res = await request(server)
         .patch(`/api/v1/teacher/homework/submissions/${submissionB.id}`)
-        .set(authHeader(app, teacherA))
+        .set('Authorization', authHeader(app, teacherA))
         .send({ score: 10 });
       expect(res.status).toBe(404);
     });
@@ -271,7 +271,7 @@ describe('Teacher Homework Grading API (Sprint H3.0 e2e)', () => {
 
       const res = await request(server)
         .patch(`/api/v1/teacher/homework/submissions/${submissionA2.id}`)
-        .set(authHeader(app, teacherA))
+        .set('Authorization', authHeader(app, teacherA))
         .send({ score: 10 });
       expect(res.status).toBe(403);
     });
@@ -279,7 +279,7 @@ describe('Teacher Homework Grading API (Sprint H3.0 e2e)', () => {
     it('rejects a teacher with no assignments at all (403)', async () => {
       const res = await request(server)
         .patch(`/api/v1/teacher/homework/submissions/${submissionA1.id}`)
-        .set(authHeader(app, unassignedTeacherA))
+        .set('Authorization', authHeader(app, unassignedTeacherA))
         .send({ score: 10 });
       expect(res.status).toBe(403);
     });
@@ -287,7 +287,7 @@ describe('Teacher Homework Grading API (Sprint H3.0 e2e)', () => {
     it('is rejected for a non-teacher role (unauthorized role)', async () => {
       const res = await request(server)
         .patch(`/api/v1/teacher/homework/submissions/${submissionA1.id}`)
-        .set(authHeader(app, schoolAdminA))
+        .set('Authorization', authHeader(app, schoolAdminA))
         .send({ score: 10 });
       expect(res.status).toBe(403);
     });

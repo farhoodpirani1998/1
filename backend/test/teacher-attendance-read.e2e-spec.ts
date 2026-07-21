@@ -150,7 +150,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
 
       const res = await request(server)
         .get('/api/v1/teacher/attendance/today')
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       const studentIds = res.body.map((r: any) => r.studentId).sort();
@@ -160,7 +160,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
     it('returns an empty array when nothing has been recorded yet today', async () => {
       const res = await request(server)
         .get('/api/v1/teacher/attendance/today')
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
@@ -174,7 +174,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
     it('is rejected for a non-teacher role', async () => {
       const res = await request(server)
         .get('/api/v1/teacher/attendance/today')
-        .set(authHeader(app, schoolAdminA));
+        .set('Authorization', authHeader(app, schoolAdminA));
       expect(res.status).toBe(403);
     });
   });
@@ -204,7 +204,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
     it('returns in-scope attendance for an explicit past date', async () => {
       const res = await request(server)
         .get(`/api/v1/teacher/attendance/date/${pastDate}`)
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body.map((r: any) => r.studentId)).toEqual([studentA1a.id]);
@@ -215,7 +215,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
       const res = await request(server)
         .get(`/api/v1/teacher/attendance/date/${pastDate}`)
         .query({ classId: classA1a.id })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body.map((r: any) => r.studentId)).toEqual([studentA1a.id]);
@@ -225,7 +225,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
       const res = await request(server)
         .get(`/api/v1/teacher/attendance/date/${pastDate}`)
         .query({ classId: classA1b.id })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(403);
     });
@@ -235,7 +235,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
       const res = await request(server)
         .get(`/api/v1/teacher/attendance/date/${pastDate}`)
         .query({ gradeId: otherGrade.id })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(403);
     });
@@ -243,7 +243,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
     it('rejects a malformed date (400)', async () => {
       const res = await request(server)
         .get('/api/v1/teacher/attendance/date/not-a-date')
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(400);
     });
@@ -251,7 +251,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
     it('is rejected for a non-teacher role', async () => {
       const res = await request(server)
         .get(`/api/v1/teacher/attendance/date/${pastDate}`)
-        .set(authHeader(app, schoolAdminA));
+        .set('Authorization', authHeader(app, schoolAdminA));
       expect(res.status).toBe(403);
     });
   });
@@ -279,7 +279,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
 
       const res = await request(server)
         .get('/api/v1/teacher/attendance/status')
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body).toHaveLength(2);
@@ -307,7 +307,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
     it('counts an unrecorded student as notRecorded, not absent', async () => {
       const res = await request(server)
         .get('/api/v1/teacher/attendance/status')
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       const classA1aRow = res.body.find((r: any) => r.classId === classA1a.id);
@@ -332,7 +332,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/attendance/status')
         .query({ date: pastDate })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       const classA1aRow = res.body.find((r: any) => r.classId === classA1a.id);
@@ -343,7 +343,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
       const res = await request(server)
         .get('/api/v1/teacher/attendance/status')
         .query({ gradeId: gradeA2.id })
-        .set(authHeader(app, teacherA));
+        .set('Authorization', authHeader(app, teacherA));
 
       expect(res.status).toBe(200);
       expect(res.body).toHaveLength(1);
@@ -354,7 +354,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
       const unassignedTeacher = await createUser(app, { role: Role.TEACHER, schoolId: schoolA.id });
       const res = await request(server)
         .get('/api/v1/teacher/attendance/status')
-        .set(authHeader(app, unassignedTeacher));
+        .set('Authorization', authHeader(app, unassignedTeacher));
 
       expect(res.status).toBe(200);
       expect(res.body).toEqual([]);
@@ -363,7 +363,7 @@ describe('Teacher Attendance Read (Sprint A.1 e2e)', () => {
     it('is rejected for a non-teacher role', async () => {
       const res = await request(server)
         .get('/api/v1/teacher/attendance/status')
-        .set(authHeader(app, schoolAdminA));
+        .set('Authorization', authHeader(app, schoolAdminA));
       expect(res.status).toBe(403);
     });
   });
