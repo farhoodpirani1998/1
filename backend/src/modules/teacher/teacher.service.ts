@@ -33,6 +33,7 @@ import {
   HomeworkSubmissionService,
 } from '../homework/homework-submission.service';
 import { HomeworkSubmission, HomeworkSubmissionStatus } from '../homework/entities/homework-submission.entity';
+import { GradeHomeworkSubmissionDto } from '../homework/dto/grade-homework-submission.dto';
 
 // Sprint 2B: 'teacher' added alongside 'grade'/'subject' so
 // toTeacherAssignmentView can populate teacherName as well as
@@ -676,6 +677,43 @@ export class TeacherService {
       pendingRate: rate(pendingCount),
       missingRate: rate(missingCount),
     };
+  }
+
+  /**
+   * Sprint H3.0 — grades (or re-grades) one submission belonging to one
+   * of the teacher's own accessible homework.
+   *
+   * Same access gate as every other Sprint A.3.3 submission route on
+   * this service: the submission's homework must exist within the
+   * caller's school AND the teacher must hold a TeacherAssignment
+   * covering its (gradeId, subjectId) -- reuses
+   * assertHomeworkAccessible() directly rather than re-deriving that
+   * check, exactly the "one shared access gate, not a copy per route"
+   * shape getMyHomeworkSubmissions()/getMyHomeworkSubmissionSummary()
+   * already follow. Deliberately NOT restricted to homework this
+   * teacher personally posted (same "assignment-scoped, not
+   * creator-scoped" reasoning as the rest of this section).
+   *
+   * The submission itself is resolved first (schoolId-scoped, same
+   * "wrong-tenant id looks identical to nonexistent" 404 shape every
+   * other lookup in this codebase uses) so a submissionId from another
+   * school 404s before this ever touches the assignment gate; its own
+   * homeworkId then feeds assertHomeworkAccessible() the same way every
+   * other route here resolves it. All grading business logic (the
+   * score/maxScore bound, feedback's omit-vs-clear rule, setting
+   * gradedAt/gradedByUserId) is owned entirely by
+   * HomeworkSubmissionService.gradeSubmission() -- never duplicated
+   * here.
+   */
+  async gradeMyHomeworkSubmission(
+    teacherId: string,
+    schoolId: string,
+    submissionId: string,
+    dto: GradeHomeworkSubmissionDto,
+  ): Promise<HomeworkSubmission> {
+    const submission = await this.homeworkSubmissionService.findOne(submissionId, schoolId);
+    await this.assertHomeworkAccessible(teacherId, schoolId, submission.homeworkId);
+    return this.homeworkSubmissionService.gradeSubmission(submissionId, dto, schoolId, teacherId);
   }
 
   // ---------------------------------------------------------------------

@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { HomeworkSubmission, HomeworkSubmissionStatus } from './entities/homework-submission.entity';
 import { Student } from '../students/entities/student.entity';
 import { HomeworkService } from './homework.service';
+import { GradeHomeworkSubmissionDto } from './dto/grade-homework-submission.dto';
 
 const SUBMISSION_RELATIONS = ['student', 'homework'];
 
@@ -64,6 +65,13 @@ export interface HomeworkSubmissionSummary {
  * deliberately out of scope, same as the entity itself (see
  * HomeworkSubmission's header comment) -- recordSubmission() only ever
  * writes status/submittedAt, never a score or an attachment reference.
+ *
+ * Sprint H3.0 update: grading is no longer out of scope -- see
+ * gradeSubmission() below. File attachments remain unimplemented.
+ * gradeSubmission() is intentionally independent of recordSubmission():
+ * it never writes status/submittedAt, and recordSubmission() never
+ * writes the grading columns, so the two write paths can't step on each
+ * other.
  */
 @Injectable()
 export class HomeworkSubmissionService {
@@ -123,6 +131,71 @@ export class HomeworkSubmissionService {
       status: input.status,
       submittedAt,
     });
+    return this.submissionRepo.save(submission);
+  }
+
+  /**
+   * Sprint H3.0 — grades (or re-grades) one existing submission.
+   *
+   * Deliberately separate from recordSubmission() above, never
+   * reimplements or calls into it: recordSubmission() owns the
+   * submit-side upsert (status/submittedAt only, keyed on
+   * (homeworkId, studentId)); this method owns only the grading fields
+   * (score/feedback/gradedAt/gradedByUserId), keyed on the submission's
+   * own id, and never writes status or submittedAt -- both are read
+   * back unchanged on the same row this saves.
+   *
+   * Tenant enforcement mirrors findOne() above: the submission is
+   * looked up scoped to schoolId (a wrong-tenant or nonexistent
+   * submissionId both 404 identically, same "looks identical to
+   * nonexistent" reasoning findOne()'s own comment gives). A submission
+   * may be graded regardless of its current status -- this sprint does
+   * not require `submitted`/`late` first, since a teacher correcting a
+   * `missing` row straight to a score is a reasonable real-world flow
+   * and nothing about the schema (every grading column is nullable
+   * independent of status) forces otherwise.
+   *
+   * `score`'s upper bound is resolved here, not in the DTO: the
+   * submission's homework is resolved through
+   * HomeworkService.findOneForSchool() (already tenant-checked, so this
+   * never re-derives a second tenant check for the homework side), and
+   * if that Homework row happens to carry a `maxScore` property (it
+   * does not today -- see the Homework entity and the DTO's own
+   * comment) the score is additionally bounded by it; otherwise only
+   * the DTO's own >= 0 floor applies. This runtime (not
+   * compile-time-typed) check is what lets that upper bound activate
+   * automatically the moment a future migration adds
+   * Homework.maxScore, with no change needed here or in the DTO.
+   *
+   * `feedback` follows an explicit-omit-vs-explicit-clear rule: left
+   * out of the request body entirely, any previously-stored feedback is
+   * left untouched; an explicit empty string clears it. This is the
+   * same "omitting a field leaves it unchanged, explicit value (however
+   * empty) always wins" convention
+   * RecordHomeworkSubmissionInput.submittedAt's own comment already
+   * documents for this module.
+   */
+  async gradeSubmission(
+    submissionId: string,
+    dto: GradeHomeworkSubmissionDto,
+    schoolId: string,
+    teacherUserId: string,
+  ): Promise<HomeworkSubmission> {
+    const submission = await this.findOne(submissionId, schoolId);
+
+    const homework = await this.homeworkService.findOneForSchool(submission.homeworkId, schoolId);
+    const maxScore = (homework as unknown as { maxScore?: unknown }).maxScore;
+    if (typeof maxScore === 'number' && dto.score > maxScore) {
+      throw new BadRequestException('نمره نمی‌تواند بیشتر از حداکثر نمره تکلیف باشد');
+    }
+
+    submission.score = dto.score;
+    if (dto.feedback !== undefined) {
+      submission.feedback = dto.feedback;
+    }
+    submission.gradedAt = new Date();
+    submission.gradedByUserId = teacherUserId;
+
     return this.submissionRepo.save(submission);
   }
 

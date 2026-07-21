@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Put, Delete, Body, Param, Query, UseGuards, HttpCode } from '@nestjs/common';
+import { Controller, Post, Get, Put, Patch, Delete, Body, Param, Query, UseGuards, HttpCode } from '@nestjs/common';
 import { TeacherService } from './teacher.service';
 import { CreateTeacherAssignmentDto } from './dto/create-teacher-assignment.dto';
 import { QueryTeacherStudentsDto } from './dto/query-teacher-students.dto';
@@ -22,6 +22,7 @@ import { QueryHomeworkDto } from '../homework/dto/query-homework.dto';
 import { toHomeworkView } from '../homework/dto/homework-view.dto';
 import { QueryTeacherHomeworkSubmissionsDto } from './dto/query-teacher-homework-submissions.dto';
 import { toTeacherHomeworkSubmissionView } from './dto/teacher-homework-submission-view.dto';
+import { GradeHomeworkSubmissionDto } from '../homework/dto/grade-homework-submission.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -337,6 +338,30 @@ export class TeacherController {
   @Roles('teacher')
   getMyHomeworkSubmissionSummary(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
     return this.teacherService.getMyHomeworkSubmissionSummary(user.id, user.schoolId, id);
+  }
+
+  // Sprint H3.0 — grades (or re-grades) one submission. Declared as its
+  // own literal path segment ('submissions/:submissionId', not nested
+  // under 'homework/:id/...') since grading acts on a submission by its
+  // own id, not by (homeworkId, studentId) -- the caller doesn't need
+  // to already know which homework a submission belongs to.
+  // Authorization is the exact same assignment gate every other
+  // homework-submission route above already uses -- see
+  // TeacherService.gradeMyHomeworkSubmission().
+  @Patch('homework/submissions/:submissionId')
+  @Roles('teacher')
+  async gradeHomeworkSubmission(
+    @Param('submissionId') submissionId: string,
+    @Body() dto: GradeHomeworkSubmissionDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const submission = await this.teacherService.gradeMyHomeworkSubmission(
+      user.id,
+      user.schoolId,
+      submissionId,
+      dto,
+    );
+    return toTeacherHomeworkSubmissionView(submission);
   }
 
   // Same roster-aware counts as the summary route above, plus the

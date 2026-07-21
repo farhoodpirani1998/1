@@ -13,6 +13,15 @@ export interface TeacherHomeworkSubmissionView {
   studentName?: string;
   status: string;
   submittedAt: Date | null;
+  // Sprint H3.0 — additive: null on every submission that hasn't been
+  // graded yet, same "unset until the thing it names has actually
+  // happened" shape as submittedAt above. Every field that already
+  // existed on this view is unchanged, so no existing caller of
+  // GET /teacher/homework/:id/submissions breaks.
+  score: number | null;
+  feedback: string | null;
+  gradedAt: Date | null;
+  gradedByUserId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,6 +36,10 @@ export function toTeacherHomeworkSubmissionView(
     studentName: submission.student?.fullName,
     status: submission.status,
     submittedAt: submission.submittedAt,
+    score: submission.score,
+    feedback: submission.feedback,
+    gradedAt: submission.gradedAt,
+    gradedByUserId: submission.gradedByUserId,
     createdAt: submission.createdAt,
     updatedAt: submission.updatedAt,
   };

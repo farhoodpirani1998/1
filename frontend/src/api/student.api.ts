@@ -55,6 +55,19 @@ export function getHomework() {
   return api.get<StudentHomeworkView[]>('/student/homework');
 }
 
+// POST /student/homework/:homeworkId/submit — Sprint H2. Records (or
+// corrects, on a second call) the signed-in student's own submission for
+// one homework. Body is intentionally empty (SubmitHomeworkDto has no
+// fields — see StudentController's own comment: there's nothing to submit
+// yet but the fact of submission itself, no note/no file this sprint), so
+// this only ever needs the homeworkId, taken from the URL, never from a
+// client-supplied studentId. Returns the same StudentHomeworkView shape
+// getHomework() returns per row, so a caller can drop the response
+// straight into its existing list without a new type.
+export function submitHomework(homeworkId: string) {
+  return api.post<StudentHomeworkView>(`/student/homework/${homeworkId}/submit`, {});
+}
+
 // GET /student/announcements — announcements targeted at 'all' or
 // 'students', within the student's own school.
 export function getAnnouncements() {

@@ -31,7 +31,7 @@ export function MyAvatarPanel() {
     // otherwise choosing the same file twice in a row (e.g. re-picking
     // after a validation error) wouldn't fire onChange the second time.
     e.target.value = '';
-    if (!file) {
+    if (!file || isBusy) {
       return;
     }
     setError(null);
@@ -45,6 +45,7 @@ export function MyAvatarPanel() {
   }
 
   function handleRemove() {
+    if (isBusy) return;
     setError(null);
     deleteAvatar.mutate(undefined, {
       onSuccess: () => showSuccess('آواتار حذف شد'),

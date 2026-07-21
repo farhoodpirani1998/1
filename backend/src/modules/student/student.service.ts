@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { StudentUser } from '../students/entities/student-user.entity';
@@ -34,6 +34,7 @@ import { ReportCardView, buildReportCard } from '../student-assessments/dto/repo
 // one response.
 import { HomeworkService } from '../homework/homework.service';
 import { HomeworkSubmissionService } from '../homework/homework-submission.service';
+import { HomeworkSubmissionStatus } from '../homework/entities/homework-submission.entity';
 import { StudentHomeworkView, toStudentHomeworkView } from './dto/student-homework-view.dto';
 // ADR-001 Task 4F: GET /student/announcements reuses AnnouncementsService
 // the same way GET /student/attendance reuses AttendanceService above --
@@ -207,6 +208,79 @@ export class StudentService {
   async getMyHomework(userId: string, schoolId: string): Promise<StudentHomeworkView[]> {
     const student = await this.resolveMyStudent(userId, schoolId);
     return this.buildHomeworkView(student.id, schoolId);
+  }
+
+  /**
+   * Sprint H1.5: the authenticated student's own action to submit (or
+   * resubmit/correct) one homework — the only /student/* write in this
+   * service, every other method here is read-only. Resolution is the
+   * identical resolveMyStudent() every read above uses (404 if unlinked
+   * or cross-school), so an unlinked student can't submit any more than
+   * they can read.
+   *
+   * The homework itself is fetched once via
+   * HomeworkService.findOneForSchool() — the same tenant check (404
+   * nonexistent, 403 cross-school) every other homework-adjacent read in
+   * this class already gets, and the one place `dueDate` needs to come
+   * from. That check only ever confirms *tenant* (same school) — it says
+   * nothing about whether this homework was posted for this student's own
+   * grade. HomeworkSubmissionService.recordSubmission() doesn't check that
+   * either (by design — see its own doc comment: it only ever enforces
+   * schoolId, the same scope every other homework write in the codebase
+   * checks). Left unchecked, any authenticated student could submit a
+   * homework row belonging to a different grade in the same school, since
+   * findOneForSchool()'s 403/404 split is keyed on schoolId alone.
+   *
+   * So this method adds the one check that's actually missing, right
+   * here rather than in HomeworkSubmissionService (which stays a generic,
+   * reusable "record this student's submission for this homework" writer
+   * — narrowing its tenant check to "same grade too" would break any
+   * future caller, e.g. a teacher correcting a submission, that has no
+   * "my own grade" notion to enforce): using the already-loaded `homework`
+   * and `student` from resolveMyStudent()/findOneForSchool() above (no
+   * extra query), homework.gradeId must equal student.gradeId, or this
+   * 403s before anything is written. (Homework has no separate
+   * class-level assignment field today — see Homework entity — so grade
+   * is the full ownership check for now; a class dimension would be added
+   * here too if one's ever introduced.)
+   *
+   * Status is computed here, once, from a plain string-date compare
+   * against `dueDate` ('YYYY-MM-DD', the same format the frontend's own
+   * isOverdue() already compares against): 'late' once today's date is
+   * past dueDate, 'submitted' otherwise. This is the other piece of new
+   * business logic this sprint adds — everything else (the
+   * upsert-on-resubmit, the tenant checks, submittedAt derivation) is
+   * entirely HomeworkSubmissionService.recordSubmission()'s existing
+   * logic, reused as-is and never reimplemented here.
+   *
+   * Returns the same StudentHomeworkView shape GET /student/homework
+   * already returns per row (built via the same toStudentHomeworkView()
+   * mapper, fed the same already-fetched `homework` plus the fresh
+   * `submission`), so the frontend can drop this response straight into
+   * its existing list/cache without a new type.
+   */
+  async submitMyHomework(
+    userId: string,
+    schoolId: string,
+    homeworkId: string,
+  ): Promise<StudentHomeworkView> {
+    const student = await this.resolveMyStudent(userId, schoolId);
+    const homework = await this.homeworkService.findOneForSchool(homeworkId, schoolId);
+
+    if (homework.gradeId !== student.gradeId) {
+      throw new ForbiddenException('این تکلیف متعلق به پایه شما نیست');
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const status =
+      today > homework.dueDate ? HomeworkSubmissionStatus.LATE : HomeworkSubmissionStatus.SUBMITTED;
+
+    const submission = await this.homeworkSubmissionService.recordSubmission(
+      { homeworkId: homework.id, studentId: student.id, status },
+      schoolId,
+    );
+
+    return toStudentHomeworkView(homework, submission);
   }
 
   /**

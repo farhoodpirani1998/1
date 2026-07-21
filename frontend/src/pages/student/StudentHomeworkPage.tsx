@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { PageHeader } from '../../components/PageHeader';
 import { Card } from '../../components/Card';
 import { StatCard } from '../../components/StatCard';
@@ -5,14 +6,33 @@ import { EmptyState } from '../../components/EmptyState';
 import { Button } from '../../components/Button';
 import { SkeletonCards } from '../../components/Skeleton';
 import { Table, type TableColumn } from '../../components/Table';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
+import { FormError } from '../../components/FormError';
 import { AssignmentsIcon } from '../../components/icons/SchoolIcons';
 import { formatDate, toPersianDigits } from '../../lib/format';
-import { useStudentHomework } from '../../hooks/useStudentPortal';
+import { useToast } from '../../lib/toast';
+import { parseApiError, getErrorMessage, type ParsedApiError } from '../../lib/error-handler';
+import { useStudentHomework, useSubmitHomework } from '../../hooks/useStudentPortal';
 import type { StudentHomeworkView } from '../../types/studentPortal.types';
 
 // Task 5B-C — /student/homework. The signed-in student's own assigned
 // homework, backed by GET /student/homework (useStudentHomework) only —
 // no other query, no direct API call, no duplicated state/business logic.
+//
+// Sprint H2 adds the page's one write: a per-row Submit/Resubmit action
+// backed by POST /student/homework/:homeworkId/submit (useSubmitHomework,
+// hooks/useStudentPortal.ts), confirmed via the shared ConfirmDialog
+// rather than firing on click — same "confirm before a state-changing
+// action" shape used elsewhere in the app (VoidPaymentDialog, delete
+// flows). No new architecture: the mutation invalidates
+// queryKeys.studentPortal.homework() only (no manual cache patch), so the
+// table's own useStudentHomework() query refetches and every column
+// (badge, submittedAt, action button) updates from that one refetch —
+// there is no second, hand-maintained copy of "this row's status" on this
+// page. Errors surface both as a toast (useToast, matching every other
+// mutation in the app) and inline via the shared FormError, so the retry
+// path is just reopening/reconfirming the same dialog — no bespoke retry
+// logic is introduced.
 //
 // Design reference: same "stat row + records Table" shape as
 // StudentAttendancePage (loading → SkeletonCards, error → EmptyState +
@@ -84,6 +104,50 @@ function SubmissionStatusBadge({ submissionStatus }: { submissionStatus: string 
 
 export function StudentHomeworkPage() {
   const homeworkQuery = useStudentHomework();
+  const submitHomework = useSubmitHomework();
+  const { showSuccess, showError } = useToast();
+
+  // The homework row currently targeted by the confirm dialog — null
+  // means the dialog is closed. Reused for both the first submission and
+  // a resubmit (same endpoint, same upsert-on-resubmit backend behavior —
+  // see StudentService.submitMyHomework()'s own doc comment), so there's
+  // only ever one dialog/one mutation in flight at a time, never a
+  // per-row copy of this state.
+  const [actionTarget, setActionTarget] = useState<StudentHomeworkView | null>(null);
+  const [actionError, setActionError] = useState<ParsedApiError | null>(null);
+
+  function openAction(hw: StudentHomeworkView) {
+    setActionError(null);
+    setActionTarget(hw);
+  }
+
+  function closeAction() {
+    if (submitHomework.isPending) return;
+    setActionTarget(null);
+    setActionError(null);
+  }
+
+  // Also doubles as the retry action: on failure the dialog stays open
+  // (closeAction() isn't called from onError below), so clicking confirm
+  // again just re-fires the same mutation for the same actionTarget.
+  function confirmAction() {
+    if (!actionTarget) return;
+    setActionError(null);
+    submitHomework.mutate(actionTarget.id, {
+      onSuccess: () => {
+        showSuccess(
+          isOverdue(actionTarget.dueDate)
+            ? 'تکلیف با تأخیر ثبت شد'
+            : 'تکلیف با موفقیت ثبت شد',
+        );
+        setActionTarget(null);
+      },
+      onError: (err) => {
+        setActionError(parseApiError(err));
+        showError(getErrorMessage(err));
+      },
+    });
+  }
 
   if (homeworkQuery.isLoading) {
     return (
@@ -180,6 +244,24 @@ export function StudentHomeworkPage() {
       header: 'تاریخ ارسال',
       render: (hw) => (hw.submittedAt ? formatDate(hw.submittedAt) : '—'),
     },
+    {
+      key: 'action',
+      header: 'اقدام',
+      render: (hw) => {
+        const pending = submitHomework.isPending && actionTarget?.id === hw.id;
+        return (
+          <Button
+            size="sm"
+            variant={isSubmitted(hw.submissionStatus) ? 'secondary' : 'primary'}
+            loading={pending}
+            disabled={submitHomework.isPending && !pending}
+            onClick={() => openAction(hw)}
+          >
+            {isSubmitted(hw.submissionStatus) ? 'ارسال مجدد' : 'ثبت ارسال'}
+          </Button>
+        );
+      },
+    },
   ];
 
   return (
@@ -202,6 +284,7 @@ export function StudentHomeworkPage() {
 
       <div className="mt-6">
         <Card title="لیست تکالیف">
+          <FormError error={actionError} />
           <Table
             columns={columns}
             data={homework}
@@ -211,6 +294,24 @@ export function StudentHomeworkPage() {
           />
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={actionTarget !== null}
+        title={actionTarget && isSubmitted(actionTarget.submissionStatus) ? 'ارسال مجدد تکلیف' : 'ثبت ارسال تکلیف'}
+        description={
+          actionTarget
+            ? isSubmitted(actionTarget.submissionStatus)
+              ? `آیا از ثبت مجدد ارسال «${actionTarget.title}» مطمئن هستید؟ وضعیت قبلی این تکلیف جایگزین می‌شود.`
+              : isOverdue(actionTarget.dueDate)
+                ? `مهلت «${actionTarget.title}» گذشته است. با این حال می‌توانید آن را با تأخیر ثبت کنید.`
+                : `آیا از ثبت ارسال «${actionTarget.title}» مطمئن هستید؟`
+            : undefined
+        }
+        confirmLabel={actionTarget && isSubmitted(actionTarget.submissionStatus) ? 'ارسال مجدد' : 'ثبت ارسال'}
+        loading={submitHomework.isPending}
+        onConfirm={confirmAction}
+        onCancel={closeAction}
+      />
     </div>
   );
 }

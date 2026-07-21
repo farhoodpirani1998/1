@@ -29,7 +29,7 @@ const KIND_LABELS: Record<ParsedApiError['kind'], string> = {
 export function FormError({ error }: { error: ParsedApiError | null }) {
   if (!error) return null;
   return (
-    <div className={`mb-4 rounded-lg border px-3 py-2.5 text-sm ${KIND_STYLES[error.kind]}`}>
+    <div role="alert" aria-live="polite" className={`mb-4 rounded-lg border px-3 py-2.5 text-sm ${KIND_STYLES[error.kind]}`}>
       <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold opacity-90">
         <ErrorIcon size={14} className="shrink-0" />
         {KIND_LABELS[error.kind]}

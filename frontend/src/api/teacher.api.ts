@@ -372,6 +372,64 @@ export function getMyHomeworkSubmissionSummary(homeworkId: string) {
 }
 
 // ---------------------------------------------------------------------
+// Sprint H3.0 — GET /teacher/homework/:id/submissions and
+// PATCH /teacher/homework/submissions/:submissionId. Mirrors backend
+// TeacherHomeworkSubmissionView / GradeHomeworkSubmissionDto exactly
+// (teacher-homework-submission-view.dto.ts, grade-homework-submission.dto.ts).
+//
+// Deliberately does NOT include a fileUrl/fileName/fileType field:
+// HomeworkSubmission has no file-storage column on the backend at all
+// yet (SubmitHomeworkDto is an empty body — see that DTO's own header
+// comment), so there is nothing real to mirror here. The submissions
+// modal still shows a file preview/download using locally-generated
+// placeholder data (see api/homeworkSubmissions.mock.ts) until a real
+// upload endpoint exists — do not add a file field to this interface
+// before that backend work lands, or it will silently lie about what
+// the API returns.
+//
+// Similarly, there is no "returned for revision" status on the backend
+// (HomeworkSubmissionStatus is only pending/submitted/late/missing) and
+// no endpoint for it — "return" stays a purely local/mock action layered
+// on top of this real data (see homeworkSubmissions.mock.ts).
+// ---------------------------------------------------------------------
+
+export interface TeacherHomeworkSubmissionView {
+  id: string;
+  homeworkId: string;
+  studentId: string;
+  studentName?: string;
+  status: string;
+  submittedAt: string | null;
+  score: number | null;
+  feedback: string | null;
+  gradedAt: string | null;
+  gradedByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Optional narrowing filter, mirrors QueryTeacherHomeworkSubmissionsDto
+// — omitted entirely returns every submission row for the homework.
+export function getMyHomeworkSubmissions(homeworkId: string, status?: string) {
+  return api.get<TeacherHomeworkSubmissionView[]>(`/teacher/homework/${homeworkId}/submissions`, {
+    params: status ? { status } : undefined,
+  });
+}
+
+// score is required (int, >= 0 — no upper bound enforced today, see
+// GradeHomeworkSubmissionDto's own comment on Homework.maxScore not
+// existing yet). feedback is optional: omit to leave any previously
+// stored feedback unchanged, pass '' to explicitly clear it.
+export interface GradeHomeworkSubmissionInput {
+  score: number;
+  feedback?: string;
+}
+
+export function gradeMyHomeworkSubmission(submissionId: string, dto: GradeHomeworkSubmissionInput) {
+  return api.patch<TeacherHomeworkSubmissionView>(`/teacher/homework/submissions/${submissionId}`, dto);
+}
+
+// ---------------------------------------------------------------------
 // Teacher Timetable (Phase 5K). GET /teacher/timetable — @Roles('teacher').
 // Read-only: every scheduled period for the caller, within their own
 // school (TeacherController.getMyTimetable takes no query params, unlike

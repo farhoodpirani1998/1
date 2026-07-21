@@ -94,6 +94,52 @@ export class HomeworkSubmission {
   @Column({ name: 'submitted_at', type: 'timestamp', nullable: true })
   submittedAt: Date | null;
 
+  // Sprint H3.0 — Homework Grading Foundation.
+  //
+  // Additive-only, same "future grading ... additive columns on this
+  // same table" shape this entity's own header comment already
+  // anticipated. All four columns are nullable: a submission is
+  // gradeable regardless of status (this sprint does not restrict
+  // grading to `submitted`/`late` rows -- see
+  // HomeworkSubmissionService.gradeSubmission()), and an ungraded row
+  // simply has all four columns unset, same "nullable until the thing
+  // it names has actually happened" shape as `submittedAt` above.
+  //
+  // `score` is a plain integer (see GradeHomeworkSubmissionDto), not
+  // numeric/decimal -- unlike Assessment.score (which normalizes
+  // against a configurable maxScore for report-card averaging),
+  // homework grading has no such normalization requirement yet, so
+  // integer is the simplest column that satisfies today's validation
+  // (min 0, optionally bounded by homework.maxScore once that field
+  // exists -- see the DTO's own comment).
+  @Column({ type: 'int', nullable: true })
+  score: number | null;
+
+  // Free-text teacher comment on the grade. Same "text column, no
+  // length cap enforced at the schema level" shape as
+  // Homework.description; length is bounded at the DTO layer instead
+  // (see GradeHomeworkSubmissionDto).
+  @Column({ type: 'text', nullable: true })
+  feedback: string | null;
+
+  // When the submission was last graded -- null until gradeSubmission()
+  // sets it, same "nullable timestamp, set only once the thing it names
+  // has actually happened" shape as `submittedAt` above. Re-set (not
+  // preserved) on every re-grade, so it always reflects the most recent
+  // grading action.
+  @Column({ name: 'graded_at', type: 'timestamp', nullable: true })
+  gradedAt: Date | null;
+
+  // The teacher (User.id) who most recently graded this submission --
+  // not necessarily the same teacher who posted the homework (see
+  // TeacherService's own "assignment-scoped, not creator-scoped"
+  // reasoning for why any assigned teacher may act on a submission).
+  // Stored as a plain uuid column, not a ManyToOne relation, same
+  // "store the id, no relation needed for a field only ever read back
+  // as-is" shape used elsewhere for ids that are never joined through.
+  @Column({ name: 'graded_by_user_id', type: 'uuid', nullable: true })
+  gradedByUserId: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

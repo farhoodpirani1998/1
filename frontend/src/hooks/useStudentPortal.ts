@@ -1,10 +1,11 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getProfile,
   getAttendance,
   getAssessments,
   getReportCard,
   getHomework,
+  submitHomework,
   getAnnouncements,
   getDocuments,
   getTimetable,
@@ -19,10 +20,10 @@ import { queryKeys } from '../lib/queryKeys';
 //
 // Every hook below is read-only, same "query only, nothing to
 // invalidate" shape as the Teacher Portal's own read-only hooks
-// (useTeacherTimetable, useTeacherAnnouncements) — this portal has no
-// mutations. Foundation only: these hooks aren't wired into any page
-// yet (the Dashboard/feature pages are placeholders for now), but are
-// ready for the sprints that build them.
+// (useTeacherTimetable, useTeacherAnnouncements) — foundation only, ready
+// for the sprints that build the pages using them. Sprint H2 adds this
+// portal's first (and so far only) mutation, useSubmitHomework() below,
+// wired into StudentHomeworkPage.
 
 // GET /student/profile.
 export function useStudentProfile() {
@@ -61,6 +62,24 @@ export function useStudentHomework() {
   return useQuery({
     queryKey: queryKeys.studentPortal.homework(),
     queryFn: () => getHomework().then((res) => res.data),
+  });
+}
+
+// POST /student/homework/:homeworkId/submit — Sprint H2. The portal's
+// first write. Invalidates ONLY queryKeys.studentPortal.homework() (no
+// manual cache write/patch) — the backend's own upsert-on-resubmit
+// already means a second call for the same homeworkId corrects the
+// existing row rather than creating a second one, so a plain invalidate
+// + refetch is enough to bring StudentHomeworkPage's list back in sync,
+// same "invalidate the one query this write can affect, let React Query
+// refetch" shape useRecordAttendanceAdmin() already uses.
+export function useSubmitHomework() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (homeworkId: string) => submitHomework(homeworkId).then((res) => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.studentPortal.homework() });
+    },
   });
 }
 

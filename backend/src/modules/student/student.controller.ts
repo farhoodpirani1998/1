@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import { StudentService } from './student.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -10,6 +10,7 @@ import { ParentAttendanceView } from '../attendance/dto/attendance-view.dto';
 import { ParentAssessmentView } from '../student-assessments/dto/assessment-view.dto';
 import { ReportCardView } from '../student-assessments/dto/report-card-view.dto';
 import { StudentHomeworkView } from './dto/student-homework-view.dto';
+import { SubmitHomeworkDto } from './dto/submit-homework.dto';
 import { RecipientAnnouncementView } from '../announcements/dto/announcement-view.dto';
 import { ParentStudentDocumentView } from '../student-documents/dto/student-document-view.dto';
 import { RecipientTimetableEntryView } from '../timetable/dto/timetable-entry-view.dto';
@@ -90,6 +91,28 @@ export class StudentController {
   @Get('homework')
   getHomework(@CurrentUser() user: AuthenticatedUser): Promise<StudentHomeworkView[]> {
     return this.studentService.getMyHomework(user.id, user.schoolId);
+  }
+
+  // Sprint H1.5: the one write route on this controller — every other
+  // /student/* route is read-only. Same "resolve entirely via
+  // CurrentUser, no client-supplied studentId" shape as every read
+  // above: homeworkId identifies *which* homework (from the URL), the
+  // token identifies *who* (never a body field). Body is intentionally
+  // empty (see SubmitHomeworkDto's own comment) — there's nothing to
+  // submit yet but the fact of submission itself; no note, no file.
+  // Resubmitting (calling this again for the same homework) corrects
+  // the existing row rather than creating a second one — entirely
+  // StudentService.submitMyHomework() / HomeworkSubmissionService.
+  // recordSubmission()'s existing upsert behavior, not reimplemented
+  // here.
+  @Roles(Role.STUDENT)
+  @Post('homework/:homeworkId/submit')
+  submitHomework(
+    @Param('homeworkId') homeworkId: string,
+    @Body() _dto: SubmitHomeworkDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<StudentHomeworkView> {
+    return this.studentService.submitMyHomework(user.id, user.schoolId, homeworkId);
   }
 
   // ADR-001 Task 4F: same "resolve entirely via CurrentUser, no
