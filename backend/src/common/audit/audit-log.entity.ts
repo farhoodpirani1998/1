@@ -22,6 +22,24 @@ export enum AuditAction {
   CREATE_INSTALLMENT = 'CREATE_INSTALLMENT',
   UPDATE_INSTALLMENT = 'UPDATE_INSTALLMENT',
   DISCOUNT_APPLIED = 'DISCOUNT_APPLIED',
+  // Sprint 2 — Feature 2B: written once per lock transition (see
+  // AuthService.login / AuditEventsListener) -- never per failed attempt.
+  ACCOUNT_LOCKED = 'ACCOUNT_LOCKED',
+  // Sprint 2 — Feature 3A: gap-fill for domain events that were already
+  // emitted by InstallmentsService but had no AuditEventsListener handler
+  // (see AuditEventsListener for each one's mapping).
+  INSTALLMENT_ADDED = 'INSTALLMENT_ADDED',
+  INSTALLMENT_REMOVED = 'INSTALLMENT_REMOVED',
+  INSTALLMENT_WRITTEN_OFF = 'INSTALLMENT_WRITTEN_OFF',
+  INSTALLMENTS_RENEGOTIATED = 'INSTALLMENTS_RENEGOTIATED',
+  // Sprint 2 — Feature 3A: security/user-management coverage. Never
+  // written for failed login attempts -- see AuthService.login and the
+  // existing ACCOUNT_LOCKED comment above for why.
+  LOGIN_SUCCEEDED = 'LOGIN_SUCCEEDED',
+  PASSWORD_CHANGED = 'PASSWORD_CHANGED',
+  PASSWORD_RESET = 'PASSWORD_RESET',
+  USER_CREATED = 'USER_CREATED',
+  USER_STATUS_CHANGED = 'USER_STATUS_CHANGED',
 }
 
 /**

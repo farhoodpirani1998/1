@@ -2,12 +2,27 @@ import { NestFactory } from '@nestjs/core';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
+import hpp from 'hpp';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { AppLogger } from './common/logging/app-logger.service';
 import { AVATAR_URL_PREFIX, resolveAvatarUploadDir } from './common/storage/avatar-storage.service';
-import { isSwaggerEnabled, setupSwagger, SWAGGER_DOCS_PATH } from './config/swagger.config';
+import {
+  isSwaggerEnabled,
+  setupSwagger,
+  swaggerCspMiddleware,
+  SWAGGER_DOCS_PATH,
+} from './config/swagger.config';
 import { initSentry } from './config/sentry.config';
+
+// Explicit backstop on top of ValidationPipe's own whitelist/forbidNonWhitelisted
+// -- Express's default (no limit set) is 100kb; this makes the ceiling a
+// deliberate choice rather than an implicit default. Well above any real
+// JSON payload this API accepts (DTOs are small; the one binary upload,
+// avatars, goes through multer/FileInterceptor instead -- see
+// avatar-upload.options.ts -- which this does not touch).
+const JSON_BODY_LIMIT = '1mb';
+const URLENCODED_BODY_LIMIT = '1mb';
 
 async function bootstrap() {
   // Must run before NestFactory.create() so a failure during Nest's own
@@ -41,6 +56,19 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   app.use(helmet());
+
+  // HTTP Parameter Pollution guard -- collapses duplicate query/body keys
+  // (e.g. ?role=student&role=admin) down to the last value before they
+  // reach ValidationPipe, so a DTO field always sees the single scalar it
+  // expects. Runs before any routing/validation, same as helmet.
+  app.use(hpp());
+
+  // Express's own default is 100kb; make the ceiling explicit rather than
+  // implicit. Does not touch the avatar upload route -- that's multipart
+  // (multer/FileInterceptor, see avatar-upload.options.ts), which these
+  // json/urlencoded parsers don't handle.
+  app.useBodyParser('json', { limit: JSON_BODY_LIMIT });
+  app.useBodyParser('urlencoded', { limit: URLENCODED_BODY_LIMIT, extended: true });
 
   // Sprint P1 — Universal Avatar System. Serves whatever
   // AvatarStorageService writes to disk (see common/storage/avatar-storage.service.ts)
@@ -96,6 +124,10 @@ async function bootstrap() {
   // setGlobalPrefix() so the generated doc's paths (and the UI's own URL,
   // under /api/v1/docs) match what clients actually call.
   if (isSwaggerEnabled()) {
+    // Registered before setupSwagger() so it runs first in the middleware
+    // stack for this path and overrides the strict global CSP header set
+    // by app.use(helmet()) above -- every other route is unaffected.
+    app.use(`/api/v1/${SWAGGER_DOCS_PATH}`, swaggerCspMiddleware());
     setupSwagger(app);
     new Logger('Bootstrap').warn(
       `Swagger UI enabled at /api/v1/${SWAGGER_DOCS_PATH} (ENABLE_SWAGGER=true, NODE_ENV=${process.env.NODE_ENV ?? 'undefined'}). ` +

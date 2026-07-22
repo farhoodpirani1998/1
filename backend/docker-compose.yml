@@ -5,7 +5,7 @@
 # Usage:
 #   cp .env.example .env   # then fill in real values
 #   docker compose up -d --build
-#   docker compose exec app npm run migration:run   # once, before first boot's traffic
+#   docker compose exec app npm run migration:run:prod   # once, before first boot's traffic
 
 services:
   app:
@@ -37,6 +37,12 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+    # Sprint 3 Phase 1 — reliability hardening: Nest's shutdown hooks
+    # (app.enableShutdownHooks() in main.ts) are already wired up, but
+    # Docker's default SIGTERM grace period is only 10s before it sends
+    # SIGKILL -- too short for BullMQ workers (see notifications.processor.ts)
+    # to finish an in-flight job. 30s gives graceful shutdown room to work.
+    stop_grace_period: 30s
 
   postgres:
     image: postgres:16-alpine

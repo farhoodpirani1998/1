@@ -81,6 +81,59 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   SENTRY_ENVIRONMENT?: string;
+
+  // Sprint 2 — Feature 2B: account-level brute-force lockout (see
+  // AuthService.login). Both optional with defaults in auth.service.ts
+  // (5 attempts / 15 minutes) so this never blocks boot when unset --
+  // same "safe default, override only if you need to" treatment as
+  // every other tunable in this section.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  LOGIN_LOCKOUT_THRESHOLD?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  LOGIN_LOCKOUT_DURATION_MINUTES?: number;
+
+  // Sprint 2 — Feature 1: selects the StorageProvider implementation
+  // (see common/storage/storage.module.ts). Only 'local' exists today —
+  // an S3 driver is a future addition, not implemented yet. Defaults to
+  // 'local' when unset (see the useFactory default in StorageModule),
+  // so this is optional here rather than required.
+  @IsOptional()
+  @IsIn(['local'])
+  STORAGE_DRIVER?: string;
+
+  // Sprint 3 Phase 1 — reliability hardening: threshold (ms) above which
+  // TypeORM logs a query as slow (see maxQueryExecutionTime in
+  // app.module.ts's TypeOrmModule.forRoot). Optional with a safe default
+  // there (1000ms) so this never blocks boot when unset.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  DB_SLOW_QUERY_THRESHOLD_MS?: number;
+
+  // Sprint 3 Phase 2 — reliability hardening: how long SmsProviderService
+  // waits for the SMS gateway before aborting the request (see
+  // sms-provider.service.ts). Optional with a safe default there
+  // (10000ms) so this never blocks boot when unset, and has no bearing
+  // on whether SMS itself is configured (SMS_API_URL/SMS_API_KEY remain
+  // the only gate for that, unchanged).
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  SMS_REQUEST_TIMEOUT_MS?: number;
+
+  // Sprint 3 Phase 2 — reliability hardening: max Postgres connections
+  // this app instance's pool may open (see `extra.max` in app.module.ts's
+  // TypeOrmModule.forRoot). Optional with a safe default there (10,
+  // matching pg's own default) so this never blocks boot when unset.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  DB_POOL_MAX?: number;
 }
 
 // Minimum JWT_SECRET length enforced only in production — long enough to

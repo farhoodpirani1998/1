@@ -164,13 +164,19 @@ reviewed decision — not a default.
 ```bash
 cp .env.example .env   # fill in real values — see comments in the file
 docker compose up -d --build
-docker compose exec app npm run migration:run   # once, before serving traffic
+docker compose exec app npm run migration:run:prod   # once, before serving traffic
 ```
 
 Migrations are **never** run automatically on container start
 (`migrationsRun: false` in `app.module.ts`, unchanged from Phase 1) — run
-them explicitly as a one-off step before rolling out a new image, the same
-way `npm run migration:run` works outside Docker.
+them explicitly as a one-off step before rolling out a new image.
+
+Note the `:prod` suffix: the runtime image ships only compiled `dist/`
+output and production `node_modules` (no `ts-node`/`typescript`, no
+`src/`), so `migration:run:prod` runs the plain `typeorm` CLI (a
+production dependency) against the compiled `dist/database/data-source.js`
+instead. Outside Docker — running against a full local checkout — use
+`npm run migration:run` (the `src/`-based, ts-node version) as before.
 
 ## Backup & restore
 

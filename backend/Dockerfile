@@ -6,14 +6,12 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-# `npm ci` requires package-lock.json to exist — it errors out otherwise.
-# This repo does not currently commit one, so blindly running `npm ci` here
-# would fail every build. Prefer `npm ci` (reproducible, respects the lock
-# file) whenever a lock file is present, and fall back to `npm install`
-# (resolves fresh, writes a new lock file into the image layer) when it
-# isn't. Committing package-lock.json to the repo is still the recommended
-# fix — see docs/DEPLOYMENT.md — this fallback only makes the build safe
-# in the meantime.
+# package-lock.json is committed to this repo, so `npm ci` (reproducible,
+# respects the lock file exactly) is the normal path here. The `npm
+# install` branch below only exists as a defensive fallback for the
+# unlikely case a checkout is missing it (e.g. a local .dockerignore
+# mistake) so the build fails with a clear warning instead of npm ci's
+# less obvious "package-lock.json not found" error.
 COPY package.json package-lock.json* ./
 RUN if [ -f package-lock.json ]; then \
       npm ci; \
@@ -74,7 +72,9 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -qO- http://127.0.0.1:3000/api/v1/health/live || exit 1
 
-# Database migrations are run explicitly (npm run migration:run), never on
+# Database migrations are run explicitly (npm run migration:run:prod --
+# this image has no ts-node/src, so the plain, dist/-based script is the
+# one that works here; see src/database/data-source.ts), never on
 # container boot — see app.module.ts's `migrationsRun: false`. Run them as
 # a separate one-off step/job before rolling out a new image; see
 # docs/DEPLOYMENT.md.

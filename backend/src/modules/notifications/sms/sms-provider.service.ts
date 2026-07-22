@@ -22,11 +22,21 @@ export class SmsProviderService {
   private readonly apiUrl: string | undefined;
   private readonly apiKey: string | undefined;
   private readonly senderNumber: string | undefined;
+  private readonly requestTimeoutMs: number;
 
   constructor(private readonly configService: ConfigService) {
     this.apiUrl = this.configService.get<string>('SMS_API_URL');
     this.apiKey = this.configService.get<string>('SMS_API_KEY');
     this.senderNumber = this.configService.get<string>('SMS_SENDER_NUMBER');
+    // Sprint 3 Phase 2 — reliability hardening: a hung gateway used to
+    // keep this request (and the BullMQ worker processing it) open
+    // indefinitely, since fetch() has no timeout of its own. A worker
+    // stuck like that also can't pick up its next job, and if the whole
+    // process is eventually killed mid-request, the queued job is left
+    // in a state where BullMQ may retry it -- risking a duplicate SMS if
+    // the original request actually reached the gateway before the kill.
+    // Bounding the request lets it fail fast and predictably instead.
+    this.requestTimeoutMs = this.configService.get<number>('SMS_REQUEST_TIMEOUT_MS') ?? 10_000;
   }
 
   async send(message: SmsMessage): Promise<{ success: boolean; providerRef?: string }> {
@@ -45,6 +55,11 @@ export class SmsProviderService {
           Authorization: this.apiKey,
         },
         body: JSON.stringify(this.buildRequestBody(message)),
+        // AbortSignal.timeout() (Node >= 17.3, available on the node:20
+        // base image this project builds on) aborts the underlying
+        // fetch if it hasn't settled within requestTimeoutMs, without
+        // needing a manually-managed AbortController + setTimeout pair.
+        signal: AbortSignal.timeout(this.requestTimeoutMs),
       });
 
       if (!response.ok) {
@@ -56,7 +71,12 @@ export class SmsProviderService {
       const data = await response.json();
       return { success: true, providerRef: data?.messageId ?? data?.id };
     } catch (error) {
-      this.logger.error(`SMS gateway request failed: ${(error as Error).message}`);
+      const isTimeout = error instanceof Error && error.name === 'TimeoutError';
+      this.logger.error(
+        isTimeout
+          ? `SMS gateway request timed out after ${this.requestTimeoutMs}ms`
+          : `SMS gateway request failed: ${(error as Error).message}`,
+      );
       return { success: false };
     }
   }

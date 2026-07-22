@@ -2,6 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AuditAction, AuditLog } from './audit-log.entity';
+import {
+  normalizePagination,
+  type PaginatedResult,
+} from '../utils/pagination';
+import { QueryAuditLogsDto } from './dto/query-audit-logs.dto';
 
 export interface RecordAuditParams {
   schoolId: string | null;
@@ -65,5 +70,57 @@ export class AuditService {
       order: { createdAt: 'DESC' },
       take: limit,
     });
+  }
+
+  /**
+   * Backs GET /audit-logs (AuditController). `schoolId` is resolved by the
+   * controller from the authenticated user, never from the query string —
+   * `null` means "no schoolId filter" (super_admin, sees every school),
+   * a real id means "scoped to exactly this school" (school_admin). This
+   * is the only difference from findForSchool() above: everything else
+   * (indexes used, append-only shape of what's returned) is the same.
+   *
+   * Reuses normalizePagination() (common/utils/pagination.ts) rather than
+   * a new pagination implementation — same DEFAULT_PAGE_LIMIT/
+   * MAX_PAGE_LIMIT ceiling every other list endpoint in this codebase
+   * already applies. Always returns the wrapped PaginatedResult shape
+   * (unlike findAll()-style endpoints elsewhere that conditionally return
+   * a plain array): this is a new, dedicated read endpoint with no legacy
+   * plain-array caller to stay compatible with.
+   */
+  async findWithFilters(
+    schoolId: string | null,
+    filters: QueryAuditLogsDto,
+  ): Promise<PaginatedResult<AuditLog>> {
+    const { page, limit, skip } = normalizePagination(filters);
+
+    const qb = this.auditRepo.createQueryBuilder('audit');
+
+    if (schoolId !== null) {
+      qb.andWhere('audit.schoolId = :schoolId', { schoolId });
+    }
+    if (filters.action !== undefined) {
+      qb.andWhere('audit.action = :action', { action: filters.action });
+    }
+    if (filters.entityType !== undefined) {
+      qb.andWhere('audit.entityType = :entityType', { entityType: filters.entityType });
+    }
+    if (filters.entityId !== undefined) {
+      qb.andWhere('audit.entityId = :entityId', { entityId: filters.entityId });
+    }
+    if (filters.userId !== undefined) {
+      qb.andWhere('audit.userId = :userId', { userId: filters.userId });
+    }
+    if (filters.dateFrom !== undefined) {
+      qb.andWhere('audit.createdAt >= :dateFrom', { dateFrom: new Date(filters.dateFrom) });
+    }
+    if (filters.dateTo !== undefined) {
+      qb.andWhere('audit.createdAt <= :dateTo', { dateTo: new Date(filters.dateTo) });
+    }
+
+    qb.orderBy('audit.createdAt', 'DESC').skip(skip).take(limit);
+
+    const [data, total] = await qb.getManyAndCount();
+    return { data, total, page, limit };
   }
 }

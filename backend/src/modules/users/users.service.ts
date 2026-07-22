@@ -1,12 +1,15 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as bcrypt from 'bcrypt';
 import { User } from './entities/user.entity';
 import { School } from '../schools/entities/school.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AvatarStorageService } from '../../common/storage/avatar-storage.service';
+import { DOMAIN_EVENTS, UserStatusChangedEvent } from '../../common/events/domain-events';
+import { Role } from '../../common/authorization/roles.enum';
 import {
   normalizePagination,
   wantsPaginatedResponse,
@@ -31,6 +34,7 @@ export class UsersService {
     @InjectRepository(School)
     private readonly schoolRepo: Repository<School>,
     private readonly avatarStorage: AvatarStorageService,
+    private readonly events: EventEmitter2,
   ) {}
 
   async findAll(
@@ -81,6 +85,12 @@ export class UsersService {
       user.fullName = dto.fullName;
     }
 
+    // Sprint 2 — Feature 3A: captured before save() so the emitted event
+    // reflects what actually changed, not the post-save value on both
+    // sides.
+    const previousIsActive = user.isActive;
+    let isActiveChanged = false;
+
     if (dto.isActive !== undefined && dto.isActive !== user.isActive) {
       user.isActive = dto.isActive;
       // Any existing JWT for this user (issued while active, or before
@@ -90,9 +100,25 @@ export class UsersService {
       // Only the isActive branch bumps this: editing just fullName/phone
       // doesn't need to force every other session to re-login.
       user.tokenVersion += 1;
+      isActiveChanged = true;
     }
 
     const saved = await this.userRepo.save(user);
+
+    // Sprint 2 — Feature 3A: audit coverage, emitted only when isActive
+    // actually toggled -- editing just fullName/phone emits nothing.
+    if (isActiveChanged) {
+      this.events.emit(
+        DOMAIN_EVENTS.USER_STATUS_CHANGED,
+        new UserStatusChangedEvent(
+          saved.id,
+          saved.role === Role.SUPER_ADMIN || saved.role === Role.FOUNDER ? null : saved.schoolId,
+          previousIsActive,
+          saved.isActive,
+        ),
+      );
+    }
+
     const { passwordHash: _drop, ...safe } = saved;
     return safe;
   }

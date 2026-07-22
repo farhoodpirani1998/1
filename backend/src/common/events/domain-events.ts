@@ -29,6 +29,16 @@ export const DOMAIN_EVENTS = {
   INSTALLMENT_ADDED: 'installment.added',
   INSTALLMENT_REMOVED: 'installment.removed',
   INSTALLMENTS_RENEGOTIATED: 'installments.renegotiated',
+  // Sprint 2 — Feature 2B: emitted once, at the moment an account
+  // transitions into a lock (not on every failed attempt) -- see
+  // AuthService.login.
+  ACCOUNT_LOCKED: 'account.locked',
+  // Sprint 2 — Feature 3A: security/user-management coverage.
+  LOGIN_SUCCEEDED: 'auth.login-succeeded',
+  PASSWORD_CHANGED: 'auth.password-changed',
+  PASSWORD_RESET: 'auth.password-reset',
+  USER_CREATED: 'user.created',
+  USER_STATUS_CHANGED: 'user.status-changed',
 } as const;
 
 export class TuitionPlanCreatedEvent {
@@ -181,3 +191,92 @@ export class InstallmentsRenegotiatedEvent {
     public readonly performedBy: string,
   ) {}
 }
+
+/**
+ * Emitted by AuthService.login() exactly once, on the attempt that pushes
+ * failedLoginAttempts to the configured threshold and sets lockedUntil --
+ * not on every failed attempt while already locked, and not on attempts
+ * before the threshold is reached. schoolId is whatever the account's own
+ * schoolId is (null for super_admin/founder, same as everywhere else this
+ * shape appears); there is no "performedBy" since the actor here is
+ * whoever supplied the bad password, not an authenticated user.
+ */
+export class AccountLockedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly schoolId: string | null,
+    public readonly lockedUntil: Date,
+  ) {}
+}
+
+/**
+ * Sprint 2 — Feature 3A: emitted by AuthService.login() once the password
+ * check, lock check, and school-active check have all passed -- i.e. the
+ * same point a token is about to be issued. identifierType records which
+ * field the request logged in with (LoginDto only allows one of
+ * phone/username per attempt, enforced earlier in login()), so the audit
+ * row can show what kind of login this was without storing the actual
+ * phone/username value itself.
+ */
+export class LoginSucceededEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly schoolId: string | null,
+    public readonly identifierType: 'phone' | 'username',
+  ) {}
+}
+
+/**
+ * Sprint 2 — Feature 3A: emitted by AuthService.changePassword() after the
+ * new passwordHash has been saved. No password/passwordHash on this event
+ * on purpose -- only the fact that a change happened is audit-worthy, not
+ * any credential material.
+ */
+export class PasswordChangedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly schoolId: string | null,
+  ) {}
+}
+
+/**
+ * Sprint 2 — Feature 3A: emitted by AuthService.resetPassword() after the
+ * new passwordHash has been saved and the reset code cleared. Same
+ * no-credential-material rule as PasswordChangedEvent.
+ */
+export class PasswordResetEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly schoolId: string | null,
+  ) {}
+}
+
+/**
+ * Sprint 2 — Feature 3A: emitted by AuthService.register() after the new
+ * User row is saved. userId/schoolId only -- no fullName/phone/role, so
+ * this event carries no PII beyond what AuditLog already keys audit rows
+ * on for every other entity.
+ */
+export class UserCreatedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly schoolId: string | null,
+  ) {}
+}
+
+/**
+ * Sprint 2 — Feature 3A: emitted by UsersService.update() only on the
+ * branch that actually flips isActive (same branch that bumps
+ * tokenVersion) -- editing just fullName/phone does not emit this.
+ * oldStatus/newStatus are the isActive booleans, not free-text status
+ * strings, matching what UpdateUserDto/the User entity actually store.
+ */
+export class UserStatusChangedEvent {
+  constructor(
+    public readonly userId: string,
+    public readonly schoolId: string | null,
+    public readonly oldStatus: boolean,
+    public readonly newStatus: boolean,
+  ) {}
+}
+

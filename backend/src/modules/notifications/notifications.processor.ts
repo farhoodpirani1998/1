@@ -11,7 +11,21 @@ interface SendSmsJobData {
   notificationId: string;
 }
 
-@Processor(NOTIFICATIONS_QUEUE)
+// Sprint 3 Phase 2 — reliability hardening: BullMQ's lock is what lets a
+// second worker safely pick up a job if the one holding it dies without
+// finishing (stalled-job recovery) -- but the default lockDuration
+// (30s) sits close enough to SmsProviderService's default 10s request
+// timeout (plus DB lookups/writes either side of the fetch call) that a
+// slow-but-not-yet-timed-out attempt could have its lock expire and get
+// reassigned to another worker while still in flight, risking two
+// workers sending the same SMS. 60s gives real margin above the 10s
+// default timeout without masking a genuinely stuck worker for long.
+// This is intentionally a static value, not read from
+// SMS_REQUEST_TIMEOUT_MS: @Processor's options are evaluated as soon as
+// this file is imported (as part of Nest resolving the module graph),
+// which happens before ConfigModule.forRoot() runs and loads .env --
+// reading the env var here could silently see an empty value.
+@Processor(NOTIFICATIONS_QUEUE, { lockDuration: 60_000 })
 @Injectable()
 export class NotificationsProcessor extends WorkerHost {
   private readonly logger = new Logger(NotificationsProcessor.name);

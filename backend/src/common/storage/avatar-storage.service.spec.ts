@@ -1,7 +1,5 @@
-import { promises as fs } from 'fs';
-import * as os from 'os';
-import * as path from 'path';
 import { AvatarStorageService, AVATAR_URL_PREFIX } from './avatar-storage.service';
+import { StorageProvider } from './storage-provider.interface';
 
 function makeFile(overrides: Partial<Express.Multer.File> = {}): Express.Multer.File {
   return {
@@ -19,30 +17,43 @@ function makeFile(overrides: Partial<Express.Multer.File> = {}): Express.Multer.
   };
 }
 
+/**
+ * In-memory fake StorageProvider — AvatarStorageService is tested in
+ * isolation from any real filesystem now that storage mechanics live in
+ * LocalStorageProvider (see local-storage.provider.spec.ts for those
+ * tests). This fake exists purely to observe what AvatarStorageService
+ * asks the provider to do (key/buffer on save, key on delete), not to
+ * re-verify filesystem safety — that's the provider's own contract.
+ */
+class FakeStorageProvider implements StorageProvider {
+  files = new Map<string, Buffer>();
+
+  async save(key: string, buffer: Buffer): Promise<void> {
+    this.files.set(key, buffer);
+  }
+
+  async delete(key: string): Promise<void> {
+    this.files.delete(key);
+  }
+}
+
 describe('AvatarStorageService', () => {
-  let tmpDir: string;
+  let provider: FakeStorageProvider;
   let service: AvatarStorageService;
 
-  beforeEach(async () => {
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'avatar-storage-test-'));
-    process.env.AVATAR_UPLOAD_DIR = tmpDir;
-    service = new AvatarStorageService();
+  beforeEach(() => {
+    provider = new FakeStorageProvider();
+    service = new AvatarStorageService(provider);
   });
 
-  afterEach(async () => {
-    delete process.env.AVATAR_UPLOAD_DIR;
-    await fs.rm(tmpDir, { recursive: true, force: true });
-  });
-
-  it('writes the file to disk and returns a URL under AVATAR_URL_PREFIX', async () => {
+  it('writes the file via the provider and returns a URL under AVATAR_URL_PREFIX', async () => {
     const url = await service.save('user-1', makeFile());
 
     expect(url.startsWith(`${AVATAR_URL_PREFIX}/user-1-`)).toBe(true);
     expect(url.endsWith('.jpg')).toBe(true);
 
-    const writtenPath = path.join(tmpDir, path.basename(url));
-    const contents = await fs.readFile(writtenPath);
-    expect(contents.toString()).toBe('fake-image-bytes');
+    const key = url.slice(`${AVATAR_URL_PREFIX}/`.length);
+    expect(provider.files.get(key)?.toString()).toBe('fake-image-bytes');
   });
 
   it('derives the extension from mimetype, never from the client-supplied filename', async () => {
@@ -63,41 +74,31 @@ describe('AvatarStorageService', () => {
     expect(first).not.toBe(second);
   });
 
-  it('rejects an unsupported mime type', async () => {
+  it('rejects an unsupported mime type without calling the provider', async () => {
     await expect(service.save('user-4', makeFile({ mimetype: 'application/pdf' }))).rejects.toThrow(
       /Unsupported avatar mime type/,
     );
+    expect(provider.files.size).toBe(0);
   });
 
-  it('removes a previously-saved file', async () => {
+  it('removes a previously-saved file via the provider', async () => {
     const url = await service.save('user-5', makeFile());
-    const writtenPath = path.join(tmpDir, path.basename(url));
+    const key = url.slice(`${AVATAR_URL_PREFIX}/`.length);
 
-    await expect(fs.access(writtenPath)).resolves.toBeUndefined();
+    expect(provider.files.has(key)).toBe(true);
     await service.remove(url);
-    await expect(fs.access(writtenPath)).rejects.toThrow();
+    expect(provider.files.has(key)).toBe(false);
   });
 
-  it('is a no-op when removing null', async () => {
+  it('is a no-op when removing null (never calls the provider)', async () => {
+    const deleteSpy = jest.spyOn(provider, 'delete');
     await expect(service.remove(null)).resolves.toBeUndefined();
+    expect(deleteSpy).not.toHaveBeenCalled();
   });
 
-  it('is a no-op when removing a file that no longer exists', async () => {
-    await expect(service.remove(`${AVATAR_URL_PREFIX}/already-gone.jpg`)).resolves.toBeUndefined();
-  });
-
-  it('refuses to delete a path that escapes the upload directory', async () => {
-    const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'avatar-storage-outside-'));
-    const outsideFile = path.join(outside, 'not-an-avatar.jpg');
-    await fs.writeFile(outsideFile, 'should-not-be-touched');
-
-    // basename() strips any directory traversal from a crafted URL before
-    // it ever reaches the filesystem call, so this exercises the same
-    // defense-in-depth path even though avatarUrl is always
-    // server-generated in practice.
-    await service.remove(`${AVATAR_URL_PREFIX}/../../../../${outsideFile}`);
-
-    await expect(fs.access(outsideFile)).resolves.toBeUndefined();
-    await fs.rm(outside, { recursive: true, force: true });
+  it('passes only the basename of the URL as the key, stripping any path segments', async () => {
+    const deleteSpy = jest.spyOn(provider, 'delete');
+    await service.remove(`${AVATAR_URL_PREFIX}/../../../../etc/passwd.jpg`);
+    expect(deleteSpy).toHaveBeenCalledWith('passwd.jpg');
   });
 });

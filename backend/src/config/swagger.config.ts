@@ -1,5 +1,27 @@
 import { INestApplication } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
+
+// Swagger UI (served by @nestjs/swagger's SwaggerModule.setup below) ships
+// its own inline bootstrap <script> and inline <style> tags, which
+// helmet()'s default global CSP (registered once in main.ts, applied to
+// every route) deliberately does not allow -- that default stays locked
+// down for the real API surface. Applying THIS relaxed policy only on the
+// Swagger path (see main.ts, mounted before setupSwagger()) keeps every
+// other route on the strict default and touches nothing else.
+export function swaggerCspMiddleware() {
+  return helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        // swagger-ui-dist's bundle inlines its init script and CSS.
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:'],
+      },
+    },
+  });
+}
 
 // Mounted at this path, i.e. GET /api/v1/docs once the app's global prefix
 // is applied. Also serves the raw OpenAPI JSON at /api/v1/docs-json
@@ -46,6 +68,14 @@ export function setupSwagger(app: INestApplication): void {
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup(SWAGGER_DOCS_PATH, app, document, {
+    // SwaggerModule.setup()'s mount path is NOT prefixed by
+    // app.setGlobalPrefix() by default (SWAGGER_DOCS_PATH stays the bare
+    // 'docs' segment above) -- without this flag the UI would actually be
+    // served at /docs, not /api/v1/docs, leaving the CSP relaxation this
+    // module mounts at /api/v1/docs (see main.ts) applied to a path Swagger
+    // never uses, and the real /docs route stuck with helmet()'s strict
+    // default CSP (blocking Swagger UI's inline bootstrap script/styles).
+    useGlobalPrefix: true,
     swaggerOptions: {
       persistAuthorization: true,
     },

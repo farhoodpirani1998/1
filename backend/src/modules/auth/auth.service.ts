@@ -8,6 +8,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import * as bcrypt from 'bcrypt';
 import { User } from '../users/entities/user.entity';
 import { School } from '../schools/entities/school.entity';
@@ -23,9 +25,23 @@ import { ResetPasswordDto } from './dto/reset-password.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { Role } from '../../common/authorization/roles.enum';
 import { SmsProviderService } from '../notifications/sms/sms-provider.service';
+import {
+  DOMAIN_EVENTS,
+  AccountLockedEvent,
+  LoginSucceededEvent,
+  PasswordChangedEvent,
+  PasswordResetEvent,
+  UserCreatedEvent,
+} from '../../common/events/domain-events';
 
 const BCRYPT_ROUNDS = 12;
 const RESET_CODE_TTL_MINUTES = 10;
+// Sprint 2 — Feature 2B: account-level brute-force lockout, independent
+// of the per-IP ThrottlerGuard limit already on POST /auth/login.
+// Overridable via LOGIN_LOCKOUT_THRESHOLD / LOGIN_LOCKOUT_DURATION_MINUTES
+// (see env.validation.ts); these are the defaults when unset.
+const DEFAULT_LOGIN_LOCKOUT_THRESHOLD = 5;
+const DEFAULT_LOGIN_LOCKOUT_DURATION_MINUTES = 15;
 // Generic response for every forgot-password request, regardless of
 // whether the phone number is registered — same "don't confirm which
 // phone numbers exist" rule login() follows for bad credentials.
@@ -43,6 +59,8 @@ export class AuthService {
     private readonly studentUserRepo: Repository<StudentUser>,
     private readonly jwtService: JwtService,
     private readonly smsProviderService: SmsProviderService,
+    private readonly configService: ConfigService,
+    private readonly events: EventEmitter2,
   ) {}
 
   async register(dto: RegisterDto): Promise<Omit<User, 'passwordHash'>> {
@@ -74,6 +92,19 @@ export class AuthService {
       isActive: true,
     });
     const saved = await this.userRepo.save(user);
+
+    // Sprint 2 — Feature 3A: audit coverage for user creation. This is the
+    // only place a User row is created today (see the file-change note in
+    // the accompanying audit), so it's emitted here rather than from
+    // UsersService, which has no creation method.
+    this.events.emit(
+      DOMAIN_EVENTS.USER_CREATED,
+      new UserCreatedEvent(
+        saved.id,
+        saved.role === Role.SUPER_ADMIN || saved.role === Role.FOUNDER ? null : saved.schoolId,
+      ),
+    );
+
     const { passwordHash: _drop, ...safeUser } = saved;
     return safeUser;
   }
@@ -118,9 +149,74 @@ export class AuthService {
       throw invalidCredentialsError;
     }
 
+    const now = new Date();
+
+    // An expired lock behaves exactly like "never locked" -- clear it
+    // (and the counter that led to it) before checking anything further,
+    // rather than leaving stale lockout state sitting on the row forever.
+    if (user.lockedUntil && user.lockedUntil <= now) {
+      user.lockedUntil = null;
+      user.failedLoginAttempts = 0;
+      await this.userRepo.update(user.id, { lockedUntil: null, failedLoginAttempts: 0 });
+    }
+
+    // Active lock — rejected before bcrypt.compare is even called, with
+    // the exact same generic message as a wrong password below, so a
+    // locked account can't be distinguished from bad credentials from the
+    // outside. This is a separate control from the per-IP ThrottlerGuard
+    // limit on this same route (see auth.controller.ts) — that one caps
+    // requests per IP; this one caps consecutive failures per account,
+    // regardless of which IP(s) they come from.
+    if (user.lockedUntil && user.lockedUntil > now) {
+      throw invalidCredentialsError;
+    }
+
     const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordMatches) {
+      const threshold =
+        this.configService.get<number>('LOGIN_LOCKOUT_THRESHOLD') ??
+        DEFAULT_LOGIN_LOCKOUT_THRESHOLD;
+      const durationMinutes =
+        this.configService.get<number>('LOGIN_LOCKOUT_DURATION_MINUTES') ??
+        DEFAULT_LOGIN_LOCKOUT_DURATION_MINUTES;
+
+      const failedLoginAttempts = user.failedLoginAttempts + 1;
+      const justLocked = failedLoginAttempts >= threshold;
+      const lockedUntil = justLocked
+        ? new Date(now.getTime() + durationMinutes * 60 * 1000)
+        : null;
+
+      await this.userRepo.update(user.id, {
+        failedLoginAttempts,
+        // Only touched on the attempt that actually crosses the
+        // threshold -- an already-unlocked account with attempts below
+        // threshold must not have lockedUntil written at all.
+        ...(justLocked ? { lockedUntil } : {}),
+      });
+
+      // Emitted exactly once, on the attempt that transitions the
+      // account into a lock — not on every failed attempt, and not
+      // again while it stays locked (this whole branch isn't reached
+      // again until the lock clears or a correct password arrives).
+      if (justLocked) {
+        this.events.emit(
+          DOMAIN_EVENTS.ACCOUNT_LOCKED,
+          new AccountLockedEvent(
+            user.id,
+            user.role === Role.SUPER_ADMIN || user.role === Role.FOUNDER ? null : user.schoolId,
+            lockedUntil as Date,
+          ),
+        );
+      }
+
       throw invalidCredentialsError;
+    }
+
+    // Successful password check clears any accumulated failed-attempt
+    // count — the next bad attempt (if any) starts counting from zero.
+    if (user.failedLoginAttempts !== 0) {
+      user.failedLoginAttempts = 0;
+      await this.userRepo.update(user.id, { failedLoginAttempts: 0 });
     }
 
     // super_admin and founder have no single school (founder's schools
@@ -136,6 +232,21 @@ export class AuthService {
         throw new UnauthorizedException('مدرسه شما غیرفعال شده است');
       }
     }
+
+    // Sprint 2 — Feature 3A: audit coverage for successful logins. Placed
+    // after every check above has passed (lock, password, school-active)
+    // and before token issuance -- does not touch payload/accessToken
+    // below in any way. Never emitted on the failed-password branch or
+    // the locked-account branch above, matching ACCOUNT_LOCKED's existing
+    // "no row per failed attempt" rule.
+    this.events.emit(
+      DOMAIN_EVENTS.LOGIN_SUCCEEDED,
+      new LoginSucceededEvent(
+        user.id,
+        user.role === Role.SUPER_ADMIN || user.role === Role.FOUNDER ? null : user.schoolId,
+        dto.username ? 'username' : 'phone',
+      ),
+    );
 
     const payload: JwtPayload = {
       sub: user.id,
@@ -186,6 +297,18 @@ export class AuthService {
     // password.
     user.tokenVersion += 1;
     await this.userRepo.save(user);
+
+    // Sprint 2 — Feature 3A: audit coverage. Emitted only after save()
+    // succeeds -- no passwordHash/password on the event, see
+    // PasswordChangedEvent.
+    this.events.emit(
+      DOMAIN_EVENTS.PASSWORD_CHANGED,
+      new PasswordChangedEvent(
+        user.id,
+        user.role === Role.SUPER_ADMIN || user.role === Role.FOUNDER ? null : user.schoolId,
+      ),
+    );
+
     return { success: true };
   }
 
@@ -240,6 +363,18 @@ export class AuthService {
     // session that was open with the old password.
     user.tokenVersion += 1;
     await this.userRepo.save(user);
+
+    // Sprint 2 — Feature 3A: audit coverage. Emitted only after save()
+    // succeeds -- no passwordHash/password/code on the event, see
+    // PasswordResetEvent.
+    this.events.emit(
+      DOMAIN_EVENTS.PASSWORD_RESET,
+      new PasswordResetEvent(
+        user.id,
+        user.role === Role.SUPER_ADMIN || user.role === Role.FOUNDER ? null : user.schoolId,
+      ),
+    );
+
     return { success: true };
   }
 }

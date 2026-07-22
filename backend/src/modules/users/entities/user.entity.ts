@@ -69,6 +69,21 @@ export class User {
   @Column({ name: 'reset_code_expires_at', type: 'timestamp', nullable: true })
   resetCodeExpiresAt: Date | null;
 
+  // Sprint 2 — Feature 2B: account-level brute-force protection (see
+  // AuthService.login + migration AddLoginLockoutToUsers). Consecutive
+  // bad-password count for this account -- reset to 0 on any successful
+  // login, incremented on each bad-password attempt, independent of the
+  // existing per-IP ThrottlerGuard limit on POST /auth/login.
+  @Column({ name: 'failed_login_attempts', type: 'int', default: 0 })
+  failedLoginAttempts: number;
+
+  // NULL while unlocked. Set to a future timestamp once
+  // failedLoginAttempts reaches LOGIN_LOCKOUT_THRESHOLD; a lock clears
+  // itself once this timestamp is in the past -- there is no separate
+  // unlock action/endpoint.
+  @Column({ name: 'locked_until', type: 'timestamp', nullable: true })
+  lockedUntil: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

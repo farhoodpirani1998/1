@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { promises as fs } from 'fs';
 import * as path from 'path';
+import { STORAGE_PROVIDER, StorageProvider } from './storage-provider.interface';
 
 // Sprint P1 — Universal Avatar System.
 //
@@ -12,6 +12,12 @@ import * as path from 'path';
 // here (not inlined into UsersService) so a future move to S3-compatible
 // storage only means swapping this one class -- the controller/service
 // call sites (`save`/`remove`) wouldn't need to change shape.
+//
+// Sprint 2 — Feature 1: the actual disk I/O now lives behind an injected
+// StorageProvider (see storage-provider.interface.ts / StorageModule).
+// This class keeps everything that's specific to *avatars* -- MIME/
+// extension mapping, filename generation, and URL construction -- none
+// of which the generic provider should ever know about.
 
 // Closed allow-list, not a wildcard "any image/*" check -- keeps the
 // written file extension (and therefore what a browser will ever try to
@@ -35,26 +41,27 @@ export const AVATAR_MAX_SIZE_BYTES = 2 * 1024 * 1024;
 // apart.
 export const AVATAR_URL_PREFIX = '/uploads/avatars';
 
-// Shared by this service and main.ts's static route registration, so the
-// directory files are written to and the directory served over HTTP can
-// never drift apart. Reads process.env directly (no ConfigService
-// indirection), same style JwtStrategy/main.ts already use for
-// infra-level settings. Defaults to a folder relative to the process
-// cwd, matching where migrations/dist already resolve relative paths
-// from.
+// Shared by this service, main.ts's static route registration, and
+// StorageModule's LocalStorageProvider factory, so the directory files
+// are written to and the directory served over HTTP can never drift
+// apart. Reads process.env directly (no ConfigService indirection), same
+// style JwtStrategy/main.ts already use for infra-level settings.
+// Defaults to a folder relative to the process cwd, matching where
+// migrations/dist already resolve relative paths from.
 export function resolveAvatarUploadDir(): string {
   return path.resolve(process.env.AVATAR_UPLOAD_DIR ?? 'uploads/avatars');
 }
 
 @Injectable()
 export class AvatarStorageService {
-  private readonly logger = new Logger(AvatarStorageService.name);
-
-  private readonly uploadDir = resolveAvatarUploadDir();
+  constructor(
+    @Inject(STORAGE_PROVIDER)
+    private readonly storage: StorageProvider,
+  ) {}
 
   /**
    * Writes the given (already validated by the controller's
-   * FileInterceptor fileFilter/limits) file to disk under a fully
+   * FileInterceptor fileFilter/limits) file under a fully
    * server-generated filename and returns the relative URL to store on
    * `User.avatarUrl`.
    *
@@ -73,20 +80,18 @@ export class AvatarStorageService {
       throw new Error(`Unsupported avatar mime type: ${file.mimetype}`);
     }
 
-    await fs.mkdir(this.uploadDir, { recursive: true });
-
     const filename = `${userId}-${randomUUID()}.${extension}`;
-    const destination = path.join(this.uploadDir, filename);
-    await fs.writeFile(destination, file.buffer);
+    await this.storage.save(filename, file.buffer);
 
     return `${AVATAR_URL_PREFIX}/${filename}`;
   }
 
   /**
    * Deletes the file a previously-stored avatar URL points at, if any.
-   * Safe to call with `null` (nothing to do) and safe to call for a file
-   * that's already gone (ENOENT is swallowed) -- both are expected during
-   * normal replace/remove flows, not error conditions.
+   * Safe to call with `null` (nothing to do) -- delete-if-present
+   * semantics (including "already gone") are the StorageProvider's
+   * contract, so this method doesn't need its own ENOENT handling
+   * anymore.
    */
   async remove(avatarUrl: string | null): Promise<void> {
     if (!avatarUrl) {
@@ -94,24 +99,6 @@ export class AvatarStorageService {
     }
 
     const filename = path.basename(avatarUrl);
-    const resolved = path.resolve(this.uploadDir, filename);
-
-    // avatarUrl is always one this service generated itself (see save()
-    // above), never client-supplied -- this check is defense in depth
-    // against ever unlinking a path outside the upload directory, not a
-    // trust boundary this method expects to actually be crossed.
-    if (path.dirname(resolved) !== this.uploadDir) {
-      this.logger.warn(`Refused to delete avatar outside upload dir: ${avatarUrl}`);
-      return;
-    }
-
-    try {
-      await fs.unlink(resolved);
-    } catch (error) {
-      const err = error as NodeJS.ErrnoException;
-      if (err.code !== 'ENOENT') {
-        this.logger.warn(`Failed to delete avatar file ${resolved}: ${err.message}`);
-      }
-    }
+    await this.storage.delete(filename);
   }
 }
