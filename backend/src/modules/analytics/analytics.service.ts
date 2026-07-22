@@ -340,7 +340,8 @@ export class AnalyticsService {
     // Reused outright -- AnnouncementsService already returns every
     // announcement for the school, most recent first; the dashboard just
     // takes the top slice instead of re-querying the announcements table.
-    const rows = await this.announcementsService.findAllForSchool(schoolId);
+    const result = await this.announcementsService.findAllForSchool(schoolId);
+    const rows = Array.isArray(result) ? result : result.data;
     return rows.slice(0, limit).map((a) => ({
       id: a.id,
       title: a.title,

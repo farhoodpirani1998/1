@@ -48,6 +48,10 @@ import {
   RecipientAnnouncementView,
   toRecipientAnnouncementView,
 } from '../announcements/dto/announcement-view.dto';
+import {
+  type PaginationParams,
+  type PaginatedResult,
+} from '../../common/utils/pagination';
 // ADR-001 Task 4G: GET /student/documents reuses StudentDocumentsService
 // the same way GET /student/attendance reuses AttendanceService above --
 // no new document business logic, just resolving "which student am I" and
@@ -148,7 +152,8 @@ export class StudentService {
    */
   async getMyAttendance(userId: string, schoolId: string): Promise<ParentAttendanceView[]> {
     const student = await this.resolveMyStudent(userId, schoolId);
-    const records = await this.attendanceService.findByStudent(student.id, schoolId);
+    const result = await this.attendanceService.findByStudent(student.id, schoolId);
+    const records = Array.isArray(result) ? result : result.data;
     return records.map(toParentAttendanceView);
   }
 
@@ -164,7 +169,8 @@ export class StudentService {
    */
   async getMyAssessments(userId: string, schoolId: string): Promise<ParentAssessmentView[]> {
     const student = await this.resolveMyStudent(userId, schoolId);
-    const records = await this.assessmentsService.findByStudent(student.id, schoolId);
+    const result = await this.assessmentsService.findByStudent(student.id, schoolId);
+    const records = Array.isArray(result) ? result : result.data;
     return records.map(toParentAssessmentView);
   }
 
@@ -302,13 +308,21 @@ export class StudentService {
    * the existing toRecipientAnnouncementView (no createdById, no
    * schoolId) -- already student-safe, so no new DTO is introduced.
    */
-  async getMyAnnouncements(userId: string, schoolId: string): Promise<RecipientAnnouncementView[]> {
+  async getMyAnnouncements(
+    userId: string,
+    schoolId: string,
+    query: PaginationParams = {},
+  ): Promise<RecipientAnnouncementView[] | PaginatedResult<RecipientAnnouncementView>> {
     await this.resolveMyStudent(userId, schoolId);
-    const announcements = await this.announcementsService.findForAudience(
+    const result = await this.announcementsService.findForAudience(
       schoolId,
       AnnouncementTargetType.STUDENTS,
+      query,
     );
-    return announcements.map(toRecipientAnnouncementView);
+    if (Array.isArray(result)) {
+      return result.map(toRecipientAnnouncementView);
+    }
+    return { ...result, data: result.data.map(toRecipientAnnouncementView) };
   }
 
   /**
@@ -326,7 +340,11 @@ export class StudentService {
    */
   async getMyDocuments(userId: string, schoolId: string): Promise<ParentStudentDocumentView[]> {
     const student = await this.resolveMyStudent(userId, schoolId);
-    const documents = await this.studentDocumentsService.findByStudent(student.id, schoolId);
+    const result = await this.studentDocumentsService.findByStudent(student.id, schoolId);
+    // No `page` is ever passed here, so this is always the plain-array
+    // shape -- the Array.isArray narrowing is purely to satisfy the
+    // union return type findByStudent() now has, not a real runtime path.
+    const documents = Array.isArray(result) ? result : result.data;
     return documents.map(toParentStudentDocumentView);
   }
 
@@ -426,7 +444,7 @@ export class StudentService {
     return {
       profile: this.buildProfileView(student),
       timetable,
-      recentAnnouncements: announcements
+      recentAnnouncements: (Array.isArray(announcements) ? announcements : announcements.data)
         .slice(0, RECENT_ANNOUNCEMENTS_LIMIT)
         .map(toRecipientAnnouncementView),
       homework,

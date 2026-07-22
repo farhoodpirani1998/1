@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 // school_admin-only read surface. Teacher-side management
 // (POST/PUT/DELETE/GET /teacher/homework) and parent-side read
@@ -14,6 +15,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 // "one controller manages nothing here, dedicated portal controllers
 // write/read" shape as TimetableController / AnnouncementsController.
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Homework')
+@ApiBearerAuth('access-token')
 @Controller('homework')
 export class HomeworkController {
   constructor(private readonly homeworkService: HomeworkService) {}
@@ -21,8 +24,11 @@ export class HomeworkController {
   @Get()
   @Roles('school_admin')
   async findAll(@Query() query: QueryHomeworkDto, @CurrentUser('schoolId') schoolId: string) {
-    const homework = await this.homeworkService.findAllForSchool(schoolId, query);
-    return homework.map(toHomeworkView);
+    const result = await this.homeworkService.findAllForSchool(schoolId, query);
+    if (Array.isArray(result)) {
+      return result.map(toHomeworkView);
+    }
+    return { ...result, data: result.data.map(toHomeworkView) };
   }
 
   // Global Search's homework results link here -- roles match

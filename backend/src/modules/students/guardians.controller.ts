@@ -7,6 +7,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 // Sprint 2 (Educational Operations): guardian file management. Read
 // access matches GET /students (school_admin, accountant, staff) — a
@@ -15,6 +16,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 // PATCH /students/:id (school_admin, staff) — accountant stays
 // read-only here, same as everywhere else guardians appear.
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Guardians')
+@ApiBearerAuth('access-token')
 @Controller('guardians')
 export class GuardiansController {
   constructor(private readonly guardiansService: GuardiansService) {}

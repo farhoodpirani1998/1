@@ -1,5 +1,6 @@
-import { IsOptional, IsBoolean, IsInt, Min } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { IsOptional, IsBoolean } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
 /**
  * `isRead` arrives over the query string as the literal text "true"/
@@ -18,23 +19,12 @@ const toBoolean = ({ value }: { value: unknown }) => {
   return value;
 };
 
-export class QueryParentNotificationsDto {
+// Sprint 1 — Feature 5: page/limit moved to PaginationQueryDto (pure
+// extraction, same validators — defaults/ceiling still applied via
+// normalizePagination() in ParentService).
+export class QueryParentNotificationsDto extends PaginationQueryDto {
   @IsOptional()
   @Transform(toBoolean)
   @IsBoolean()
   isRead?: boolean;
-
-  // Same pagination pattern as QueryInstallmentsDto/QueryStudentsDto —
-  // defaults/ceiling applied via normalizePagination() in ParentService.
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  limit?: number;
 }

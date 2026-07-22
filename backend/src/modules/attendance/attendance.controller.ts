@@ -3,12 +3,16 @@ import { AttendanceService } from './attendance.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { QueryAttendanceByDateDto } from './dto/query-attendance-by-date.dto';
 import { toAttendanceView } from './dto/attendance-view.dto';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Attendance')
+@ApiBearerAuth('access-token')
 @Controller('attendance')
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
@@ -18,6 +22,7 @@ export class AttendanceController {
   // financial-only elsewhere in the app, is not granted a write here;
   // 'parent' is never granted this route, same as every staff-facing
   // endpoint outside /parent/*.
+  @ApiOperation({ summary: 'Record (or correct) a student\'s attendance for a date' })
   @Post()
   @Roles('school_admin', 'staff')
   async create(@Body() dto: CreateAttendanceDto, @CurrentUser() user: AuthenticatedUser) {
@@ -29,9 +34,16 @@ export class AttendanceController {
   // staff can all see a student's own record).
   @Get('student/:id')
   @Roles('school_admin', 'accountant', 'staff')
-  async findByStudent(@Param('id') id: string, @CurrentUser('schoolId') schoolId: string) {
-    const records = await this.attendanceService.findByStudent(id, schoolId);
-    return records.map(toAttendanceView);
+  async findByStudent(
+    @Param('id') id: string,
+    @Query() query: PaginationQueryDto,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    const result = await this.attendanceService.findByStudent(id, schoolId, query);
+    if (Array.isArray(result)) {
+      return result.map(toAttendanceView);
+    }
+    return { ...result, data: result.data.map(toAttendanceView) };
   }
 
   // Whole-school roster for one calendar day, optionally narrowed by

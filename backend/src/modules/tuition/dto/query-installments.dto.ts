@@ -1,8 +1,11 @@
-import { IsOptional, IsEnum, IsUUID, IsInt, IsString, Min, MaxLength } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsEnum, IsUUID, IsString, MaxLength } from 'class-validator';
 import { InstallmentStatus } from '../entities/installment.entity';
+import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
-export class QueryInstallmentsDto {
+// Sprint 1 — Feature 5: page/limit moved to PaginationQueryDto (pure
+// extraction, same validators — defaults/ceiling still applied in
+// InstallmentsService via normalizePagination()).
+export class QueryInstallmentsDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(InstallmentStatus)
   status?: InstallmentStatus;
@@ -28,19 +31,4 @@ export class QueryInstallmentsDto {
   @IsOptional()
   @IsUUID()
   schoolId?: string;
-
-  // Phase 4A: pagination — see QueryStudentsDto for the same pattern;
-  // defaults/ceiling applied in InstallmentsService via
-  // normalizePagination().
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  limit?: number;
 }

@@ -1,11 +1,13 @@
-import { Controller, Post, Get, Delete, Body, Param, UseGuards, HttpCode } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param, Query, UseGuards, HttpCode } from '@nestjs/common';
 import { AnnouncementsService } from './announcements.service';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
 import { toAnnouncementView } from './dto/announcement-view.dto';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 // school_admin-only management surface. Reader-facing access
 // (GET /teacher/announcements, GET /parent/announcements) is served by
@@ -15,10 +17,13 @@ import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-
 // /parent/students/:id/assessments reusing AttendanceService /
 // AssessmentsService without going through a StudentsController.
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Announcements')
+@ApiBearerAuth('access-token')
 @Controller('announcements')
 export class AnnouncementsController {
   constructor(private readonly announcementsService: AnnouncementsService) {}
 
+  @ApiOperation({ summary: 'Publish an announcement to the school (visible to teacher/parent/student portals)' })
   @Post()
   @Roles('school_admin')
   async create(@Body() dto: CreateAnnouncementDto, @CurrentUser() user: AuthenticatedUser) {
@@ -28,9 +33,15 @@ export class AnnouncementsController {
 
   @Get()
   @Roles('school_admin')
-  async findAll(@CurrentUser('schoolId') schoolId: string) {
-    const announcements = await this.announcementsService.findAllForSchool(schoolId);
-    return announcements.map(toAnnouncementView);
+  async findAll(
+    @Query() query: PaginationQueryDto,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    const result = await this.announcementsService.findAllForSchool(schoolId, query);
+    if (Array.isArray(result)) {
+      return result.map(toAnnouncementView);
+    }
+    return { ...result, data: result.data.map(toAnnouncementView) };
   }
 
   // Global Search's announcement results link here -- roles match

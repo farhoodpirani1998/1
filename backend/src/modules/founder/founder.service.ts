@@ -31,6 +31,12 @@ import {
 } from './dto/founder-teacher-view.dto';
 import { FounderOverviewView, FounderSchoolBreakdown } from './dto/founder-overview-view.dto';
 import { FounderTuitionOverview } from './dto/founder-tuition-view.dto';
+import {
+  normalizePagination,
+  wantsPaginatedResponse,
+  type PaginationParams,
+  type PaginatedResult,
+} from '../../common/utils/pagination';
 
 // Roles that count as "staff/employees" for the founder's staff
 // directory — every non-teaching, school-facing login. PARENT/TEACHER
@@ -177,18 +183,40 @@ export class FounderService {
   // widened from a single schoolId to In(schoolIds); no assertOwnsSchool
   // call needed since getOwnedSchoolIds() already is the full set of
   // schools this founder may see.
-  async getAllTeachers(founderId: string): Promise<FounderTeacherWithSchoolView[]> {
+  async getAllTeachers(
+    founderId: string,
+    pagination: PaginationParams = {},
+  ): Promise<FounderTeacherWithSchoolView[] | PaginatedResult<FounderTeacherWithSchoolView>> {
+    const paginated = wantsPaginatedResponse(pagination);
+    const { page, limit, skip } = normalizePagination(pagination);
+
     const schoolIds = await this.getOwnedSchoolIds(founderId);
-    if (schoolIds.length === 0) return [];
+    if (schoolIds.length === 0) {
+      return paginated ? { data: [], total: 0, page, limit } : [];
+    }
 
     const schools = await this.schoolRepo.find({ where: { id: In(schoolIds) } });
     const schoolNameById = new Map(schools.map((s) => [s.id, s.name]));
 
-    const teachers = await this.userRepo.find({
-      where: { schoolId: In(schoolIds), role: Role.TEACHER },
-      order: { fullName: 'ASC' },
-    });
-    if (teachers.length === 0) return [];
+    // Pagination happens here, at teacher retrieval -- not after
+    // building the full view array. Assignments below are then only
+    // ever fetched for these (already paginated) teacher ids via the
+    // existing `In(teachers.map(...))` filter, so a large cross-school
+    // teacher roster never pulls every teacher's assignments into
+    // memory just to slice a page off the end.
+    const teacherWhere = { schoolId: In(schoolIds), role: Role.TEACHER };
+    const [teachers, total]: [User[], number] = paginated
+      ? await this.userRepo.findAndCount({
+          where: teacherWhere,
+          order: { fullName: 'ASC' },
+          skip,
+          take: limit,
+        })
+      : [await this.userRepo.find({ where: teacherWhere, order: { fullName: 'ASC' } }), 0];
+
+    if (teachers.length === 0) {
+      return paginated ? { data: [], total, page, limit } : [];
+    }
 
     const assignments = await this.teacherAssignmentRepo.find({
       where: { schoolId: In(schoolIds), teacherId: In(teachers.map((t) => t.id)) },
@@ -201,7 +229,7 @@ export class FounderService {
       assignmentsByTeacher.set(a.teacherId, list);
     }
 
-    return teachers.map((teacher) =>
+    const views = teachers.map((teacher) =>
       toFounderTeacherWithSchoolView(
         teacher,
         (assignmentsByTeacher.get(teacher.id) ?? []).map((a) => ({
@@ -214,6 +242,8 @@ export class FounderService {
         schoolNameById.get(teacher.schoolId!) ?? '',
       ),
     );
+
+    return paginated ? { data: views, total, page, limit } : views;
   }
 
   // -------------------------------------------------------------------

@@ -1,8 +1,12 @@
-import { IsOptional, IsUUID, IsEnum, IsString, IsInt, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsUUID, IsEnum, IsString } from 'class-validator';
 import { StudentStatus } from '../entities/student.entity';
+import { PaginationQueryDto } from '../../../common/dto/pagination-query.dto';
 
-export class QueryStudentsDto {
+// Sprint 1 — Feature 5: page/limit moved to PaginationQueryDto (identical
+// validators, pure extraction — see that file's comment). Behavior
+// unchanged: normalizePagination()/wantsPaginatedResponse() in
+// StudentsService still gate on the same fields.
+export class QueryStudentsDto extends PaginationQueryDto {
   @IsOptional()
   @IsEnum(StudentStatus)
   status?: StudentStatus;
@@ -22,20 +26,4 @@ export class QueryStudentsDto {
   @IsOptional()
   @IsString()
   search?: string; // matches against full_name
-
-  // Phase 4A: pagination — both optional, defaults/ceiling applied in
-  // StudentsService via the shared normalizePagination() helper so a
-  // request with no params still gets a bounded result set instead of
-  // the entire school's student list.
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  limit?: number;
 }

@@ -26,12 +26,16 @@ import { Roles } from '../../../common/decorators/roles.decorator';
 import { PermissionsGuard } from '../../../common/authorization/permissions.guard';
 import { RequirePermission } from '../../../common/authorization/require-permission.decorator';
 import { Permission } from '../../../common/authorization/permissions';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@ApiTags('Tuition Installments')
+@ApiBearerAuth('access-token')
 @Controller()
 export class InstallmentsController {
   constructor(private readonly installmentsService: InstallmentsService) {}
 
+  @ApiOperation({ summary: 'Generate the installment schedule for a tuition plan' })
   @Post('tuition-plans/:id/installments/generate')
   @Roles('school_admin', 'accountant')
   generate(
@@ -61,6 +65,7 @@ export class InstallmentsController {
   // Rebuilds the unpaid remainder of a plan's schedule into a new set of
   // installments — everything already paid/cancelled/deferred/disputed/
   // written-off is left untouched. See InstallmentsService.renegotiate().
+  @ApiOperation({ summary: "Rebuild a tuition plan's unpaid installment schedule (renegotiation)" })
   @Post('tuition-plans/:id/installments/renegotiate')
   @Roles('school_admin')
   @RequirePermission(Permission.INSTALLMENT_SCHEDULE_EDIT)
@@ -121,6 +126,7 @@ export class InstallmentsController {
   // Forgives whatever remains owed on this installment. school_admin-only
   // — see InstallmentsService.writeOff() for why this is kept apart from
   // overrideStatus's plain 'cancelled' transition.
+  @ApiOperation({ summary: 'Forgive the remaining balance on an installment (school_admin only)' })
   @Patch('installments/:id/write-off')
   @Roles('school_admin')
   @RequirePermission(Permission.INSTALLMENT_WRITE_OFF)

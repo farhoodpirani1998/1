@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 // Phase 5N: Global Search.
 //
@@ -17,10 +18,13 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 // (/parent/*, /teacher/*) and a global cross-entity search over the
 // whole school is out of scope for either portal role.
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Search')
+@ApiBearerAuth('access-token')
 @Controller('search')
 export class SearchController {
   constructor(private readonly searchService: SearchService) {}
 
+  @ApiOperation({ summary: 'Cross-entity search (students, guardians, classes, etc.) within the school' })
   @Get()
   @Roles('school_admin', 'accountant', 'staff')
   async search(

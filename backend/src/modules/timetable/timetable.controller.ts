@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 // school_admin-only management surface. Reader-facing access
 // (GET /teacher/timetable, GET /parent/students/:id/timetable) is served
@@ -27,10 +28,13 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 // portal controllers read" shape as AnnouncementsController /
 // AnnouncementsService.
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Timetable')
+@ApiBearerAuth('access-token')
 @Controller('timetable')
 export class TimetableController {
   constructor(private readonly timetableService: TimetableService) {}
 
+  @ApiOperation({ summary: 'Create a timetable entry (class/subject/teacher at a day+time slot)' })
   @Post()
   @Roles('school_admin')
   async create(@Body() dto: CreateTimetableEntryDto, @CurrentUser('schoolId') schoolId: string) {

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { StudentService } from './student.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -11,10 +11,11 @@ import { ParentAssessmentView } from '../student-assessments/dto/assessment-view
 import { ReportCardView } from '../student-assessments/dto/report-card-view.dto';
 import { StudentHomeworkView } from './dto/student-homework-view.dto';
 import { SubmitHomeworkDto } from './dto/submit-homework.dto';
-import { RecipientAnnouncementView } from '../announcements/dto/announcement-view.dto';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { ParentStudentDocumentView } from '../student-documents/dto/student-document-view.dto';
 import { RecipientTimetableEntryView } from '../timetable/dto/timetable-entry-view.dto';
 import { StudentDashboardView } from './dto/student-dashboard-view.dto';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 // ADR-001 Task 4A-2: first live /student/* route. Role.STUDENT-only,
 // same isolation shape as ParentController/TeacherController. Resolves
@@ -22,6 +23,8 @@ import { StudentDashboardView } from './dto/student-dashboard-view.dto';
 // StudentService.getMyProfile — never from a client-supplied studentId,
 // same as ADR-001 §9/§10 and StudentService's own doc comment require.
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Student Portal')
+@ApiBearerAuth('access-token')
 @Controller('student')
 export class StudentController {
   constructor(private readonly studentService: StudentService) {}
@@ -125,8 +128,11 @@ export class StudentController {
   // announcements routes, no new visibility logic here or in the service.
   @Roles(Role.STUDENT)
   @Get('announcements')
-  getAnnouncements(@CurrentUser() user: AuthenticatedUser): Promise<RecipientAnnouncementView[]> {
-    return this.studentService.getMyAnnouncements(user.id, user.schoolId);
+  getAnnouncements(
+    @Query() query: PaginationQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.studentService.getMyAnnouncements(user.id, user.schoolId, query);
   }
 
   // ADR-001 Task 4G: same "resolve entirely via CurrentUser, no

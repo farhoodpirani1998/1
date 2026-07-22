@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 // Phase 5J: Analytics Dashboard Foundation.
 //
@@ -13,10 +14,13 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 // accountant has no standing reason to see, so the role list is
 // intentionally narrower than ReportsController's.
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Analytics')
+@ApiBearerAuth('access-token')
 @Controller('analytics')
 export class AnalyticsController {
   constructor(private readonly analyticsService: AnalyticsService) {}
 
+  @ApiOperation({ summary: 'School-wide analytics: attendance, assessments, and financials' })
   @Get('dashboard')
   @Roles('school_admin')
   getDashboard(@Query() query: GetDashboardQueryDto, @CurrentUser('schoolId') schoolId: string) {

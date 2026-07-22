@@ -25,6 +25,11 @@ import { CreateAssessmentDto } from '../student-assessments/dto/create-assessmen
 import { AttendanceService } from '../attendance/attendance.service';
 import { AssessmentsService } from '../student-assessments/assessments.service';
 import { Role } from '../../common/authorization/roles.enum';
+import {
+  normalizePagination,
+  wantsPaginatedResponse,
+  type PaginatedResult,
+} from '../../common/utils/pagination';
 import { StudentProfileService } from '../students/profile/student-profile.service';
 import { StudentProfileView } from '../students/profile/student-profile-view.dto';
 import { Homework } from '../homework/entities/homework.entity';
@@ -549,7 +554,7 @@ export class TeacherService {
     teacherId: string,
     schoolId: string,
     query: QueryTeacherAssessmentsDto,
-  ): Promise<Assessment[]> {
+  ): Promise<Assessment[] | PaginatedResult<Assessment>> {
     const entries = await this.resolveAssessmentScope(
       teacherId,
       schoolId,
@@ -559,6 +564,10 @@ export class TeacherService {
     );
 
     if (entries.length === 0) {
+      if (wantsPaginatedResponse(query)) {
+        const { page, limit } = normalizePagination(query);
+        return { data: [], total: 0, page, limit };
+      }
       return [];
     }
 
@@ -575,11 +584,16 @@ export class TeacherService {
       }
     }
 
-    return this.assessmentsService.findForScope(schoolId, entries, {
-      studentId: query.studentId,
-      fromDate: query.fromDate,
-      toDate: query.toDate,
-    });
+    return this.assessmentsService.findForScope(
+      schoolId,
+      entries,
+      {
+        studentId: query.studentId,
+        fromDate: query.fromDate,
+        toDate: query.toDate,
+      },
+      query,
+    );
   }
 
   // ---------------------------------------------------------------------

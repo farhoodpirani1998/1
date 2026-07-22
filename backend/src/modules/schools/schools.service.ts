@@ -6,6 +6,12 @@ import { Student } from '../students/entities/student.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateSchoolDto } from './dto/create-school.dto';
 import { UpdateSchoolDto } from './dto/update-school.dto';
+import {
+  normalizePagination,
+  wantsPaginatedResponse,
+  type PaginationParams,
+  type PaginatedResult,
+} from '../../common/utils/pagination';
 
 export type SchoolWithCounts = School & { studentCount: number; userCount: number };
 
@@ -28,8 +34,21 @@ export class SchoolsService {
   // `student.deleted_at IS NULL` on the join condition excludes archived
   // (soft-deleted) students from the count, matching how every other
   // students query in this codebase treats withdrawn/archived rows.
-  async findAll(): Promise<SchoolWithCounts[]> {
-    const raw = await this.schoolRepo
+  //
+  // Sprint 1 Feature 5: page/limit are applied as skip()/take() on this
+  // same raw query builder, deliberately NOT converted to entity-level
+  // pagination -- Postgres applies LIMIT/OFFSET *after* GROUP BY, so
+  // skip/take here still slices one row per school (a grouped row),
+  // never a raw ungrouped student/user row. The total for the paginated
+  // shape is a plain `schoolRepo.count()`, not a count of this grouped
+  // query: findAll() has no WHERE filter of its own and the LEFT JOINs
+  // never drop a school row (a school with zero students/users still
+  // gets one row, with both counts at 0), so "every school" and "every
+  // grouped row this query would produce" are always the same number.
+  async findAll(
+    query: PaginationParams = {},
+  ): Promise<SchoolWithCounts[] | PaginatedResult<SchoolWithCounts>> {
+    const qb = this.schoolRepo
       .createQueryBuilder('school')
       .leftJoin(Student, 'student', 'student.school_id = school.id AND student.deleted_at IS NULL')
       .leftJoin(User, 'appUser', 'appUser.school_id = school.id')
@@ -41,16 +60,36 @@ export class SchoolsService {
       .addSelect('COUNT(DISTINCT student.id)', 'studentCount')
       .addSelect('COUNT(DISTINCT appUser.id)', 'userCount')
       .groupBy('school.id')
-      .orderBy('school.name', 'ASC')
-      .getRawMany();
+      .orderBy('school.name', 'ASC');
 
-    // pg returns COUNT(...) as a string (bigint) — coerce to number for
-    // the API response.
-    return raw.map((row) => ({
+    if (wantsPaginatedResponse(query)) {
+      const { page, limit, skip } = normalizePagination(query);
+      const [raw, total] = await Promise.all([
+        qb.skip(skip).take(limit).getRawMany(),
+        this.schoolRepo.count(),
+      ]);
+      return {
+        data: raw.map((row) => this.toSchoolWithCounts(row)),
+        total,
+        page,
+        limit,
+      };
+    }
+
+    const raw = await qb.getRawMany();
+    return raw.map((row) => this.toSchoolWithCounts(row));
+  }
+
+  // pg returns COUNT(...) as a string (bigint) — coerce to number for
+  // the API response. Split out of findAll() only so the paginated and
+  // plain-array branches above share the exact same row-shaping, rather
+  // than duplicating the parseInt calls in both.
+  private toSchoolWithCounts(row: any): SchoolWithCounts {
+    return {
       ...row,
       studentCount: parseInt(row.studentCount, 10),
       userCount: parseInt(row.userCount, 10),
-    }));
+    };
   }
 
   async findOne(id: string): Promise<School> {

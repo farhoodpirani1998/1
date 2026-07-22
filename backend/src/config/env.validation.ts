@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min, MinLength, validateSync } from 'class-validator';
+import { IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength, validateSync } from 'class-validator';
 
 enum Environment {
   Development = 'development',
@@ -60,6 +60,27 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   LOG_LEVEL?: string;
+
+  // Controls whether the Swagger/OpenAPI UI + JSON document are mounted
+  // (see main.ts). Only the literal string "true" enables it; anything
+  // else (unset, "false", typos) is treated as disabled. Kept as a plain
+  // string here rather than @IsBoolean() since env vars are always
+  // strings on process.env — the true/false parsing happens in main.ts.
+  @IsOptional()
+  @IsIn(['true', 'false'])
+  ENABLE_SWAGGER?: string;
+
+  // Sentry error reporting (see config/sentry.config.ts). Both optional
+  // in every environment, including production — an unconfigured DSN
+  // simply means Sentry.init() is skipped and error reporting stays
+  // off; it must never block boot.
+  @IsOptional()
+  @IsString()
+  SENTRY_DSN?: string;
+
+  @IsOptional()
+  @IsString()
+  SENTRY_ENVIRONMENT?: string;
 }
 
 // Minimum JWT_SECRET length enforced only in production — long enough to

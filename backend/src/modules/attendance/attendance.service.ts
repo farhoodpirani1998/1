@@ -6,6 +6,12 @@ import { Student } from '../students/entities/student.entity';
 import { ParentStudent } from '../parent/entities/parent-student.entity';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { QueryAttendanceByDateDto } from './dto/query-attendance-by-date.dto';
+import {
+  normalizePagination,
+  wantsPaginatedResponse,
+  type PaginationParams,
+  type PaginatedResult,
+} from '../../common/utils/pagination';
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -77,12 +83,24 @@ export class AttendanceService {
    * schoolId-scoped existence check, so a wrong-tenant id 404s exactly
    * like a nonexistent one.
    */
-  async findByStudent(studentId: string, schoolId: string): Promise<Attendance[]> {
+  async findByStudent(
+    studentId: string,
+    schoolId: string,
+    query: PaginationParams = {},
+  ): Promise<Attendance[] | PaginatedResult<Attendance>> {
     await this.assertStudentInSchool(studentId, schoolId);
-    return this.attendanceRepo.find({
+    const { page, limit, skip } = normalizePagination(query);
+    const [data, total] = await this.attendanceRepo.findAndCount({
       where: { studentId },
       order: { date: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    if (wantsPaginatedResponse(query)) {
+      return { data, total, page, limit };
+    }
+    return data;
   }
 
   /**
@@ -177,12 +195,13 @@ export class AttendanceService {
     studentId: string,
     parentId: string,
     schoolId: string,
-  ): Promise<Attendance[]> {
+    query: PaginationParams = {},
+  ): Promise<Attendance[] | PaginatedResult<Attendance>> {
     const link = await this.parentStudentRepo.findOne({ where: { parentId, studentId } });
     if (!link) {
       throw new NotFoundException('دانش‌آموز یافت نشد');
     }
-    return this.findByStudent(studentId, schoolId);
+    return this.findByStudent(studentId, schoolId, query);
   }
 
   /**

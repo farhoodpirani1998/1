@@ -4,6 +4,12 @@ import { In, Repository } from 'typeorm';
 import { Announcement, AnnouncementTargetType } from './entities/announcement.entity';
 import { AnnouncementRead } from './entities/announcement-read.entity';
 import { CreateAnnouncementDto } from './dto/create-announcement.dto';
+import {
+  normalizePagination,
+  wantsPaginatedResponse,
+  type PaginationParams,
+  type PaginatedResult,
+} from '../../common/utils/pagination';
 
 // Sprint A.4: one announcement paired with the calling user's own read
 // status -- returned by findForAudienceWithReadStatus() below, never
@@ -50,12 +56,27 @@ export class AnnouncementsService {
   /**
    * school_admin-facing: every announcement posted in their own school,
    * regardless of targetType, most recent first.
+   *
+   * Sprint 1 — Feature 5: optional pagination, same "additive, gated on
+   * `page`" contract as StudentsService.findWithFilters() — a caller that
+   * omits `page`/`limit` still gets the plain array back, unchanged.
    */
-  async findAllForSchool(schoolId: string): Promise<Announcement[]> {
-    return this.announcementRepo.find({
+  async findAllForSchool(
+    schoolId: string,
+    query: PaginationParams = {},
+  ): Promise<Announcement[] | PaginatedResult<Announcement>> {
+    const { page, limit, skip } = normalizePagination(query);
+    const [data, total] = await this.announcementRepo.findAndCount({
       where: { schoolId },
       order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    if (wantsPaginatedResponse(query)) {
+      return { data, total, page, limit };
+    }
+    return data;
   }
 
   /**
@@ -97,11 +118,20 @@ export class AnnouncementsService {
   async findForAudience(
     schoolId: string,
     audience: AnnouncementTargetType,
-  ): Promise<Announcement[]> {
-    return this.announcementRepo.find({
+    query: PaginationParams = {},
+  ): Promise<Announcement[] | PaginatedResult<Announcement>> {
+    const { page, limit, skip } = normalizePagination(query);
+    const [data, total] = await this.announcementRepo.findAndCount({
       where: { schoolId, targetType: In([AnnouncementTargetType.ALL, audience]) },
       order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    if (wantsPaginatedResponse(query)) {
+      return { data, total, page, limit };
+    }
+    return data;
   }
 
   /**
@@ -184,8 +214,26 @@ export class AnnouncementsService {
     schoolId: string,
     audience: AnnouncementTargetType,
     userId: string,
+    query: PaginationParams = {},
+  ): Promise<AnnouncementWithReadStatus[] | PaginatedResult<AnnouncementWithReadStatus>> {
+    // findForAudience() already applies the same page/limit -- pull the
+    // plain array out of either shape it can return (paginated or not)
+    // before mapping in read status, then re-wrap to match.
+    const result = await this.findForAudience(schoolId, audience, query);
+    const announcements = Array.isArray(result) ? result : result.data;
+
+    const withReadStatus = await this.attachReadStatus(announcements, userId);
+
+    if (!Array.isArray(result)) {
+      return { data: withReadStatus, total: result.total, page: result.page, limit: result.limit };
+    }
+    return withReadStatus;
+  }
+
+  private async attachReadStatus(
+    announcements: Announcement[],
+    userId: string,
   ): Promise<AnnouncementWithReadStatus[]> {
-    const announcements = await this.findForAudience(schoolId, audience);
     if (announcements.length === 0) {
       return [];
     }

@@ -13,10 +13,12 @@ import { FounderService } from './founder.service';
 import { LinkFounderSchoolDto } from './dto/link-founder-school.dto';
 import { QueryStudentsDto } from '../students/dto/query-students.dto';
 import { GetDashboardQueryDto } from '../analytics/dto/get-dashboard-query.dto';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 // Phase 5O: Founder (مؤسس) Portal.
 //
@@ -29,6 +31,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 // the read routes it configures" shape ParentController.link/unlink
 // already uses).
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Founder')
+@ApiBearerAuth('access-token')
 @Controller('founder')
 export class FounderController {
   constructor(private readonly founderService: FounderService) {}
@@ -42,6 +46,7 @@ export class FounderController {
   // Aggregated dashboard across every school this founder owns — one
   // row per school plus grand totals. See GET /founder/schools/:schoolId
   // /dashboard for the full single-school analytics view.
+  @ApiOperation({ summary: 'Aggregated dashboard totals across every school this founder owns' })
   @Get('overview')
   @Roles('founder')
   getOverview(@CurrentUser('id') founderId: string) {
@@ -80,8 +85,8 @@ export class FounderController {
   // (getOwnedSchoolIds(), no single :schoolId param to guess/enumerate).
   @Get('teachers')
   @Roles('founder')
-  getAllTeachers(@CurrentUser('id') founderId: string) {
-    return this.founderService.getAllTeachers(founderId);
+  getAllTeachers(@Query() query: PaginationQueryDto, @CurrentUser('id') founderId: string) {
+    return this.founderService.getAllTeachers(founderId, query);
   }
 
   @Get('schools/:schoolId/staff')

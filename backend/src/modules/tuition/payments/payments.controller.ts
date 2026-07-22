@@ -19,12 +19,16 @@ import { CurrentUser } from '../../../common/decorators/current-user.decorator';
 import { PermissionsGuard } from '../../../common/authorization/permissions.guard';
 import { RequirePermission } from '../../../common/authorization/require-permission.decorator';
 import { Permission } from '../../../common/authorization/permissions';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@ApiTags('Tuition Payments')
+@ApiBearerAuth('access-token')
 @Controller()
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
 
+  @ApiOperation({ summary: 'Record a payment against an installment' })
   @Post('installments/:id/payments')
   @Roles('school_admin', 'accountant')
   async create(
@@ -71,6 +75,7 @@ export class PaymentsController {
   // so this is school_admin-only *and* gated by the finer-grained
   // PAYMENT_VOID permission (today the two line up, but the permission
   // layer means we can loosen the role without silently loosening this).
+  @ApiOperation({ summary: 'Void a recorded payment (school_admin only)' })
   @Delete('payments/:id')
   @Roles('school_admin')
   @RequirePermission(Permission.PAYMENT_VOID)

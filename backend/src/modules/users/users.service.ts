@@ -7,6 +7,12 @@ import { School } from '../schools/entities/school.entity';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { AvatarStorageService } from '../../common/storage/avatar-storage.service';
+import {
+  normalizePagination,
+  wantsPaginatedResponse,
+  type PaginationParams,
+  type PaginatedResult,
+} from '../../common/utils/pagination';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -27,9 +33,26 @@ export class UsersService {
     private readonly avatarStorage: AvatarStorageService,
   ) {}
 
-  async findAll(): Promise<Omit<User, 'passwordHash'>[]> {
-    const users = await this.userRepo.find({ order: { createdAt: 'DESC' } });
-    return users.map(({ passwordHash: _drop, ...safe }) => safe);
+  async findAll(
+    query: PaginationParams = {},
+  ): Promise<Omit<User, 'passwordHash'>[] | PaginatedResult<Omit<User, 'passwordHash'>>> {
+    // No schoolId filter here — same cross-tenant-visible shape as
+    // before: this route is super_admin-only (see @Roles('super_admin')
+    // on UsersController), so seeing every school's users is the
+    // existing, intended behavior, not something this pagination pass
+    // changes.
+    const { page, limit, skip } = normalizePagination(query);
+    const [users, total] = await this.userRepo.findAndCount({
+      order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
+    });
+    const safeUsers = users.map(({ passwordHash: _drop, ...safe }) => safe);
+
+    if (wantsPaginatedResponse(query)) {
+      return { data: safeUsers, total, page, limit };
+    }
+    return safeUsers;
   }
 
   // Generalized from the old setActive(id, isActive) to accept any

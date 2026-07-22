@@ -24,8 +24,11 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 // Phase 5D: Student Profile.
 import { StudentProfileService } from './profile/student-profile.service';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Students')
+@ApiBearerAuth('access-token')
 @Controller('students')
 export class StudentsController {
   constructor(
@@ -33,6 +36,7 @@ export class StudentsController {
     private readonly studentProfileService: StudentProfileService,
   ) {}
 
+  @ApiOperation({ summary: 'Register a new student in the current school' })
   @Post()
   @Roles('school_admin', 'staff')
   create(
@@ -48,6 +52,7 @@ export class StudentsController {
   // of "register a student", not a separate capability. Literal
   // 'bulk-import' segment, so it never collides with GET/PATCH/DELETE
   // ':id' below (different path shape, not a route-ordering concern).
+  @ApiOperation({ summary: 'Register many students at once from a pre-parsed spreadsheet' })
   @Post('bulk-import')
   @Roles('school_admin', 'staff')
   bulkImport(
@@ -132,6 +137,7 @@ export class StudentsController {
   // addParent()/create() above, since unlike a parent contact this
   // creates a direct login for the student themself, a more sensitive
   // action than 'staff' is granted elsewhere in this controller.
+  @ApiOperation({ summary: "Provision a portal login for the student themself (school_admin only)" })
   @Post(':id/account')
   @Roles('school_admin')
   provisionAccount(

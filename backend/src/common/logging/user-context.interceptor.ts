@@ -7,7 +7,7 @@ import { requestContextStorage } from './request-context';
  * Global interceptor (registered via APP_INTERCEPTOR in
  * ObservabilityModule). Interceptors run after guards, so by the time this
  * executes, JwtAuthGuard/JwtStrategy has already populated `request.user`
- * for authenticated routes. Copies id/schoolId into the same
+ * for authenticated routes. Copies id/schoolId/role into the same
  * AsyncLocalStorage store RequestIdMiddleware started, so every log line
  * for the rest of this request (and the error filter, if it fails) can
  * include them — without any controller/service being touched.
@@ -23,6 +23,7 @@ export class UserContextInterceptor implements NestInterceptor {
       if (store && user) {
         store.userId = user.id;
         store.schoolId = user.schoolId ?? undefined;
+        store.role = user.role ?? undefined;
       }
     }
 

@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 // school_admin-only. schoolId always comes from the authenticated user's
 // own token (CurrentUser), never from the request body/params -- there
@@ -14,6 +15,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 // guessing an id. Same tenant-isolation shape as every other
 // school_admin-scoped controller in this codebase.
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('School Settings')
+@ApiBearerAuth('access-token')
 @Controller('settings')
 export class SchoolSettingsController {
   constructor(private readonly schoolSettingsService: SchoolSettingsService) {}
@@ -25,6 +28,7 @@ export class SchoolSettingsController {
     return toSchoolSettingsView(settings);
   }
 
+  @ApiOperation({ summary: "Update the current school's settings" })
   @Put()
   @Roles('school_admin')
   async update(

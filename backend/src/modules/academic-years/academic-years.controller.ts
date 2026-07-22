@@ -14,12 +14,16 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Academic Years')
+@ApiBearerAuth('access-token')
 @Controller('academic-years')
 export class AcademicYearsController {
   constructor(private readonly academicYearsService: AcademicYearsService) {}
 
+  @ApiOperation({ summary: 'Create an academic year for the current school' })
   @Post()
   @Roles('school_admin')
   create(

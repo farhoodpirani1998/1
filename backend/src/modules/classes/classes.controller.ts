@@ -7,12 +7,16 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Classes')
+@ApiBearerAuth('access-token')
 @Controller('classes')
 export class ClassesController {
   constructor(private readonly classesService: ClassesService) {}
 
+  @ApiOperation({ summary: 'Create a class for the current school' })
   @Post()
   @Roles('school_admin')
   create(@Body() dto: CreateClassDto, @CurrentUser('schoolId') schoolId: string) {

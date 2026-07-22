@@ -1,11 +1,13 @@
-import { Controller, Post, Get, Delete, Body, Param, UseGuards, HttpCode } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param, Query, UseGuards, HttpCode } from '@nestjs/common';
 import { StudentDocumentsService } from './student-documents.service';
 import { CreateStudentDocumentDto } from './dto/create-student-document.dto';
 import { toStudentDocumentView } from './dto/student-document-view.dto';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 // Phase 5I: Student Document Management.
 //
@@ -14,6 +16,8 @@ import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-
 // same shape as GET /students/:id/profile living on StudentsController
 // even though it's served by a different service.
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Student Documents')
+@ApiBearerAuth('access-token')
 @Controller('students')
 export class StudentDocumentsController {
   constructor(private readonly studentDocumentsService: StudentDocumentsService) {}
@@ -22,6 +26,7 @@ export class StudentDocumentsController {
   // (school_admin, staff). accountant, being financial-only elsewhere in
   // the app, is not granted a write here; 'parent' is never granted this
   // route, same as every staff-facing endpoint outside /parent/*.
+  @ApiOperation({ summary: "Attach a document reference to a student's record" })
   @Post(':id/documents')
   @Roles('school_admin', 'staff')
   async create(
@@ -42,9 +47,16 @@ export class StudentDocumentsController {
   // accountant, staff can all see a student's own record).
   @Get(':id/documents')
   @Roles('school_admin', 'accountant', 'staff')
-  async findByStudent(@Param('id') studentId: string, @CurrentUser('schoolId') schoolId: string) {
-    const documents = await this.studentDocumentsService.findByStudent(studentId, schoolId);
-    return documents.map(toStudentDocumentView);
+  async findByStudent(
+    @Param('id') studentId: string,
+    @Query() query: PaginationQueryDto,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    const result = await this.studentDocumentsService.findByStudent(studentId, schoolId, query);
+    if (Array.isArray(result)) {
+      return result.map(toStudentDocumentView);
+    }
+    return { ...result, data: result.data.map(toStudentDocumentView) };
   }
 }
 
@@ -54,6 +66,8 @@ export class StudentDocumentsController {
 // globally unique and its tenant is re-checked from the token, not the
 // URL.
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Student Documents')
+@ApiBearerAuth('access-token')
 @Controller('documents')
 export class DocumentsController {
   constructor(private readonly studentDocumentsService: StudentDocumentsService) {}

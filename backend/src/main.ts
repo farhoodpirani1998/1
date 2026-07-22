@@ -1,13 +1,20 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { AppLogger } from './common/logging/app-logger.service';
 import { AVATAR_URL_PREFIX, resolveAvatarUploadDir } from './common/storage/avatar-storage.service';
+import { isSwaggerEnabled, setupSwagger, SWAGGER_DOCS_PATH } from './config/swagger.config';
+import { initSentry } from './config/sentry.config';
 
 async function bootstrap() {
+  // Must run before NestFactory.create() so a failure during Nest's own
+  // bootstrap (module wiring, DB connection, etc.) is still captured.
+  // No-op when SENTRY_DSN is unset — see sentry.config.ts.
+  initSentry();
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     // Structured (JSON in production, pretty in dev) logger — see
     // app-logger.service.ts. bufferLogs holds Nest's own bootstrap log
@@ -83,6 +90,18 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
 
   app.setGlobalPrefix('api/v1');
+
+  // Opt-in only (ENABLE_SWAGGER=true) regardless of environment — see
+  // swagger.config.ts for the enable/disable rules. Deliberately after
+  // setGlobalPrefix() so the generated doc's paths (and the UI's own URL,
+  // under /api/v1/docs) match what clients actually call.
+  if (isSwaggerEnabled()) {
+    setupSwagger(app);
+    new Logger('Bootstrap').warn(
+      `Swagger UI enabled at /api/v1/${SWAGGER_DOCS_PATH} (ENABLE_SWAGGER=true, NODE_ENV=${process.env.NODE_ENV ?? 'undefined'}). ` +
+        'This endpoint is unauthenticated — do not enable in production unless deliberately intended.',
+    );
+  }
 
   await app.listen(process.env.PORT ?? 3000);
 }

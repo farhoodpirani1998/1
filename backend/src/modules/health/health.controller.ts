@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { HealthCheck, HealthCheckService, TypeOrmHealthIndicator } from '@nestjs/terminus';
 import { SkipThrottle } from '@nestjs/throttler';
 import { RedisHealthIndicator } from './redis-health.indicator';
+import { ApiTags } from '@nestjs/swagger';
 
 // Deliberately no @UseGuards(...) — load balancers, container
 // orchestrators (Kubernetes probes), and uptime monitors hit these
@@ -9,6 +10,7 @@ import { RedisHealthIndicator } from './redis-health.indicator';
 // works. @SkipThrottle so frequent probing never trips the global
 // ThrottlerGuard registered as APP_GUARD in app.module.ts.
 @SkipThrottle()
+@ApiTags('Health')
 @Controller('health')
 export class HealthController {
   constructor(

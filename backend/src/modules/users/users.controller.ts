@@ -4,6 +4,7 @@ import {
   Patch,
   Param,
   Body,
+  Query,
   UseGuards,
   Post,
   Delete,
@@ -11,6 +12,7 @@ import {
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -21,17 +23,20 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { avatarFileValidationPipe, avatarMulterOptions } from '../../common/storage/avatar-upload.options';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles('super_admin')
+@ApiTags('Users')
+@ApiBearerAuth('access-token')
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Roles('super_admin')
   @Get()
-  findAll() {
-    return this.usersService.findAll();
+  findAll(@Query() query: PaginationQueryDto) {
+    return this.usersService.findAll(query);
   }
 
   // Replaces the old { isActive }-only setActive endpoint — same route,
@@ -44,6 +49,7 @@ export class UsersController {
     return this.usersService.update(id, dto);
   }
 
+  @ApiOperation({ summary: "Reset another user's password (super_admin only)" })
   @Roles('super_admin')
   @Patch(':id/reset-password')
   resetPassword(@Param('id') id: string, @Body() dto: ResetPasswordDto) {
@@ -64,6 +70,8 @@ export class UsersController {
 // @Roles() — the same self-service shape AuthController already uses
 // for POST /auth/change-password.
 @UseGuards(JwtAuthGuard)
+@ApiTags('Users')
+@ApiBearerAuth('access-token')
 @Controller('users/me')
 export class UsersMeController {
   constructor(private readonly usersService: UsersService) {}
@@ -87,6 +95,7 @@ export class UsersMeController {
   // handles storage + a coarse size/type backstop; avatarFileValidationPipe()
   // is the authoritative size/type check (see common/storage/avatar-upload.options.ts
   // for why both exist).
+  @ApiOperation({ summary: "Upload/replace the current user's avatar image" })
   @Post('avatar')
   @UseInterceptors(FileInterceptor('avatar', avatarMulterOptions()))
   uploadAvatar(

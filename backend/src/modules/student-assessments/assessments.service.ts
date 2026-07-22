@@ -7,6 +7,12 @@ import { Student } from '../students/entities/student.entity';
 import { ParentStudent } from '../parent/entities/parent-student.entity';
 import { CreateAssessmentDto } from './dto/create-assessment.dto';
 import { ReportCardView, buildReportCard } from './dto/report-card-view.dto';
+import {
+  normalizePagination,
+  wantsPaginatedResponse,
+  type PaginationParams,
+  type PaginatedResult,
+} from '../../common/utils/pagination';
 
 const DEFAULT_MAX_SCORE = 20;
 
@@ -102,13 +108,25 @@ export class AssessmentsService {
    * single schoolId-scoped existence check, so a wrong-tenant id 404s
    * exactly like a nonexistent one.
    */
-  async findByStudent(studentId: string, schoolId: string): Promise<Assessment[]> {
+  async findByStudent(
+    studentId: string,
+    schoolId: string,
+    query: PaginationParams = {},
+  ): Promise<Assessment[] | PaginatedResult<Assessment>> {
     await this.assertStudentInSchool(studentId, schoolId);
-    return this.assessmentRepo.find({
+    const { page, limit, skip } = normalizePagination(query);
+    const [data, total] = await this.assessmentRepo.findAndCount({
       where: { studentId },
       relations: ['subject'],
       order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    if (wantsPaginatedResponse(query)) {
+      return { data, total, page, limit };
+    }
+    return data;
   }
 
   /**
@@ -136,8 +154,13 @@ export class AssessmentsService {
     schoolId: string,
     entries: { gradeId: string; classId: string | null; subjectId: string | null }[],
     filters: { studentId?: string; fromDate?: string; toDate?: string } = {},
-  ): Promise<Assessment[]> {
+    pagination: PaginationParams = {},
+  ): Promise<Assessment[] | PaginatedResult<Assessment>> {
     if (entries.length === 0) {
+      if (wantsPaginatedResponse(pagination)) {
+        const { page, limit } = normalizePagination(pagination);
+        return { data: [], total: 0, page, limit };
+      }
       return [];
     }
 
@@ -189,7 +212,20 @@ export class AssessmentsService {
       qb.andWhere('assessment.createdAt <= :toDate', { toDate: filters.toDate });
     }
 
-    return qb.orderBy('assessment.createdAt', 'DESC').getMany();
+    qb.orderBy('assessment.createdAt', 'DESC');
+
+    // Same qb, same WHERE/Brackets built above -- no GROUP BY here (each
+    // row is one Assessment), so skip/take + getManyAndCount() on this
+    // exact query builder gives a correct total (matching rows before
+    // the page slice) with no separate count query needed, unlike
+    // SchoolsService.findAll()'s grouped raw query below.
+    if (wantsPaginatedResponse(pagination)) {
+      const { page, limit, skip } = normalizePagination(pagination);
+      const [data, total] = await qb.skip(skip).take(limit).getManyAndCount();
+      return { data, total, page, limit };
+    }
+
+    return qb.getMany();
   }
 
   /**
@@ -222,9 +258,10 @@ export class AssessmentsService {
     studentId: string,
     parentId: string,
     schoolId: string,
-  ): Promise<Assessment[]> {
+    query: PaginationParams = {},
+  ): Promise<Assessment[] | PaginatedResult<Assessment>> {
     await this.assertParentLinked(studentId, parentId);
-    return this.findByStudent(studentId, schoolId);
+    return this.findByStudent(studentId, schoolId, query);
   }
 
   async getReportCardForParent(

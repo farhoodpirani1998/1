@@ -11,6 +11,11 @@ import { TeacherAssignment } from '../teacher/entities/teacher-assignment.entity
 import { CreateHomeworkDto } from './dto/create-homework.dto';
 import { UpdateHomeworkDto } from './dto/update-homework.dto';
 import { QueryHomeworkDto } from './dto/query-homework.dto';
+import {
+  normalizePagination,
+  wantsPaginatedResponse,
+  type PaginatedResult,
+} from '../../common/utils/pagination';
 
 const HOMEWORK_RELATIONS = ['grade', 'subject', 'teacher'];
 const RECENT_HOMEWORK_LIMIT = 10;
@@ -162,8 +167,9 @@ export class HomeworkService {
     teacherId: string,
     schoolId: string,
     query: QueryHomeworkDto = {},
-  ): Promise<Homework[]> {
-    return this.homeworkRepo.find({
+  ): Promise<Homework[] | PaginatedResult<Homework>> {
+    const { page, limit, skip } = normalizePagination(query);
+    const [data, total] = await this.homeworkRepo.findAndCount({
       where: {
         teacherId,
         schoolId,
@@ -173,7 +179,14 @@ export class HomeworkService {
       },
       relations: HOMEWORK_RELATIONS,
       order: { dueDate: 'ASC' },
+      skip,
+      take: limit,
     });
+
+    if (wantsPaginatedResponse(query)) {
+      return { data, total, page, limit };
+    }
+    return data;
   }
 
   // ---------------------------------------------------------------------
@@ -185,8 +198,12 @@ export class HomeworkService {
    * / teacherId / academicYearId. Every result is scoped to the caller's
    * own school -- same shape as TimetableService.findAllForSchool().
    */
-  async findAllForSchool(schoolId: string, query: QueryHomeworkDto = {}): Promise<Homework[]> {
-    return this.homeworkRepo.find({
+  async findAllForSchool(
+    schoolId: string,
+    query: QueryHomeworkDto = {},
+  ): Promise<Homework[] | PaginatedResult<Homework>> {
+    const { page, limit, skip } = normalizePagination(query);
+    const [data, total] = await this.homeworkRepo.findAndCount({
       where: {
         schoolId,
         ...(query.gradeId ? { gradeId: query.gradeId } : {}),
@@ -196,7 +213,14 @@ export class HomeworkService {
       },
       relations: HOMEWORK_RELATIONS,
       order: { dueDate: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    if (wantsPaginatedResponse(query)) {
+      return { data, total, page, limit };
+    }
+    return data;
   }
 
   // ---------------------------------------------------------------------

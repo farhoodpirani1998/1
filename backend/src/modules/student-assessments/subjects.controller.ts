@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
 // Same role gates as GradesController: school_admin manages the list,
 // school_admin/accountant/staff can read it (staff need it to pick a
@@ -13,6 +14,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 // as it is on /grades). 'parent' is never granted this route, same as
 // every staff-facing endpoint outside /parent/*.
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Subjects')
+@ApiBearerAuth('access-token')
 @Controller('subjects')
 export class SubjectsController {
   constructor(private readonly subjectsService: SubjectsService) {}

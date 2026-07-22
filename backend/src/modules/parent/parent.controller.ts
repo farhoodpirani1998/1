@@ -18,6 +18,7 @@ import { toParentInstallmentView } from './dto/parent-installments-view.dto';
 import { toParentPaymentView } from './dto/parent-payments-view.dto';
 import { toParentNotificationView } from './dto/parent-notification-view.dto';
 import { QueryParentNotificationsDto } from './dto/query-parent-notifications.dto';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -43,8 +44,11 @@ import { toTimetableEntryView } from '../timetable/dto/timetable-entry-view.dto'
 // Phase 5L: Homework & Assignments.
 import { HomeworkService } from '../homework/homework.service';
 import { toRecipientHomeworkView } from '../homework/dto/homework-view.dto';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Parent Portal')
+@ApiBearerAuth('access-token')
 @Controller('parent')
 export class ParentController {
   constructor(
@@ -97,6 +101,7 @@ export class ParentController {
   // parent_students rows are created/removed — school_admin links a
   // parent account (created via POST /auth/register with role: 'parent')
   // to the student(s) that account should see.
+  @ApiOperation({ summary: "Link a parent account to a student (school_admin only)" })
   @Post('link')
   @Roles('school_admin')
   link(@Body() dto: LinkParentDto, @CurrentUser('schoolId') schoolId: string) {
@@ -114,6 +119,7 @@ export class ParentController {
   // to view their linked students' tuition plans, installments, and payment history.
   // All endpoints verify the parent owns the student before returning data.
 
+  @ApiOperation({ summary: "Get a linked student's tuition plan (parent-only, ownership-checked)" })
   @Get('students/:id/tuition')
   @Roles('parent')
   async getStudentTuition(@Param('id') studentId: string, @CurrentUser() user: AuthenticatedUser) {
@@ -167,9 +173,21 @@ export class ParentController {
   // do.
   @Get('students/:id/attendance')
   @Roles('parent')
-  async getStudentAttendance(@Param('id') studentId: string, @CurrentUser() user: AuthenticatedUser) {
-    const records = await this.attendanceService.findForParent(studentId, user.id, user.schoolId);
-    return records.map(toParentAttendanceView);
+  async getStudentAttendance(
+    @Param('id') studentId: string,
+    @Query() query: PaginationQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const result = await this.attendanceService.findForParent(
+      studentId,
+      user.id,
+      user.schoolId,
+      query,
+    );
+    if (Array.isArray(result)) {
+      return result.map(toParentAttendanceView);
+    }
+    return { ...result, data: result.data.map(toParentAttendanceView) };
   }
 
   // Phase 5C: Parent Notifications. Combined inbox across every student
@@ -208,9 +226,21 @@ export class ParentController {
   // same way findMyStudent() / getStudentAttendance do.
   @Get('students/:id/assessments')
   @Roles('parent')
-  async getStudentAssessments(@Param('id') studentId: string, @CurrentUser() user: AuthenticatedUser) {
-    const records = await this.assessmentsService.findForParent(studentId, user.id, user.schoolId);
-    return records.map(toParentAssessmentView);
+  async getStudentAssessments(
+    @Param('id') studentId: string,
+    @Query() query: PaginationQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const result = await this.assessmentsService.findForParent(
+      studentId,
+      user.id,
+      user.schoolId,
+      query,
+    );
+    if (Array.isArray(result)) {
+      return result.map(toParentAssessmentView);
+    }
+    return { ...result, data: result.data.map(toParentAssessmentView) };
   }
 
   @Get('students/:id/report-card')
@@ -227,12 +257,19 @@ export class ParentController {
   // request" reasoning as TeacherController.getMyAnnouncements.
   @Get('announcements')
   @Roles('parent')
-  async getMyAnnouncements(@CurrentUser('schoolId') schoolId: string) {
-    const announcements = await this.announcementsService.findForAudience(
+  async getMyAnnouncements(
+    @Query() query: PaginationQueryDto,
+    @CurrentUser('schoolId') schoolId: string,
+  ) {
+    const result = await this.announcementsService.findForAudience(
       schoolId,
       AnnouncementTargetType.PARENTS,
+      query,
     );
-    return announcements.map(toRecipientAnnouncementView);
+    if (Array.isArray(result)) {
+      return result.map(toRecipientAnnouncementView);
+    }
+    return { ...result, data: result.data.map(toRecipientAnnouncementView) };
   }
 
   // Phase 5I: Student Document Management. Same "linked child only" rule
@@ -242,13 +279,21 @@ export class ParentController {
   // same way findMyStudent() / getStudentAssessments do.
   @Get('students/:id/documents')
   @Roles('parent')
-  async getStudentDocuments(@Param('id') studentId: string, @CurrentUser() user: AuthenticatedUser) {
-    const documents = await this.studentDocumentsService.findForParent(
+  async getStudentDocuments(
+    @Param('id') studentId: string,
+    @Query() query: PaginationQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const result = await this.studentDocumentsService.findForParent(
       studentId,
       user.id,
       user.schoolId,
+      query,
     );
-    return documents.map(toParentStudentDocumentView);
+    if (Array.isArray(result)) {
+      return result.map(toParentStudentDocumentView);
+    }
+    return { ...result, data: result.data.map(toParentStudentDocumentView) };
   }
 
   // Phase 5K: Timetable Foundation. Same "linked child only" rule as every

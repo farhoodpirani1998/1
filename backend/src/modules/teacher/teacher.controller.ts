@@ -5,6 +5,7 @@ import { QueryTeacherStudentsDto } from './dto/query-teacher-students.dto';
 import { QueryTeacherAttendanceDto } from './dto/query-teacher-attendance.dto';
 import { QueryTeacherAttendanceStatusDto } from './dto/query-teacher-attendance-status.dto';
 import { QueryTeacherAssessmentsDto } from './dto/query-teacher-assessments.dto';
+import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
 import { CreateAttendanceDto } from '../attendance/dto/create-attendance.dto';
 import { toAttendanceView } from '../attendance/dto/attendance-view.dto';
 import { CreateAssessmentDto } from '../student-assessments/dto/create-assessment.dto';
@@ -27,8 +28,11 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser, AuthenticatedUser } from '../../common/decorators/current-user.decorator';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
+@ApiTags('Teacher Portal')
+@ApiBearerAuth('access-token')
 @Controller('teacher')
 export class TeacherController {
   constructor(
@@ -140,6 +144,7 @@ export class TeacherController {
   // before delegating to AttendanceService.record(), which owns every
   // other piece of business logic (upsert-on-resubmit, academicYearId
   // derivation) unchanged.
+  @ApiOperation({ summary: "Record attendance for one of the teacher's own assigned classes" })
   @Post('attendance')
   @Roles('teacher')
   async recordAttendance(@Body() dto: CreateAttendanceDto, @CurrentUser() user: AuthenticatedUser) {
@@ -206,8 +211,11 @@ export class TeacherController {
   @Get('assessments')
   @Roles('teacher')
   async getMyAssessments(@Query() query: QueryTeacherAssessmentsDto, @CurrentUser() user: AuthenticatedUser) {
-    const assessments = await this.teacherService.getMyAssessments(user.id, user.schoolId, query);
-    return assessments.map(toAssessmentView);
+    const result = await this.teacherService.getMyAssessments(user.id, user.schoolId, query);
+    if (Array.isArray(result)) {
+      return result.map(toAssessmentView);
+    }
+    return { ...result, data: result.data.map(toAssessmentView) };
   }
 
   // Phase 5H: School Announcements. Read-only, teacher-scoped: only
@@ -225,15 +233,25 @@ export class TeacherController {
   // strictly additive.
   @Get('announcements')
   @Roles('teacher')
-  async getMyAnnouncements(@CurrentUser() user: AuthenticatedUser) {
-    const results = await this.announcementsService.findForAudienceWithReadStatus(
+  async getMyAnnouncements(
+    @Query() query: PaginationQueryDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    const result = await this.announcementsService.findForAudienceWithReadStatus(
       user.schoolId,
       AnnouncementTargetType.TEACHERS,
       user.id,
+      query,
     );
-    return results.map(({ announcement, isRead, readAt }) =>
-      toTeacherAnnouncementView(announcement, isRead, readAt),
-    );
+    const mapView = (entries: { announcement: any; isRead: boolean; readAt: Date | null }[]) =>
+      entries.map(({ announcement, isRead, readAt }) =>
+        toTeacherAnnouncementView(announcement, isRead, readAt),
+      );
+
+    if (Array.isArray(result)) {
+      return mapView(result);
+    }
+    return { ...result, data: mapView(result.data) };
   }
 
   // Sprint A.4: marks one announcement as read for the calling teacher.
@@ -278,6 +296,7 @@ export class TeacherController {
   // above). teacherId is always the caller's own id, never taken from the
   // request body (see CreateHomeworkDto).
 
+  @ApiOperation({ summary: 'Create a homework assignment for one of the teacher\'s classes' })
   @Post('homework')
   @Roles('teacher')
   async createHomework(@Body() dto: CreateHomeworkDto, @CurrentUser() user: AuthenticatedUser) {
@@ -288,8 +307,11 @@ export class TeacherController {
   @Get('homework')
   @Roles('teacher')
   async getMyHomework(@Query() query: QueryHomeworkDto, @CurrentUser() user: AuthenticatedUser) {
-    const homework = await this.homeworkService.findForTeacher(user.id, user.schoolId, query);
-    return homework.map(toHomeworkView);
+    const result = await this.homeworkService.findForTeacher(user.id, user.schoolId, query);
+    if (Array.isArray(result)) {
+      return result.map(toHomeworkView);
+    }
+    return { ...result, data: result.data.map(toHomeworkView) };
   }
 
   @Put('homework/:id')
@@ -348,6 +370,7 @@ export class TeacherController {
   // Authorization is the exact same assignment gate every other
   // homework-submission route above already uses -- see
   // TeacherService.gradeMyHomeworkSubmission().
+  @ApiOperation({ summary: "Grade a student's homework submission" })
   @Patch('homework/submissions/:submissionId')
   @Roles('teacher')
   async gradeHomeworkSubmission(

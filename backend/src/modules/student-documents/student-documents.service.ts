@@ -5,6 +5,12 @@ import { StudentDocument } from './entities/student-document.entity';
 import { Student } from '../students/entities/student.entity';
 import { ParentStudent } from '../parent/entities/parent-student.entity';
 import { CreateStudentDocumentDto } from './dto/create-student-document.dto';
+import {
+  normalizePagination,
+  wantsPaginatedResponse,
+  type PaginationParams,
+  type PaginatedResult,
+} from '../../common/utils/pagination';
 
 const RECENT_DOCUMENTS_LIMIT = 10;
 
@@ -52,12 +58,24 @@ export class StudentDocumentsService {
    * schoolId-scoped existence check, so a wrong-tenant id 404s exactly
    * like a nonexistent one.
    */
-  async findByStudent(studentId: string, schoolId: string): Promise<StudentDocument[]> {
+  async findByStudent(
+    studentId: string,
+    schoolId: string,
+    query: PaginationParams = {},
+  ): Promise<StudentDocument[] | PaginatedResult<StudentDocument>> {
     await this.assertStudentInSchool(studentId, schoolId);
-    return this.documentRepo.find({
+    const { page, limit, skip } = normalizePagination(query);
+    const [data, total] = await this.documentRepo.findAndCount({
       where: { studentId },
       order: { createdAt: 'DESC' },
+      skip,
+      take: limit,
     });
+
+    if (wantsPaginatedResponse(query)) {
+      return { data, total, page, limit };
+    }
+    return data;
   }
 
   /**
@@ -74,9 +92,10 @@ export class StudentDocumentsService {
     studentId: string,
     parentId: string,
     schoolId: string,
-  ): Promise<StudentDocument[]> {
+    query: PaginationParams = {},
+  ): Promise<StudentDocument[] | PaginatedResult<StudentDocument>> {
     await this.assertParentLinked(studentId, parentId);
-    return this.findByStudent(studentId, schoolId);
+    return this.findByStudent(studentId, schoolId, query);
   }
 
   /**

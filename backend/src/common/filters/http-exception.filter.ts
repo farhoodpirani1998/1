@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import * as Sentry from '@sentry/node';
 import { getRequestContext } from '../logging/request-context';
 
 @Catch()
@@ -39,6 +40,25 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `Unhandled exception on ${request.method} ${request.url}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
+    }
+
+    // Sentry: additional reporting destination alongside the logger
+    // above, not a replacement. Reports genuinely unexpected errors only
+    // — never an intentionally-thrown HttpException in the 4xx range
+    // (BadRequestException, UnauthorizedException, NotFoundException,
+    // validation errors, etc.), which are expected control flow, not
+    // bugs. A deliberately-thrown 5xx HttpException (rare, but possible)
+    // is still reported, same as any non-HttpException. A no-op when
+    // SENTRY_DSN isn't configured — see config/sentry.config.ts.
+    if (!isHttpException || status >= 500) {
+      const rc = getRequestContext();
+      Sentry.withScope((scope) => {
+        if (rc?.requestId) scope.setTag('requestId', rc.requestId);
+        if (rc?.userId) scope.setUser({ id: rc.userId });
+        if (rc?.schoolId) scope.setTag('schoolId', rc.schoolId);
+        if (rc?.role) scope.setTag('role', rc.role);
+        Sentry.captureException(exception);
+      });
     }
 
     // Set by RequestIdMiddleware on every request; falls back to the
